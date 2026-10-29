@@ -1,21 +1,29 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Boxes, CircleDollarSign, LockKeyhole, Package, RefreshCw } from 'lucide-react';
+import { ArrowUpFromLine, Boxes, LockKeyhole, Package, RefreshCw } from 'lucide-react';
+import { Link } from 'react-router';
 
 import { useProducts } from '@/features/catalog/api';
 import { useOrganization } from '@/features/organizations/organization-provider';
+import { useStockSummary } from '@/features/stock/api';
 import { useApiHealth } from '@/features/system/use-api-health';
 import { cn } from '@/lib/cn';
+
+function formatQuantity(value: number): string {
+  return new Intl.NumberFormat('en-TN', { maximumFractionDigits: 4 }).format(value);
+}
 
 export function DashboardPage() {
   const health = useApiHealth();
   const queryClient = useQueryClient();
   const { organization } = useOrganization();
-  const products = useProducts(organization?.organizationId ?? null, {
+  const organizationId = organization?.organizationId ?? null;
+  const products = useProducts(organizationId, {
     search: '',
     status: '',
     page: 1,
     pageSize: 1,
   });
+  const stock = useStockSummary(organizationId);
 
   const status = health.isPending
     ? { tone: 'pending', label: 'Checking API…' }
@@ -33,20 +41,22 @@ export function DashboardPage() {
     {
       label: 'Units on hand',
       icon: Boxes,
-      value: '—',
-      hint: 'Derived from the stock ledger in Phase 3',
+      value: stock.data ? formatQuantity(stock.data.onHand) : '—',
+      hint: stock.isError
+        ? 'Stock summary failed'
+        : `${stock.data?.locationCount ?? 0} stock lines across warehouses`,
     },
     {
       label: 'Reserved units',
       icon: LockKeyhole,
-      value: '—',
-      hint: 'Reservations arrive in Phase 3',
+      value: stock.data ? formatQuantity(stock.data.reserved) : '—',
+      hint: 'Active reservations hold availability, not physical stock',
     },
     {
-      label: 'Inventory value',
-      icon: CircleDollarSign,
-      value: '—',
-      hint: 'Valued from posted movements in Phase 5',
+      label: 'Available units',
+      icon: ArrowUpFromLine,
+      value: stock.data ? formatQuantity(stock.data.available) : '—',
+      hint: 'On hand minus active reservations',
     },
   ];
 
@@ -91,7 +101,7 @@ export function DashboardPage() {
           type="button"
           onClick={() => {
             void queryClient.invalidateQueries({ queryKey: ['system', 'health'] });
-            void products.refetch();
+            void queryClient.invalidateQueries({ queryKey: ['organizations'] });
           }}
           className="inline-flex items-center gap-2 self-start rounded-lg px-3 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 sm:self-auto"
         >
@@ -125,15 +135,24 @@ export function DashboardPage() {
         </dl>
       </section>
 
-      <section className="rounded-xl border border-dashed border-slate-300 bg-white/60 p-6">
-        <h2 className="text-sm font-semibold text-slate-900">
-          Stock metrics arrive with the ledger
-        </h2>
+      <section className="rounded-xl border border-slate-200 bg-white p-6">
+        <h2 className="text-sm font-semibold text-slate-900">Stock ledger is live</h2>
         <p className="mt-2 max-w-2xl text-sm text-slate-600">
-          Products are now read from PostgreSQL under organization row-level security. Units,
-          reservations and valuation stay empty until the immutable stock ledger lands in Phase 3 —
-          no placeholder numbers are shown.
+          Balances above are projected from immutable, idempotent stock movements. Transfers,
+          reservations and serialized devices are recorded with an audit trail; reconciliation can
+          detect and repair projection drift without touching the ledger.
         </p>
+        <div className="mt-4 flex flex-wrap gap-3 text-sm font-medium">
+          <Link to="/stock" className="text-indigo-700 hover:text-indigo-900">
+            Open stock levels →
+          </Link>
+          <Link to="/stock/movements" className="text-indigo-700 hover:text-indigo-900">
+            View movements →
+          </Link>
+          <Link to="/devices" className="text-indigo-700 hover:text-indigo-900">
+            Devices →
+          </Link>
+        </div>
       </section>
     </div>
   );

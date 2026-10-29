@@ -16,6 +16,11 @@ function isPostgresError(value: unknown): value is PostgresErrorLike {
 const CONSTRAINT_MESSAGES: Record<string, string> = {
   category_cycle: 'A category cannot be its own ancestor.',
   organization_requires_owner: 'An organization must keep at least one owner.',
+  insufficient_stock: 'Not enough stock available for this movement.',
+  stock_reserved: 'The requested quantity is reserved for an outgoing order.',
+  reservation_not_active: 'The reservation is no longer active.',
+  reservation_mismatch: 'The reservation does not match this issue.',
+  reservation_already_fulfilled: 'The reservation was already fulfilled.',
 };
 
 /**
@@ -43,6 +48,13 @@ export function toDatabaseErrorDescriptor(error: unknown): ErrorDescriptor | nul
 
   switch (databaseError.code) {
     case '23505':
+      if (rawMessage === 'idempotency_key_conflict') {
+        return {
+          status: 409,
+          code: 'idempotency_conflict',
+          message: 'This Idempotency-Key was already used for a different request.',
+        };
+      }
       return {
         status: 409,
         code: 'conflict',
@@ -78,6 +90,15 @@ export function toDatabaseErrorDescriptor(error: unknown): ErrorDescriptor | nul
       };
     case '28000':
       return { status: 401, code: 'unauthenticated', message: 'Authentication is required.' };
+    case 'P0002':
+      return {
+        status: 404,
+        code: 'not_found',
+        message:
+          rawMessage === 'reservation_not_found' ? 'Reservation not found.' : 'Record not found.',
+        details,
+      };
+    case '22023':
     case '22P02':
     case '22003':
       return {

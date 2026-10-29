@@ -11,6 +11,7 @@ import { TenantDatabase } from '../database/tenant-database.service';
 import type { AppTransaction } from '../database/database.types';
 
 export const CATALOG_WRITERS: readonly MemberRole[] = ['owner', 'admin', 'manager'];
+export const ORG_ADMINS: readonly MemberRole[] = ['owner', 'admin'];
 
 interface Options {
   roles?: readonly MemberRole[];

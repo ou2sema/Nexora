@@ -99,6 +99,17 @@ API does not confirm that an organization exists.
 The database connection role must be allowed to `SET ROLE authenticated`. The Supabase
 `postgres` role is; a custom migration role needs `authenticated` granted to it.
 
+Stock and device mutations are POSTs that require an `Idempotency-Key` header (8–120
+characters). A retry with the same key and payload returns the first result with
+`duplicate: true`; the same key with a different payload returns `409 idempotency_conflict`.
+Stock postings (`receipt`, `issue`, `adjustment`) are idempotent per key, transfers commit
+both legs in one transaction, and reservations reduce `available` without moving stock.
+Reconciliation is restricted to owner and admin; all reads require membership.
+
+Serialized-device writes follow a fixed status graph and append a `device_events` row for
+every change. Products must have `isSerialized = true` before a device can be registered
+against them.
+
 ## Quality gates
 
 ```powershell
@@ -115,14 +126,29 @@ alphabetically, so `@mystock/api` would otherwise build against a stale or missi
 
 ## Database
 
-The schema is plain SQL in `supabase/migrations`, applied in filename order. Demo data lives in
-`supabase/seed.sql` and requires at least one signed-up user (it raises
+The schema is plain SQL in `supabase/migrations`, applied in filename order:
+
+| Migration                               | Contents                                                         |
+| --------------------------------------- | ---------------------------------------------------------------- |
+| `20261029120000_tenancy.sql`            | organizations, memberships, helper functions, base RLS           |
+| `20261029121000_catalog.sql`            | products, categories, brands, warehouses, storage locations      |
+| `20261029130000_stock_ledger.sql`       | ledger, balances, reservations, idempotency, reconciliation RPCs |
+| `20261029140000_serialized_devices.sql` | devices, device events, lifecycle transitions                    |
+
+Demo data lives in `supabase/seed.sql` and requires at least one signed-up user (it raises
 `seed_requires_auth_user` otherwise).
 
 Tenant isolation is enforced by Postgres RLS: tables carry `organization_id`, roles come from
 `memberships.role`, and every policy calls the `app.*` helpers. The isolation suite runs
 against PGlite (PostgreSQL in WASM) inside Vitest, so it needs no Docker, no credentials, and
 runs in CI on every `npm run test`.
+
+PGlite allows only one connection, so `apps/api/test/db/concurrency.test.ts` boots a
+temporary embedded PostgreSQL 18 cluster instead. The `embedded-postgres` dev dependency
+ships the platform binary through `npm install`; the suite applies the real migrations,
+opens a 12-connection `pg` pool, and proves row-lock serialization, idempotent duplicate
+claims, deadlock-free opposing transfers, and reservation/issue races. It needs no Docker
+and no hosted credentials.
 
 | Role    | Manage organization and members | Write catalog | Read |
 | ------- | ------------------------------- | ------------- | ---- |
@@ -145,12 +171,20 @@ percent-encoded):
 npx supabase db push --db-url $env:DATABASE_URL --include-seed
 ```
 
-Current hosted state (project `kohrmjzwmtqnwrmkymez`, checked 2026-10-29): both migrations
-are applied, RLS is enabled on every table, and the demo seed has run against the first
-signed-up user, who is owner of “SBS VISION” with 7 products and 2 warehouses. A hosted
-end-to-end check passed: a real Supabase password grant produced a token the API accepted,
-the callers' organizations were isolated, and a foreign organization returned `404`. The
-temporary verification account was removed; only the owner remains.
+Current hosted state (project `kohrmjzwmtqnwrmkymez`, checked 2026-10-29): the tenancy and
+catalog migrations are applied, RLS is enabled on every table, and the demo seed has run
+against the first signed-up user, who is owner of “SBS VISION” with 7 products and 2
+warehouses. A Phase 2 hosted end-to-end check passed: a real Supabase password grant
+produced a token the API accepted, the callers' organizations were isolated, and a foreign
+organization returned `404`. The temporary verification account was removed; only the owner
+remains.
+
+The Phase 3 migrations (`20261029130000_stock_ledger.sql` and
+`20261029140000_serialized_devices.sql`) are **not yet applied** to the hosted project. They
+are verified locally against embedded PostgreSQL only, so stock and device routes fail
+against the hosted database until the push above is run. The root `.env` `DATABASE_URL`
+still contains a placeholder; replace it with the real connection string before pushing and
+never commit that value.
 
 Re-running the command above seeds idempotently. The seed raises `seed_requires_auth_user`
 when no account exists.
@@ -166,16 +200,18 @@ npm run test --workspace @mystock/api -- test/db
 
 ## Test suites
 
-| Command                                 | What it runs                                                                                    |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `npm run test`                          | 106 Vitest tests: RLS/seed, API auth and catalog integration, API shell, env, contracts, domain |
-| `npm run test:e2e`                      | Playwright against the API and dev server (16 checks: 8 specs × desktop/mobile)                 |
-| `npm run test:e2e:headed`               | Same, with visible browsers (local verification)                                                |
-| `npm run test:e2e -- --project=desktop` | One Playwright project only                                                                     |
+| Command                                 | What it runs                                                                                                        |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `npm run test`                          | 153 Vitest tests: RLS/seed, catalog, stock, devices, real-PostgreSQL concurrency, API shell, env, contracts, domain |
+| `npm run test:e2e`                      | Playwright against the API and dev server (16 checks: 8 specs × desktop/mobile)                                     |
+| `npm run test:e2e:headed`               | Same, with visible browsers (local verification)                                                                    |
+| `npm run test:e2e -- --project=desktop` | One Playwright project only                                                                                         |
 
 The API suites (`apps/api/test/api`) run the real migrations on PGlite, sign JWTs with
 locally generated ES256 keys, and serve the trusted public key from a temporary JWKS
-endpoint. No hosted credentials and no network access are required.
+endpoint. No hosted credentials and no network access are required. The concurrency suite
+(`apps/api/test/db/concurrency.test.ts`) uses embedded PostgreSQL because it needs multiple
+simultaneous connections.
 
 Playwright starts both servers itself (`webServer` in `apps/web/playwright.config.ts`)
 and reuses already-running instances locally. Reuse means a stale process can serve old
@@ -194,6 +230,9 @@ cd apps/web
 npx allure generate ./allure-results -o ./allure-report --clean
 npx allure open ./allure-report
 ```
+
+For a one-shot local preview, `npx allure serve ./allure-results --port 5050` generates and
+serves the report at http://localhost:5050 without writing `allure-report/`.
 
 `allure` needs Java on `PATH`. Every `npm run test:e2e` clears `apps/web/allure-results`
 first, so the report always reflects exactly one run. `allure-results/` and

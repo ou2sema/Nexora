@@ -47,15 +47,13 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
           Coming next
         </p>
         <ul className="mt-2 space-y-1 px-3 text-sm text-slate-500">
-          <li>Devices &amp; serials · Phase 3</li>
-          <li>Movements · Phase 3</li>
           <li>Scanning · Phase 4</li>
           <li>Reports · Phase 5</li>
         </ul>
       </nav>
 
       <div className="border-t border-white/10 px-5 py-4 text-xs text-slate-500">
-        Database &amp; identity · Phase 2
+        Stock ledger &amp; devices · Phase 3
       </div>
     </div>
   );

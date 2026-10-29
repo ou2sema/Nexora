@@ -19,12 +19,17 @@ interface RequestOptions {
   token: string;
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: unknown;
+  headers?: Record<string, string>;
   signal?: AbortSignal;
+}
+
+export function newIdempotencyKey(): string {
+  return crypto.randomUUID();
 }
 
 export async function apiRequest<T>(
   path: string,
-  { token, method = 'GET', body, signal }: RequestOptions,
+  { token, method = 'GET', body, headers, signal }: RequestOptions,
 ): Promise<T> {
   const response = await fetch(`${env.VITE_API_BASE_URL.replace(/\/$/, '')}${path}`, {
     method,
@@ -33,6 +38,7 @@ export async function apiRequest<T>(
       accept: 'application/json',
       authorization: `Bearer ${token}`,
       ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+      ...headers,
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });

@@ -14,7 +14,9 @@ import { EnvModule } from './config/env.module';
 import { SERVER_ENV } from './config/env.tokens';
 import { CatalogModule } from './catalog/catalog.module';
 import { DatabaseModule } from './database/database.module';
+import { DevicesModule } from './devices/devices.module';
 import { HealthModule } from './health/health.module';
+import { StockModule } from './stock/stock.module';
 import { TenancyModule } from './tenancy/tenancy.module';
 
 @Module({
@@ -58,6 +60,8 @@ import { TenancyModule } from './tenancy/tenancy.module';
     AuthModule,
     AccountModule,
     CatalogModule,
+    StockModule,
+    DevicesModule,
     HealthModule,
   ],
   providers: [
