@@ -76,14 +76,52 @@ npm run build          # packages first, then apps (order matters)
 alphabetically, so `@mystock/api` would otherwise build against a stale or missing
 `@mystock/config` output.
 
+## Database
+
+The schema is plain SQL in `supabase/migrations`, applied in filename order. Demo data lives in
+`supabase/seed.sql` and requires at least one signed-up user (it raises
+`seed_requires_auth_user` otherwise).
+
+Tenant isolation is enforced by Postgres RLS: tables carry `organization_id`, roles come from
+`memberships.role`, and every policy calls the `app.*` helpers. The isolation suite runs
+against PGlite (PostgreSQL in WASM) inside Vitest, so it needs no Docker, no credentials, and
+runs in CI on every `npm run test`.
+
+| Role    | Manage organization and members | Write catalog | Read |
+| ------- | ------------------------------- | ------------- | ---- |
+| owner   | yes                             | yes           | yes  |
+| admin   | yes                             | yes           | yes  |
+| manager | no                              | yes           | yes  |
+| viewer  | no                              | no            | yes  |
+
+Applying migrations to the hosted project (needs your access token and database password):
+
+```powershell
+npx supabase link --project-ref <project-ref>
+npx supabase db push --include-seed
+```
+
+Without linking, push directly with the connection string from `.env` (the CLI expects it
+percent-encoded):
+
+```powershell
+npx supabase db push --db-url $env:DATABASE_URL --include-seed
+```
+
+Run only the database tests while iterating:
+
+```powershell
+npm run test --workspace @mystock/api -- test/db
+```
+
 ## Test suites
 
-| Command                                 | What it runs                                              |
-| --------------------------------------- | --------------------------------------------------------- |
-| `npm run test`                          | 43 Vitest tests: API shell, env schema, contracts, domain |
-| `npm run test:e2e`                      | Playwright against the API and dev server                 |
-| `npm run test:e2e:headed`               | Same, with visible browsers (local verification)          |
-| `npm run test:e2e -- --project=desktop` | One Playwright project only                               |
+| Command                                 | What it runs                                                        |
+| --------------------------------------- | ------------------------------------------------------------------- |
+| `npm run test`                          | 78 Vitest tests: API shell, env schema, contracts, domain, RLS/seed |
+| `npm run test:e2e`                      | Playwright against the API and dev server                           |
+| `npm run test:e2e:headed`               | Same, with visible browsers (local verification)                    |
+| `npm run test:e2e -- --project=desktop` | One Playwright project only                                         |
 
 Playwright starts both servers itself (`webServer` in `apps/web/playwright.config.ts`)
 and reuses already-running instances locally. Locally it drives the installed Edge

@@ -4,7 +4,9 @@ Inventory management platform for electronics and technology products: multi-war
 stock, an immutable stock ledger, serialized-device traceability, barcode workflows,
 and organization-scoped reporting.
 
-> Status: Phase 1 (foundation). Nothing is production-ready yet.
+> Status: Phase 2 (database and identity). The schema, RLS policies, and tenant-isolation
+> tests are in place; API authentication and catalog endpoints are next. Nothing is
+> production-ready yet.
 
 ## Stack
 
@@ -26,9 +28,13 @@ Architecture decisions live in [`docs/adr/`](docs/adr/). The Phase 0 assessment 
 apps/api        NestJS API
 apps/web        React SPA
 packages/       contracts (Zod), domain rules, config, testing helpers
-supabase/       migrations, seeds, RLS tests
+supabase/       migrations, seed, RLS tests
 docs/           ADRs, diagrams, runbooks
 ```
+
+Multi-tenancy is organization-based: every catalog row carries `organization_id`, access is
+decided by `memberships.role`, and Postgres RLS enforces the boundary for every query. See
+[ADR-0003](docs/adr/0003-tenancy-and-rls.md).
 
 ## Prerequisites
 
