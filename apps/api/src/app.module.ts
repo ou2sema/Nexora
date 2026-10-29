@@ -6,10 +6,16 @@ import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 
+import { AccountModule } from './account/account.module';
+import { AuthGuard } from './auth/auth.guard';
+import { AuthModule } from './auth/auth.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { EnvModule } from './config/env.module';
 import { SERVER_ENV } from './config/env.tokens';
+import { CatalogModule } from './catalog/catalog.module';
+import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
+import { TenancyModule } from './tenancy/tenancy.module';
 
 @Module({
   imports: [
@@ -47,11 +53,17 @@ import { HealthModule } from './health/health.module';
         { ttl: env.RATE_LIMIT_TTL_SECONDS * 1000, limit: env.RATE_LIMIT_LIMIT },
       ],
     }),
+    DatabaseModule,
+    TenancyModule,
+    AuthModule,
+    AccountModule,
+    CatalogModule,
     HealthModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: AuthGuard },
   ],
 })
 export class AppModule {}

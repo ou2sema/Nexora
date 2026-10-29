@@ -1,41 +1,54 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Boxes, CircleDollarSign, LockKeyhole, Package, RefreshCw } from 'lucide-react';
 
+import { useProducts } from '@/features/catalog/api';
+import { useOrganization } from '@/features/organizations/organization-provider';
 import { useApiHealth } from '@/features/system/use-api-health';
 import { cn } from '@/lib/cn';
-
-const metrics = [
-  {
-    label: 'Distinct products',
-    icon: Package,
-    hint: 'Product catalog arrives in Phase 2',
-  },
-  {
-    label: 'Units on hand',
-    icon: Boxes,
-    hint: 'Derived from the stock ledger in Phase 3',
-  },
-  {
-    label: 'Reserved units',
-    icon: LockKeyhole,
-    hint: 'Reservations arrive in Phase 3',
-  },
-  {
-    label: 'Inventory value',
-    icon: CircleDollarSign,
-    hint: 'Valued from posted movements in Phase 5',
-  },
-];
 
 export function DashboardPage() {
   const health = useApiHealth();
   const queryClient = useQueryClient();
+  const { organization } = useOrganization();
+  const products = useProducts(organization?.organizationId ?? null, {
+    search: '',
+    status: '',
+    page: 1,
+    pageSize: 1,
+  });
 
   const status = health.isPending
     ? { tone: 'pending', label: 'Checking API…' }
     : health.isError
       ? { tone: 'error', label: 'API unreachable' }
       : { tone: 'ok', label: 'API online' };
+
+  const metrics = [
+    {
+      label: 'Distinct products',
+      icon: Package,
+      value: products.data ? String(products.data.total) : '—',
+      hint: products.isError ? 'Catalog query failed' : 'Active and archived catalog entries',
+    },
+    {
+      label: 'Units on hand',
+      icon: Boxes,
+      value: '—',
+      hint: 'Derived from the stock ledger in Phase 3',
+    },
+    {
+      label: 'Reserved units',
+      icon: LockKeyhole,
+      value: '—',
+      hint: 'Reservations arrive in Phase 3',
+    },
+    {
+      label: 'Inventory value',
+      icon: CircleDollarSign,
+      value: '—',
+      hint: 'Valued from posted movements in Phase 5',
+    },
+  ];
 
   return (
     <div className="space-y-8">
@@ -78,6 +91,7 @@ export function DashboardPage() {
           type="button"
           onClick={() => {
             void queryClient.invalidateQueries({ queryKey: ['system', 'health'] });
+            void products.refetch();
           }}
           className="inline-flex items-center gap-2 self-start rounded-lg px-3 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 sm:self-auto"
         >
@@ -97,7 +111,14 @@ export function DashboardPage() {
                 <metric.icon aria-hidden="true" className="size-4 text-slate-400" />
                 {metric.label}
               </dt>
-              <dd className="mt-3 text-3xl font-semibold tabular-nums text-slate-400">—</dd>
+              <dd
+                className={cn(
+                  'mt-3 text-3xl font-semibold tabular-nums',
+                  metric.value === '—' ? 'text-slate-400' : 'text-slate-900',
+                )}
+              >
+                {metric.value}
+              </dd>
               <p className="mt-2 text-xs text-slate-500">{metric.hint}</p>
             </div>
           ))}
@@ -105,11 +126,13 @@ export function DashboardPage() {
       </section>
 
       <section className="rounded-xl border border-dashed border-slate-300 bg-white/60 p-6">
-        <h2 className="text-sm font-semibold text-slate-900">No inventory data yet</h2>
+        <h2 className="text-sm font-semibold text-slate-900">
+          Stock metrics arrive with the ledger
+        </h2>
         <p className="mt-2 max-w-2xl text-sm text-slate-600">
-          This dashboard is wired to the API and ready for real aggregates. Metrics stay empty until
-          the database foundation (Phase 2) and the stock ledger (Phase 3) are in place — no
-          placeholder numbers are shown.
+          Products are now read from PostgreSQL under organization row-level security. Units,
+          reservations and valuation stay empty until the immutable stock ledger lands in Phase 3 —
+          no placeholder numbers are shown.
         </p>
       </section>
     </div>

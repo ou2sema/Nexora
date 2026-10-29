@@ -7,3 +7,4 @@ export {
 } from './quantity';
 export { computeGtinCheckDigit, isValidEan13, isValidGtin, isValidUpcA } from './barcode/gs1';
 export { CURRENCY_CODE, formatTnd, fromMinorUnits, MONEY_MINOR_UNITS, toMinorUnits } from './money';
+export { slugify } from './slug';

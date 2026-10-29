@@ -1,5 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 
+import { Public } from '../auth/public.decorator';
+
 export interface HealthResponse {
   status: 'ok';
   service: 'mystock-api';
@@ -7,6 +9,7 @@ export interface HealthResponse {
   timestamp: string;
 }
 
+@Public()
 @Controller('health')
 export class HealthController {
   @Get()

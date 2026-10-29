@@ -10,6 +10,7 @@ import type { Response } from 'express';
 import { ZodError } from 'zod';
 
 import { AppError } from '../errors/app-error';
+import { toDatabaseErrorDescriptor } from '../errors/database-error';
 import type { RequestWithId } from '../http/request-id';
 
 export interface ErrorDescriptor {
@@ -40,6 +41,11 @@ export function toErrorDescriptor(exception: unknown): ErrorDescriptor {
       message: exception.message,
       details: exception.details,
     };
+  }
+
+  const databaseError = toDatabaseErrorDescriptor(exception);
+  if (databaseError) {
+    return databaseError;
   }
 
   if (exception instanceof ZodError) {

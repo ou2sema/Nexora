@@ -9,6 +9,14 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // The shared packages compile to CommonJS for the API; the browser bundle
+      // consumes their TypeScript sources so named exports survive dev mode.
+      '@mystock/contracts': fileURLToPath(
+        new URL('../../packages/contracts/src/index.ts', import.meta.url),
+      ),
+      '@mystock/domain': fileURLToPath(
+        new URL('../../packages/domain/src/index.ts', import.meta.url),
+      ),
     },
   },
   server: {

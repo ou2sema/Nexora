@@ -47,7 +47,6 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
           Coming next
         </p>
         <ul className="mt-2 space-y-1 px-3 text-sm text-slate-500">
-          <li>Warehouses · Phase 2</li>
           <li>Devices &amp; serials · Phase 3</li>
           <li>Movements · Phase 3</li>
           <li>Scanning · Phase 4</li>
@@ -56,7 +55,7 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
       </nav>
 
       <div className="border-t border-white/10 px-5 py-4 text-xs text-slate-500">
-        Production foundation · Phase 1
+        Database &amp; identity · Phase 2
       </div>
     </div>
   );

@@ -13,8 +13,9 @@ Commands are copy-pasteable; paths are relative to the repository root.
 | Java    | 17+ (developed on 27)         | Only needed for `npm run report:allure` |
 | Git     | any recent version            |                                         |
 
-A hosted Supabase project is **not** required for Phase 1: no code path contacts Supabase
-yet. It becomes mandatory in Phase 2 (database and auth).
+A Supabase project **is** required from Phase 2 onward: the app authenticates users and the
+API reads its database. The automated suites still need no hosted credentials — they run on
+PGlite with locally generated keys — but running the app locally requires a real project.
 
 ## First-time setup
 
@@ -24,8 +25,20 @@ npm install
 Copy-Item .env.example .env
 ```
 
-Fill `.env` with your Supabase project URL, anon key, and database URL. Keep
-`SUPABASE_SERVICE_ROLE_KEY` server-side only — it never appears in a `VITE_` variable.
+Fill `.env` with your Supabase project URL, anon key, database URL, and the JWT issuer:
+
+```dotenv
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_ANON_KEY=<anon-key>
+SUPABASE_JWT_ISSUER=https://<project-ref>.supabase.co/auth/v1
+SUPABASE_JWT_AUDIENCE=authenticated
+DATABASE_URL=postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres
+DATABASE_SSL=true
+```
+
+Keep `SUPABASE_SERVICE_ROLE_KEY` server-side only — it never appears in a `VITE_` variable,
+and the request path does not use it. The API verifies tokens against the project's public
+JWKS (`/auth/v1/.well-known/jwks.json`), so no JWT secret is needed.
 
 The web app validates its own environment at startup and reads a git-ignored file:
 
@@ -54,13 +67,37 @@ npm run dev --workspace @mystock/web
 | Service | URL                          | Expected response                             |
 | ------- | ---------------------------- | --------------------------------------------- |
 | API     | http://localhost:4100/health | `{"status":"ok","service":"mystock-api",...}` |
-| Web     | http://localhost:5173        | Dashboard shell with an "API online" card     |
+| Web     | http://localhost:5173        | Redirects to the sign-in page                 |
 
-The Vite dev server proxies `/api` to the API, but the dashboard calls
-`VITE_API_BASE_URL` directly, so both processes must be running.
+The web app cannot show any workspace before authentication. Create a user in the Supabase
+dashboard (Authentication → Users → Add user) or use the sign-up form, then sign in at
+http://localhost:5173/sign-in. Confirmation emails must be handled according to your project
+settings; with "Confirm email" disabled, sign-up returns a session immediately.
+
+The first signed-in user sees the organization onboarding form, because no membership exists
+yet. Creating an organization makes the caller its owner.
+
+The Vite dev server proxies `/api` to the API, but the SPA calls `VITE_API_BASE_URL`
+directly, so both processes must be running. CORS on the API allows `WEB_ORIGIN` only.
 
 Port 4100 is a deliberate choice: 3000 is commonly occupied by other local Node
 processes, which silently produces HTML 404s instead of API responses.
+
+## API authentication
+
+Every route except `/health` requires `Authorization: Bearer <supabase-access-token>`. The
+API verifies signature, issuer, audience, and expiry against the project JWKS, then opens a
+transaction that sets the `authenticated` role and the caller's claims before touching data.
+RLS therefore evaluates for the real user even though the process connects as the project
+owner.
+
+`GET /api/v1/me` returns the caller and their memberships. Organization-scoped routes take
+the organization id in the path (`/api/v1/organizations/:organizationId/...`); membership is
+re-checked on every request, and a missing membership returns `404` rather than `403` so the
+API does not confirm that an organization exists.
+
+The database connection role must be allowed to `SET ROLE authenticated`. The Supabase
+`postgres` role is; a custom migration role needs `authenticated` granted to it.
 
 ## Quality gates
 
@@ -116,17 +153,25 @@ npm run test --workspace @mystock/api -- test/db
 
 ## Test suites
 
-| Command                                 | What it runs                                                        |
-| --------------------------------------- | ------------------------------------------------------------------- |
-| `npm run test`                          | 78 Vitest tests: API shell, env schema, contracts, domain, RLS/seed |
-| `npm run test:e2e`                      | Playwright against the API and dev server                           |
-| `npm run test:e2e:headed`               | Same, with visible browsers (local verification)                    |
-| `npm run test:e2e -- --project=desktop` | One Playwright project only                                         |
+| Command                                 | What it runs                                                                                    |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `npm run test`                          | 106 Vitest tests: RLS/seed, API auth and catalog integration, API shell, env, contracts, domain |
+| `npm run test:e2e`                      | Playwright against the API and dev server (16 checks: 8 specs × desktop/mobile)                 |
+| `npm run test:e2e:headed`               | Same, with visible browsers (local verification)                                                |
+| `npm run test:e2e -- --project=desktop` | One Playwright project only                                                                     |
+
+The API suites (`apps/api/test/api`) run the real migrations on PGlite, sign JWTs with
+locally generated ES256 keys, and serve the trusted public key from a temporary JWKS
+endpoint. No hosted credentials and no network access are required.
 
 Playwright starts both servers itself (`webServer` in `apps/web/playwright.config.ts`)
-and reuses already-running instances locally. Locally it drives the installed Edge
-via `channel: 'msedge'`; on CI it downloads Playwright's Chromium. Override with
-`$env:PLAYWRIGHT_CHANNEL = ''` to use bundled Chromium locally.
+and reuses already-running instances locally. Reuse means a stale process can serve old
+code: stop leftover servers before a run you want to trust. The API server is started from
+`apps/api/dist/main.js`, so run `npm run build:apps` after changing API code.
+
+Locally it drives the installed Edge via `channel: 'msedge'`; on CI it downloads
+Playwright's Chromium. Override with `$env:PLAYWRIGHT_CHANNEL = ''` to use bundled
+Chromium locally.
 
 ## Allure report
 
@@ -185,6 +230,18 @@ Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" |
   Select-Object ProcessId, CommandLine
 ```
 
+**Blank page in development with a module export error** — the shared packages compile to
+CommonJS for the API; Vite aliases them to their TypeScript sources. Restart the dev server
+after changing `vite.config.ts`, and do not point the alias back at `dist`.
+
+**`/api/v1/...` returns 404 during E2E but 401/200 from a manual curl** — Playwright reused
+a stale API process serving an older `dist`. Stop it (check the command line first) and
+rerun; `npm run build:apps` before the suite prevents the stale build.
+
+**Sign-in fails with "Invalid login credentials"** — the user does not exist in the Supabase
+project behind `VITE_SUPABASE_URL`, or the password is wrong. Sign-up may also require email
+confirmation depending on project settings.
+
 **`Error: Environment variable VITE_SUPABASE_URL is missing`** — `apps/web/.env.local` is
 absent or incomplete. Recreate it as shown above.
 
@@ -194,8 +251,11 @@ absent or incomplete. Recreate it as shown above.
 ## Security notes
 
 - Only the Supabase **anon** key may appear in web configuration. Row Level Security is
-  what makes that safe, and RLS lands in Phase 2 with its negative tests.
+  what makes that safe; the isolation suite proves it on every test run.
+- The API verifies user tokens against the project's public JWKS. It never trusts a role
+  or organization id supplied by the client; both are re-derived from the token and the
+  membership table.
 - The service-role key stays in the API process environment and is never sent to the
-  browser, logged, or committed.
+  browser, logged, or committed. The request path does not use it.
 - `.env*` files are git-ignored; only `.env.example` is tracked, and it contains
   placeholders only.

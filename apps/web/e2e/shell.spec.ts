@@ -1,50 +1,45 @@
 import { expect, test } from '@playwright/test';
 
-test.describe('application shell', () => {
-  test('dashboard renders and reports the API as online', async ({ page }) => {
+test.describe('authentication gate', () => {
+  test('redirects anonymous visitors to the sign-in page', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'API online' })).toBeVisible({
-      timeout: 15_000,
-    });
-    await expect(page.getByText('Distinct products')).toBeVisible();
+    await expect(page).toHaveURL(/\/sign-in$/);
+    await expect(page.getByRole('heading', { name: 'Sign in', level: 2 })).toBeVisible();
+    await expect(page.getByLabel('Email')).toBeVisible();
+    await expect(page.getByLabel('Password')).toBeVisible();
   });
 
-  test('shows no fabricated inventory numbers', async ({ page }) => {
-    await page.goto('/');
+  test('validates the form before contacting the auth service', async ({ page }) => {
+    await page.goto('/sign-in');
+    await page.getByRole('button', { name: 'Sign in' }).click();
 
-    const metrics = page.locator('dl');
-    await expect(metrics.getByText('—')).toHaveCount(4);
-    await expect(page.getByText('No inventory data yet')).toBeVisible();
+    await expect(page.getByText('Enter a valid email address')).toBeVisible();
+    await expect(page.getByText('Use at least 8 characters')).toBeVisible();
+    await expect(page).toHaveURL(/\/sign-in$/);
   });
 
-  test('navigates to the products page', async ({ page, isMobile }) => {
-    await page.goto('/');
+  test('switches to account creation', async ({ page }) => {
+    await page.goto('/sign-in');
+    await page.getByRole('button', { name: 'Create one' }).click();
 
-    if (isMobile) {
-      await page.getByRole('button', { name: 'Open navigation' }).click();
-    }
-
-    await page.getByRole('link', { name: 'Products' }).click();
-
-    await expect(page).toHaveURL(/\/products$/);
-    await expect(page.getByRole('heading', { name: 'Products', level: 1 })).toBeVisible();
-    await expect(page.getByText('No products yet')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Create your account', level: 2 }),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible();
   });
 
   test('offers a skip link as the first focusable element', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/sign-in');
     await page.keyboard.press('Tab');
 
-    await expect(page.getByRole('link', { name: 'Skip to content' })).toBeFocused();
+    await expect(page.getByRole('link', { name: 'Skip to sign-in form' })).toBeFocused();
   });
 
-  test('renders the not-found page for unknown routes', async ({ page }) => {
+  test('protects unknown routes behind the same gate', async ({ page }) => {
     await page.goto('/definitely-not-a-route');
 
-    await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Back to dashboard' })).toBeVisible();
+    await expect(page).toHaveURL(/\/sign-in$/);
   });
 });
 
@@ -58,6 +53,17 @@ test.describe('api contract', () => {
     const body = (await response.json()) as { status: string; service: string };
     expect(body.status).toBe('ok');
     expect(body.service).toBe('mystock-api');
+  });
+
+  test('rejects requests without a bearer token', async ({ request }) => {
+    const response = await request.get('http://localhost:4100/api/v1/me');
+
+    expect(response.status()).toBe(401);
+    const body = (await response.json()) as {
+      error: { code: string; message: string; requestId: string };
+    };
+    expect(body.error.code).toBe('unauthenticated');
+    expect(body.error.requestId).toBe(response.headers()['x-request-id']);
   });
 
   test('unknown api routes return the error envelope', async ({ request }) => {
