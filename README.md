@@ -7,8 +7,9 @@ and organization-scoped reporting.
 > Status: Phase 2 (identity, tenancy, catalog) implemented. Users sign in through Supabase,
 > the API verifies JWTs and scopes every query to an organization, and the web app manages
 > products, warehouses, locations, categories, and brands. Automated tests cover tenant
-> isolation, authentication failures, and the management UI gate. The hosted database
-> migration and hosted RLS smoke test are still open. Nothing is production-ready yet.
+> isolation, authentication failures, and the management UI gate. The schema is applied to
+> the hosted project and its RLS passed a cross-tenant smoke test; the demo seed still
+> waits for the first signed-up user. Nothing is production-ready yet.
 
 ## Stack
 

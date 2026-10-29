@@ -103,8 +103,10 @@ modules as production, with only `DATABASE` and `SERVER_ENV` overridden. Tests c
   the request path.
 - The web shell now requires a Supabase session. Anonymous visitors are redirected to
   `/sign-in`, and unknown routes sit behind the same gate.
-- Hosted verification is still open: the schema and auth flow are proven on PGlite plus a
-  local JWKS, but Gate C's hosted half needs the migrated project, a signed-up user, and a
-  cross-tenant smoke test against the real database.
+- Hosted verification is now split: the schema is applied to the hosted project and a
+  cross-tenant smoke test passed there (member of organization B could not read, update,
+  delete, or insert into organization A's data; the insert raised `42501`). The demo seed
+  still needs the first signed-up user, so no hosted account has exercised `/me` or the
+  catalog API end to end yet.
 - Vite's single bundle is ~813 kB before code-splitting; route-level lazy loading is a
   later optimization, not a correctness issue.
