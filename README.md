@@ -15,6 +15,7 @@ and organization-scoped reporting.
 | Data     | Supabase PostgreSQL (RLS), Supabase Auth, Realtime, Storage            |
 | ORM      | Drizzle + `postgres`, SQL-first migrations in `supabase/`              |
 | Tests    | Vitest, Playwright, Allure                                             |
+| Money    | TND only, integer millimes, `formatTnd` (see ADR-0002)                 |
 
 Architecture decisions live in [`docs/adr/`](docs/adr/). The Phase 0 assessment is summarized in
 [`docs/adr/0001-stack-and-platform-boundaries.md`](docs/adr/0001-stack-and-platform-boundaries.md).

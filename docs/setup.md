@@ -117,7 +117,8 @@ The E2E job writes placeholder `VITE_` values (no real project, no real secrets)
 uploads `test-results/` plus `allure-results/` only when the run fails.
 
 To reproduce the `quality` job locally, run the gates above in the same order after a
-clean `npm ci`. To reproduce the `e2e` job locally:
+clean `npm ci`. To reproduce the `e2e` job locally, stop any running dev servers first — CI mode never
+reuses an existing server and fails if 4100 or 5173 is occupied:
 
 ```powershell
 $env:CI = 'true'
