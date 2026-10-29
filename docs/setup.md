@@ -146,12 +146,14 @@ npx supabase db push --db-url $env:DATABASE_URL --include-seed
 ```
 
 Current hosted state (project `kohrmjzwmtqnwrmkymez`, checked 2026-10-29): both migrations
-are applied and RLS is enabled on every table. A hosted cross-tenant smoke test passed — a
-member of one organization could not read, update, delete, or insert into another
-organization's rows. `auth.users` is still empty, so the seed has not run and no hosted
-account has exercised the API end to end. Sign up first (web app or dashboard), then run the
-command above; it seeds even when there are no pending migrations and fails clearly if no
-user exists.
+are applied, RLS is enabled on every table, and the demo seed has run against the first
+signed-up user, who is owner of “SBS VISION” with 7 products and 2 warehouses. A hosted
+end-to-end check passed: a real Supabase password grant produced a token the API accepted,
+the callers' organizations were isolated, and a foreign organization returned `404`. The
+temporary verification account was removed; only the owner remains.
+
+Re-running the command above seeds idempotently. The seed raises `seed_requires_auth_user`
+when no account exists.
 
 An easy way to sign up for local use is the sign-in page's "Create one" link. With
 `mailer_autoconfirm = false` (the project default), confirm the email before signing in.

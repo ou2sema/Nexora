@@ -103,10 +103,11 @@ modules as production, with only `DATABASE` and `SERVER_ENV` overridden. Tests c
   the request path.
 - The web shell now requires a Supabase session. Anonymous visitors are redirected to
   `/sign-in`, and unknown routes sit behind the same gate.
-- Hosted verification is now split: the schema is applied to the hosted project and a
-  cross-tenant smoke test passed there (member of organization B could not read, update,
-  delete, or insert into organization A's data; the insert raised `42501`). The demo seed
-  still needs the first signed-up user, so no hosted account has exercised `/me` or the
-  catalog API end to end yet.
+- Hosted verification is complete for Phase 2: schema and seed are applied, RLS is on every
+  table, and a real Supabase password grant was exchanged for a token that the API accepted.
+  A temporary second user could create its own organization and product but received `404`
+  for the seeded organization and could not read, update, delete, or insert into it; the
+  temporary account and its data were removed afterwards. The smoke tests still run through
+  a temporary account because the owner's password must never be handled by the tooling.
 - Vite's single bundle is ~813 kB before code-splitting; route-level lazy loading is a
   later optimization, not a correctness issue.
