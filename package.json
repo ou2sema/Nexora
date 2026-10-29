@@ -1,0 +1,38 @@
+{
+  "name": "mystock",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Enterprise electronics inventory management platform",
+  "packageManager": "npm@11.20.0",
+  "engines": {
+    "node": ">=22.12.0",
+    "npm": ">=10.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "build:packages": "npm run build --workspace @mystock/config --workspace @mystock/domain --workspace @mystock/contracts",
+    "build:apps": "npm run build --workspace @mystock/api --workspace @mystock/web",
+    "build": "npm run build:packages && npm run build:apps",
+    "typecheck": "npm run build:packages && npm run typecheck --workspaces --if-present",
+    "test": "npm run build:packages && npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e --workspace @mystock/web",
+    "report:allure": "npm run allure:serve --workspace @mystock/web"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.6.6",
+    "eslint": "10.13.0",
+    "eslint-config-prettier": "10.1.8",
+    "globals": "17.13.0",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1"
+  }
+}

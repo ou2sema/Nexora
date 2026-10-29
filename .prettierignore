@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+coverage
+allure-results
+allure-report
+playwright-report
+test-results
+package-lock.json
+supabase/migrations

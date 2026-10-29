@@ -1,0 +1,12 @@
+process.env.NODE_ENV = 'test';
+process.env.LOG_LEVEL = 'fatal';
+process.env.API_PORT = '3101';
+process.env.WEB_ORIGIN = 'http://localhost:5173';
+process.env.SUPABASE_URL = 'https://testsupabase.supabase.co';
+process.env.SUPABASE_ANON_KEY = 'a'.repeat(40);
+process.env.SUPABASE_SERVICE_ROLE_KEY = 'b'.repeat(40);
+process.env.SUPABASE_JWT_ISSUER = 'https://testsupabase.supabase.co/auth/v1';
+process.env.SUPABASE_JWT_AUDIENCE = 'authenticated';
+process.env.DATABASE_URL = 'postgresql://postgres:pw@localhost:5432/postgres';
+process.env.DATABASE_SSL = 'false';
+process.env.SUPABASE_STORAGE_BUCKET = 'mystock-test';
