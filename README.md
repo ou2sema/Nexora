@@ -4,13 +4,13 @@ Inventory management platform for electronics and technology products: multi-war
 stock, an immutable stock ledger, serialized-device traceability, barcode workflows,
 and organization-scoped reporting.
 
-> Status: Phase 3 (inventory integrity) implemented and verified locally. Phase 2 is verified
-> against the hosted project: schema, RLS, demo seed, sign-in token → API → tenant-scoped
-> queries. Phase 3 adds the immutable stock ledger, atomic posting functions, balance
-> projections, reservations, serialized-device traceability, idempotent mutations, and
-> reconciliation repair, with a real multi-connection PostgreSQL concurrency suite. The Phase 3
-> migrations are written and tested but **not yet pushed to the hosted database**. Nothing is
-> production-ready yet.
+> Status: Phase 3 (inventory integrity) implemented and verified locally and against the hosted
+> project. Phase 2 proved schema, RLS, demo seed, sign-in token → API → tenant-scoped queries.
+> Phase 3 adds the immutable stock ledger, atomic posting functions, balance projections,
+> reservations, serialized-device traceability, idempotent mutations, and reconciliation repair,
+> backed by a real multi-connection PostgreSQL concurrency suite. The Phase 3 migrations were
+> pushed to the hosted database on 2026-10-29 and every ledger and device flow was exercised
+> there. Nothing is production-ready yet.
 
 ## Stack
 

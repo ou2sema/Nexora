@@ -145,9 +145,9 @@ The suite needs no Docker, no hosted credentials, and runs in `npm run test` on 
   the same guard rails; direct table writes are impossible for application roles.
 - `stock_operations` grows without bound. A retention job for keys older than the retry
   window is future work; deleting old rows is safe only after that window.
-- The API and UI depend on the Phase 3 migrations. They are verified locally and are **not
-  yet applied** to the hosted Supabase project, so hosted stock and device routes will fail
-  until the migrations are pushed.
+- The API and UI depend on the Phase 3 migrations. They were pushed to the hosted Supabase
+  project on 2026-10-29, so the hosted stock and device routes run against the same schema the
+  local suites exercise.
 - Device quantity and ledger quantity are intentionally decoupled. Reports that compare
   "devices in stock" with "units on hand" will show differences when serialized receipts were
   not posted; the reconciliation view covers ledger-versus-projection drift only.

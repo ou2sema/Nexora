@@ -108,7 +108,9 @@ Reconciliation is restricted to owner and admin; all reads require membership.
 
 Serialized-device writes follow a fixed status graph and append a `device_events` row for
 every change. Products must have `isSerialized = true` before a device can be registered
-against them.
+against them. Serialized products are kept out of quantity postings: a unit enters through
+`register_device`, which records identity and lifecycle without posting a ledger receipt, and
+quantity-tracked products use the stock RPCs. Combining both in one transaction is future work.
 
 ## Quality gates
 
@@ -171,20 +173,24 @@ percent-encoded):
 npx supabase db push --db-url $env:DATABASE_URL --include-seed
 ```
 
-Current hosted state (project `kohrmjzwmtqnwrmkymez`, checked 2026-10-29): the tenancy and
-catalog migrations are applied, RLS is enabled on every table, and the demo seed has run
-against the first signed-up user, who is owner of “SBS VISION” with 7 products and 2
-warehouses. A Phase 2 hosted end-to-end check passed: a real Supabase password grant
-produced a token the API accepted, the callers' organizations were isolated, and a foreign
-organization returned `404`. The temporary verification account was removed; only the owner
-remains.
+Current hosted state (project `kohrmjzwmtqnwrmkymez`, checked 2026-10-29): all four migrations
+(tenancy, catalog, stock ledger, serialized devices) are applied, RLS is enabled on every
+table, and the demo seed has run against the first signed-up user, who is owner of “SBS VISION”
+with 7 products and 2 warehouses. A Phase 2 hosted end-to-end check passed: a real Supabase
+password grant produced a token the API accepted, the callers' organizations were isolated, and
+a foreign organization returned `404`. The temporary verification account was removed; only the
+owner remains.
 
 The Phase 3 migrations (`20261029130000_stock_ledger.sql` and
-`20261029140000_serialized_devices.sql`) are **not yet applied** to the hosted project. They
-are verified locally against embedded PostgreSQL only, so stock and device routes fail
-against the hosted database until the push above is run. The root `.env` `DATABASE_URL`
-still contains a placeholder; replace it with the real connection string before pushing and
-never commit that value.
+`20261029140000_serialized_devices.sql`) were pushed to the hosted project on 2026-10-29 with
+`npx supabase db push --db-url "$env:DATABASE_URL" --include-seed`, after the local suites and
+a read-only check of the hosted schema. A manual hosted UI pass in a second tenant then posted
+every movement type — receipt, issue, reservation, reservation fulfilment, transfer out/in,
+and an adjustment — and the balance projection matched the ledger with zero reconciliation
+drift. The same pass registered a serialized device, moved it, and walked its status graph
+(in stock → sold → returned → in stock), each step appending an event. That verification data
+remains in the tenant. The root `.env` `DATABASE_URL` holds the real connection string; never
+commit it.
 
 Re-running the command above seeds idempotently. The seed raises `seed_requires_auth_user`
 when no account exists.
