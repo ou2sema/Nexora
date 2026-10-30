@@ -11,8 +11,10 @@ and organization-scoped reporting.
 > hosted project. Phase 4 adds GTIN-validated barcode generation, a single scan pipeline,
 > server-rendered label PDFs, camera scanning with a manual fallback, and scan-assisted
 > receiving and inventory counts that post through the ledger. The Phase 4 migration was
-> applied to the hosted database on 2026-10-30 and its objects were verified read-only, but the
-> signed-in scanning console has not yet been exercised there. Nothing is production-ready yet.
+> applied to the hosted database on 2026-10-30, and a signed-in hosted pass then exercised SKU
+> and serial scanning, duplicate-scan suppression, the camera fallback, scan receiving, product
+> and device label PDFs, and a posted zero-variance inventory count. Nothing is
+> production-ready yet.
 
 ## Stack
 

@@ -149,8 +149,12 @@ Scanning page:
 6. Deny camera permission, or use a browser without `BarcodeDetector`, and confirm manual
    entry still works. The camera panel states which engine is active.
 
-Hosted runs now have the Phase 4 schema. The signed-in scan, label, and count pass against the
-hosted project remains to be recorded.
+Hosted runs now have the Phase 4 schema. A signed-in pass against the hosted project on
+2026-10-30 exercised the console end to end: SKU and serial scans resolved, a duplicate scan
+inside the guard window was ignored, a denied camera permission left manual entry usable, a
+1-unit scan receipt posted, product and device labels downloaded as 1-page A4 PDFs, and an
+inventory count at `MAIN / A-01` recorded `CABLE-01` at 9 and posted with 0 adjustments
+(on-hand unchanged). No defects surfaced.
 
 ## Quality gates
 
@@ -243,8 +247,16 @@ The Phase 4 migration (`20261030100000_barcode_workflows.sql`) was pushed on 202
 `npx supabase db push --db-url "<session-pooler-url>" --yes` after a dry run listed exactly that
 one migration. A read-only check then confirmed `stock_counts`, `stock_count_lines`, the
 one-open-count index, `app.post_stock_count`, and `app.assign_product_barcode` exist in the
-hosted project, and `stock_counts` was empty. The signed-in scanning console has still only been
-exercised locally; no hosted UI pass has been recorded for Phase 4.
+hosted project, where `stock_counts` was still empty.
+
+A signed-in hosted UI pass followed the same day in the “MyStock” tenant. It resolved
+`CABLE-01` by SKU with a `2100000000012` barcode assigned, ignored a repeated scan inside the
+1.5 s window, kept manual entry usable after camera permission was denied, posted a 1-unit scan
+receipt (A-01 8 → 9, total 11), downloaded 1-page A4 label PDFs for the product and for device
+`SN-IPH15-0001`, and ran an inventory count at `MAIN / A-01`: line `CABLE-01` counted 9, post
+reported 1 line and 0 adjustments. Hosted rows afterwards showed the count `posted`, the line
+at `9.0000`, balances 9 + 2 = 11, and zero `inventory_count` movements. No defects surfaced;
+the receipt, barcode, and posted count remain in that tenant.
 
 Re-running the command above seeds idempotently. The seed raises `seed_requires_auth_user`
 when no account exists.
