@@ -39,3 +39,26 @@ export function isValidEan13(digits: string): boolean {
 export function isValidUpcA(digits: string): boolean {
   return isValidGtin(digits, 12);
 }
+
+/** Accepts the GTIN lengths used by retail barcodes: EAN-8, UPC-A, EAN-13, GTIN-14. */
+export function isValidGtinBarcode(value: string): boolean {
+  const length = value.length;
+  if (length !== 8 && length !== 12 && length !== 13 && length !== 14) {
+    return false;
+  }
+  return isValidGtin(value, length);
+}
+
+/**
+ * Builds an EAN-13 in the `2` prefix range, which GS1 reserves for in-store
+ * internal numbering, so generated labels never collide with a manufacturer's
+ * real barcode.
+ */
+export function buildInternalEan13(sequence: number): string {
+  if (!Number.isSafeInteger(sequence) || sequence < 1 || sequence > 99_999_999_999) {
+    throw new Error('Barcode sequence must be a positive integer below 100 billion');
+  }
+
+  const payload = `2${String(sequence).padStart(11, '0')}`;
+  return `${payload}${computeGtinCheckDigit(payload)}`;
+}

@@ -4,13 +4,15 @@ Inventory management platform for electronics and technology products: multi-war
 stock, an immutable stock ledger, serialized-device traceability, barcode workflows,
 and organization-scoped reporting.
 
-> Status: Phase 3 (inventory integrity) implemented and verified locally and against the hosted
-> project. Phase 2 proved schema, RLS, demo seed, sign-in token → API → tenant-scoped queries.
-> Phase 3 adds the immutable stock ledger, atomic posting functions, balance projections,
-> reservations, serialized-device traceability, idempotent mutations, and reconciliation repair,
-> backed by a real multi-connection PostgreSQL concurrency suite. The Phase 3 migrations were
-> pushed to the hosted database on 2026-10-29 and every ledger and device flow was exercised
-> there. Nothing is production-ready yet.
+> Status: Phase 4 (barcode workflows) implemented and verified locally. Phase 2 proved schema,
+> RLS, demo seed, sign-in token → API → tenant-scoped queries. Phase 3 added the immutable stock
+> ledger, atomic posting functions, balance projections, reservations, serialized-device
+> traceability, idempotent mutations, and reconciliation repair, and was exercised against the
+> hosted project. Phase 4 adds GTIN-validated barcode generation, a single scan pipeline,
+> server-rendered label PDFs, camera scanning with a manual fallback, and scan-assisted
+> receiving and inventory counts that post through the ledger. The Phase 4 migration is not yet
+> applied to the hosted project, so the signed-in scanning console has not run there. Nothing is
+> production-ready yet.
 
 ## Stack
 
@@ -21,6 +23,7 @@ and organization-scoped reporting.
 | Data      | Supabase PostgreSQL (RLS), Supabase Auth, Realtime, Storage              |
 | ORM       | Drizzle + `postgres`, SQL-first migrations in `supabase/`                |
 | Tests     | Vitest (PGlite + embedded PostgreSQL), Playwright, Allure                |
+| Scanning  | BarcodeDetector + ZXing fallback, `bwip-js` labels, `pdf-lib` PDFs       |
 | Money     | TND only, integer millimes, `formatTnd` (see ADR-0002)                   |
 | Interface | English only (see ADR-0002)                                              |
 
@@ -29,7 +32,9 @@ Architecture decisions live in [`docs/adr/`](docs/adr/). The Phase 0 assessment 
 Authentication, tenant-scoped data access, and the catalog API are specified in
 [ADR-0004](docs/adr/0004-api-auth-and-tenant-data-access.md). The ledger, reservations,
 idempotency, and device traceability are specified in
-[ADR-0005](docs/adr/0005-stock-ledger-and-device-traceability.md).
+[ADR-0005](docs/adr/0005-stock-ledger-and-device-traceability.md). Barcodes, scanning, labels,
+and inventory counts are specified in
+[ADR-0006](docs/adr/0006-barcodes-scanning-and-stock-counts.md).
 
 ## Layout
 
@@ -82,6 +87,15 @@ query inside a transaction that holds the caller's identity, so RLS applies.
 | GET    | `/api/v1/organizations/:id/devices/:deviceId/events`                  | any member             |
 | POST   | `/api/v1/organizations/:id/devices/:deviceId/status`                  | owner, admin, manager  |
 | POST   | `/api/v1/organizations/:id/devices/:deviceId/location`                | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/scan`                                      | any member             |
+| POST   | `/api/v1/organizations/:id/products/:productId/barcode`               | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/labels`                                    | any member             |
+| GET    | `/api/v1/organizations/:id/stock-counts`                              | any member             |
+| POST   | `/api/v1/organizations/:id/stock-counts`                              | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/stock-counts/:countId`                     | any member             |
+| POST   | `/api/v1/organizations/:id/stock-counts/:countId/lines`               | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/stock-counts/:countId/post`                | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/stock-counts/:countId/discard`             | owner, admin, manager  |
 
 Errors use `{ "error": { "code", "message", "details?", "requestId" } }` and repeat the
 `x-request-id` response header. Database constraint failures map to `409` or `400`; an
@@ -101,6 +115,23 @@ issue or transfer can never consume reserved quantity. `stock-reconciliation` co
 the projection without touching historical movements. Serialized devices move through a
 fixed status graph (`in_stock → reserved/sold/in_repair/lost/disposed`, …) and every change
 appends an immutable `device_events` row.
+
+`GET .../scan?code=` resolves a device serial or IMEI first, then a product barcode, SKU, or
+internal code, and returns either a device with its full context or a product with
+per-location stock lines. `POST .../products/:id/barcode` mints an EAN-13 in the GS1
+in-store `2` range with a valid check digit and is idempotent per product; manufacturer
+barcodes are never overwritten. `POST .../labels` returns a print-ready A4 PDF for up to
+50 product or device targets (1–20 copies each), choosing EAN-8/UPC-A/EAN-13/ITF-14 when
+the code is a valid GTIN and Code 128 otherwise.
+
+Inventory counts are persisted sessions: only one count can be open per location, lines can
+be incremented by repeated scans or set directly, and posting writes one adjustment
+movement per real variance (`reference_type = 'inventory_count'`) in the same transaction
+that marks the count posted. Posting requires an `Idempotency-Key`, refuses an empty count,
+and cannot push stock below an active reservation. In the web app, `/scan` covers receiving
+and counting; camera scanning prefers the browser's `BarcodeDetector` and falls back to
+ZXing, while manual entry and serial/SKU lookup always remain available. Repeated identical
+scans within 1.5 seconds are ignored by the console.
 
 ## Prerequisites
 

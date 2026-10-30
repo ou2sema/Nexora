@@ -30,7 +30,7 @@ import { resultRows } from '../database/results';
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { CATALOG_WRITERS, TenantAccessService } from '../tenancy/tenant-access.service';
 
-interface DeviceRow {
+export interface DeviceRow {
   id: string;
   organization_id: string;
   product_id: string;
@@ -88,7 +88,7 @@ function parseResult<T>(schema: ZodType<T>, value: unknown): T {
   return parsed.data;
 }
 
-const DEVICE_SELECT = sql`
+export const DEVICE_SELECT = sql`
   select d.id, d.organization_id, d.product_id, p.sku as product_sku, p.name as product_name,
          d.serial_number, d.imei, d.condition, d.status, d.warehouse_id, w.code as warehouse_code,
          d.location_id, l.code as location_code, d.warranty_start_on, d.warranty_end_on,
@@ -103,7 +103,7 @@ const DEVICE_SELECT = sql`
     and l.warehouse_id = d.warehouse_id
 `;
 
-function toDeviceSummary(row: DeviceRow): DeviceSummary {
+export function toDeviceSummary(row: DeviceRow): DeviceSummary {
   return {
     id: row.id,
     organizationId: row.organization_id,

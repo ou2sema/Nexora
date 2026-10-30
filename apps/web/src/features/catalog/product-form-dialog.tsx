@@ -9,7 +9,7 @@ import type {
   ProductCreateInput,
   ProductStatus,
 } from '@mystock/contracts';
-import { toMinorUnits } from '@mystock/domain';
+import { isValidGtinBarcode, toMinorUnits } from '@mystock/domain';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -55,8 +55,11 @@ const schema = z.object({
   barcode: z
     .string()
     .trim()
-    .refine((value) => value === '' || /^[0-9]{8,14}$/.test(value), {
-      message: 'Use 8 to 14 digits',
+    .refine((value) => value === '' || /^[0-9]{8}$|^[0-9]{12,14}$/.test(value), {
+      message: 'Use 8, 12, 13 or 14 digits',
+    })
+    .refine((value) => value === '' || isValidGtinBarcode(value), {
+      message: 'The check digit is invalid',
     }),
   purchasePrice: priceField,
   salePrice: priceField,

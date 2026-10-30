@@ -25,13 +25,13 @@ import { brands, categories, products, storageLocations, warehouses } from '../d
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { CATALOG_WRITERS, TenantAccessService } from '../tenancy/tenant-access.service';
 
-interface ProductRow {
+export interface ProductRow {
   product: typeof products.$inferSelect;
   categoryName: string | null;
   brandName: string | null;
 }
 
-function toProductSummary({ product, categoryName, brandName }: ProductRow): ProductSummary {
+export function toProductSummary({ product, categoryName, brandName }: ProductRow): ProductSummary {
   return {
     id: product.id,
     organizationId: product.organizationId,

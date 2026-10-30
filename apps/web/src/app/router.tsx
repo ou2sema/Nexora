@@ -8,6 +8,7 @@ import { NotFoundPage } from '@/routes/not-found-page';
 import { ProductsPage } from '@/routes/products-page';
 import { ReconciliationPage } from '@/routes/reconciliation-page';
 import { ReservationsPage } from '@/routes/reservations-page';
+import { ScanningPage } from '@/routes/scanning-page';
 import { SignInPage } from '@/routes/sign-in-page';
 import { StockLevelsPage } from '@/routes/stock-levels-page';
 import { StockMovementsPage } from '@/routes/stock-movements-page';
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <DashboardPage /> },
       { path: 'products', element: <ProductsPage /> },
+      { path: 'scan', element: <ScanningPage /> },
       { path: 'stock', element: <StockLevelsPage /> },
       { path: 'stock/movements', element: <StockMovementsPage /> },
       { path: 'stock/reservations', element: <ReservationsPage /> },

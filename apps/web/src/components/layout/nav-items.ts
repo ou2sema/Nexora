@@ -5,6 +5,7 @@ import {
   LockKeyhole,
   Package,
   Scale,
+  ScanLine,
   Smartphone,
   Tags,
   Warehouse,
@@ -21,6 +22,7 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/products', label: 'Products', icon: Package },
+  { to: '/scan', label: 'Scanning', icon: ScanLine },
   { to: '/stock', label: 'Stock levels', icon: Boxes, end: true },
   { to: '/stock/movements', label: 'Movements', icon: ArrowLeftRight },
   { to: '/stock/reservations', label: 'Reservations', icon: LockKeyhole },

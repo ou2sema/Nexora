@@ -1,4 +1,4 @@
-import { Search, Smartphone } from 'lucide-react';
+import { Printer, Search, Smartphone } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import type { DeviceStatus } from '@mystock/contracts';
@@ -14,6 +14,7 @@ import {
   deviceStatusStyles,
 } from '@/features/devices/labels';
 import { useOrganization } from '@/features/organizations/organization-provider';
+import { LabelDialog, type LabelTarget } from '@/features/scanning/label-dialog';
 import { cn } from '@/lib/cn';
 
 const PAGE_SIZE = 25;
@@ -42,6 +43,7 @@ export function DevicesPage() {
   const [page, setPage] = useState(1);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const [labelTargets, setLabelTargets] = useState<LabelTarget[] | null>(null);
 
   const debouncedSearch = useDebouncedValue(search);
   const devices = useDevices(organizationId, {
@@ -225,14 +227,32 @@ export function DevicesPage() {
                     <td className="px-4 py-3 font-mono text-xs text-slate-600">
                       {device.warehouseCode} / {device.locationCode}
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setSelectedDeviceId(device.id)}
-                      >
-                        Open
-                      </Button>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() =>
+                            setLabelTargets([
+                              {
+                                kind: 'device',
+                                id: device.id,
+                                title: `${device.serialNumber} — ${device.productName}`,
+                              },
+                            ])
+                          }
+                        >
+                          <Printer aria-hidden="true" className="size-4" />
+                          Label
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setSelectedDeviceId(device.id)}
+                        >
+                          Open
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -252,6 +272,17 @@ export function DevicesPage() {
           />
         )}
       </section>
+
+      {organizationId && labelTargets && (
+        <LabelDialog
+          organizationId={organizationId}
+          targets={labelTargets}
+          open={Boolean(labelTargets)}
+          onOpenChange={(open) => {
+            if (!open) setLabelTargets(null);
+          }}
+        />
+      )}
 
       {organizationId && (
         <>

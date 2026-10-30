@@ -112,6 +112,46 @@ against them. Serialized products are kept out of quantity postings: a unit ente
 `register_device`, which records identity and lifecycle without posting a ledger receipt, and
 quantity-tracked products use the stock RPCs. Combining both in one transaction is future work.
 
+Scan lookups (`GET .../scan?code=`) are available to every member and resolve a device serial
+or IMEI before a product barcode, SKU, or internal code. Barcode assignment and every count
+mutation require owner, admin, or manager. Labels are a PDF download; the SPA requests them
+with the bearer token and saves the blob, so the token never appears in a URL. Count posting
+requires `Idempotency-Key` like the other stock mutations.
+
+## Barcode workflow verification
+
+The Phase 4 API and database suites run without a hosted project:
+
+```powershell
+npm run test --workspace @mystock/api -- test/db/barcode-workflows.test.ts test/api/scanning.test.ts
+```
+
+Expected: 17 passing tests (11 database, 6 API). They cover generated barcode format and
+idempotency, check-digit rejection, cross-tenant isolation and viewer denial, every scan
+resolution tier, a label PDF response, and the full count lifecycle including duplicate
+posting and reservation protection.
+
+To exercise the same flows by hand, start both apps (see above), sign in, and use the
+Scanning page:
+
+1. **Catalog → Assign barcode** on a product without one. It receives an EAN-13 starting
+   with `2`; clicking again returns the same value.
+2. **Scanning → Receive**, scan or type that barcode, choose a location, enter a quantity,
+   and post. The product card shows the updated on-hand quantity and stock line.
+3. Type the same code twice quickly in manual entry. The second attempt is ignored with
+   "Duplicate scan ignored".
+4. **Count** tab: start a count for a location, scan products to add counted quantities,
+   then post. The detail view shows live variance; posting writes adjustments and the
+   location's stock matches the count. Replaying with the same idempotency key returns the
+   original result.
+5. **Print label** on a product or device row downloads a PDF. Open it and confirm the
+   barcode is legible and the printed code matches the record.
+6. Deny camera permission, or use a browser without `BarcodeDetector`, and confirm manual
+   entry still works. The camera panel states which engine is active.
+
+Hosted runs need the Phase 4 migration first (see below), because the hosted database does
+not have the count tables yet.
+
 ## Quality gates
 
 ```powershell
@@ -136,6 +176,7 @@ The schema is plain SQL in `supabase/migrations`, applied in filename order:
 | `20261029121000_catalog.sql`            | products, categories, brands, warehouses, storage locations      |
 | `20261029130000_stock_ledger.sql`       | ledger, balances, reservations, idempotency, reconciliation RPCs |
 | `20261029140000_serialized_devices.sql` | devices, device events, lifecycle transitions                    |
+| `20261030100000_barcode_workflows.sql`  | GTIN checks, barcode assignment, stock counts and posting RPCs   |
 
 Demo data lives in `supabase/seed.sql` and requires at least one signed-up user (it raises
 `seed_requires_auth_user` otherwise).
@@ -173,13 +214,13 @@ percent-encoded):
 npx supabase db push --db-url $env:DATABASE_URL --include-seed
 ```
 
-Current hosted state (project `kohrmjzwmtqnwrmkymez`, checked 2026-10-29): all four migrations
-(tenancy, catalog, stock ledger, serialized devices) are applied, RLS is enabled on every
-table, and the demo seed has run against the first signed-up user, who is owner of “SBS VISION”
-with 7 products and 2 warehouses. A Phase 2 hosted end-to-end check passed: a real Supabase
-password grant produced a token the API accepted, the callers' organizations were isolated, and
-a foreign organization returned `404`. The temporary verification account was removed; only the
-owner remains.
+Current hosted state (project `kohrmjzwmtqnwrmkymez`, checked 2026-10-29): the Phase 1–3
+migrations (tenancy, catalog, stock ledger, serialized devices) are applied, RLS is enabled on
+every table, and the demo seed has run against the first signed-up user, who is owner of “SBS
+VISION” with 7 products and 2 warehouses. A Phase 2 hosted end-to-end check passed: a real
+Supabase password grant produced a token the API accepted, the callers' organizations were
+isolated, and a foreign organization returned `404`. The temporary verification account was
+removed; only the owner remains.
 
 The Phase 3 migrations (`20261029130000_stock_ledger.sql` and
 `20261029140000_serialized_devices.sql`) were pushed to the hosted project on 2026-10-29 with
@@ -191,6 +232,11 @@ drift. The same pass registered a serialized device, moved it, and walked its st
 (in stock → sold → returned → in stock), each step appending an event. That verification data
 remains in the tenant. The root `.env` `DATABASE_URL` holds the real connection string; never
 commit it.
+
+The Phase 4 migration (`20261030100000_barcode_workflows.sql`) is implemented and verified by
+the local PGlite/API suites (17 tests) but is **not applied to the hosted project**. Until it
+is pushed, the hosted API has no `stock_counts` tables or barcode RPCs, so the signed-in
+scanning console works locally only against a database that has the migration.
 
 Re-running the command above seeds idempotently. The seed raises `seed_requires_auth_user`
 when no account exists.
@@ -206,12 +252,12 @@ npm run test --workspace @mystock/api -- test/db
 
 ## Test suites
 
-| Command                                 | What it runs                                                                                                        |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `npm run test`                          | 153 Vitest tests: RLS/seed, catalog, stock, devices, real-PostgreSQL concurrency, API shell, env, contracts, domain |
-| `npm run test:e2e`                      | Playwright against the API and dev server (16 checks: 8 specs × desktop/mobile)                                     |
-| `npm run test:e2e:headed`               | Same, with visible browsers (local verification)                                                                    |
-| `npm run test:e2e -- --project=desktop` | One Playwright project only                                                                                         |
+| Command                                 | What it runs                                                                                                                           |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run test`                          | 175 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, API shell, env, contracts, domain |
+| `npm run test:e2e`                      | Playwright against the API and dev server (16 checks: 8 tests × desktop/mobile)                                                        |
+| `npm run test:e2e:headed`               | Same, with visible browsers (local verification)                                                                                       |
+| `npm run test:e2e -- --project=desktop` | One Playwright project only                                                                                                            |
 
 The API suites (`apps/api/test/api`) run the real migrations on PGlite, sign JWTs with
 locally generated ES256 keys, and serve the trusted public key from a temporary JWKS

@@ -1,3 +1,4 @@
+import { isValidGtinBarcode } from '@mystock/domain';
 import { z } from 'zod';
 
 import { paginatedSchema, paginationQuerySchema } from './pagination';
@@ -18,7 +19,8 @@ const slugSchema = z
 const barcodeSchema = z
   .string()
   .trim()
-  .regex(/^[0-9]{8,14}$/, 'Use 8 to 14 digits');
+  .regex(/^[0-9]{8}$|^[0-9]{12,14}$/, 'Use 8, 12, 13 or 14 digits')
+  .refine(isValidGtinBarcode, 'The barcode check digit is invalid');
 
 const internalCodeSchema = z
   .string()

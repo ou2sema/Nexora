@@ -1,4 +1,4 @@
-import { PackagePlus, Search } from 'lucide-react';
+import { PackagePlus, Printer, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import type { ProductStatus } from '@mystock/contracts';
@@ -6,6 +6,8 @@ import { formatTnd } from '@mystock/domain';
 
 import { Button } from '@/components/ui/button';
 import { useBrands, useCategories, useProducts } from '@/features/catalog/api';
+import { LabelDialog, type LabelTarget } from '@/features/scanning/label-dialog';
+import { useAssignBarcode } from '@/features/scanning/api';
 import { ProductFormDialog } from '@/features/catalog/product-form-dialog';
 import { useOrganization } from '@/features/organizations/organization-provider';
 import { cn } from '@/lib/cn';
@@ -42,6 +44,9 @@ export function ProductsPage() {
   const [status, setStatus] = useState<ProductStatus | ''>('');
   const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [labelTargets, setLabelTargets] = useState<LabelTarget[] | null>(null);
+  const [barcodeError, setBarcodeError] = useState<string | null>(null);
+  const assignBarcode = useAssignBarcode(organizationId ?? '');
 
   const debouncedSearch = useDebouncedValue(search);
   const products = useProducts(organizationId, {
@@ -188,6 +193,9 @@ export function ProductsPage() {
                   <th scope="col" className="px-4 py-3 font-semibold">
                     Status
                   </th>
+                  <th scope="col" className="px-4 py-3 text-right font-semibold">
+                    Labels
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -196,6 +204,9 @@ export function ProductsPage() {
                     <td className="px-4 py-3">
                       <p className="font-medium text-slate-900">{product.name}</p>
                       <p className="mt-0.5 font-mono text-xs text-slate-500">{product.sku}</p>
+                      <p className="mt-0.5 font-mono text-xs text-slate-400">
+                        {product.barcode ?? 'No barcode assigned'}
+                      </p>
                     </td>
                     <td className="px-4 py-3 text-slate-600">{product.categoryName ?? '—'}</td>
                     <td className="px-4 py-3 text-slate-600">{product.brandName ?? '—'}</td>
@@ -217,11 +228,60 @@ export function ProductsPage() {
                         {product.status}
                       </span>
                     </td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-2">
+                        {!product.barcode && canWrite && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={assignBarcode.isPending}
+                            onClick={() => {
+                              setBarcodeError(null);
+                              assignBarcode.mutate(product.id, {
+                                onError: (error) =>
+                                  setBarcodeError(
+                                    error instanceof Error
+                                      ? error.message
+                                      : 'The barcode could not be assigned.',
+                                  ),
+                              });
+                            }}
+                          >
+                            Assign barcode
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() =>
+                            setLabelTargets([
+                              {
+                                kind: 'product',
+                                id: product.id,
+                                title: `${product.name} (${product.sku})`,
+                              },
+                            ])
+                          }
+                        >
+                          <Printer aria-hidden="true" className="size-4" />
+                          Label
+                        </Button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+        )}
+
+        {barcodeError && (
+          <p
+            role="alert"
+            className="border-t border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-800"
+          >
+            {barcodeError}
+          </p>
         )}
 
         {total > 0 && (
@@ -250,6 +310,17 @@ export function ProductsPage() {
           </div>
         )}
       </section>
+
+      {organizationId && labelTargets && (
+        <LabelDialog
+          organizationId={organizationId}
+          targets={labelTargets}
+          open={Boolean(labelTargets)}
+          onOpenChange={(open) => {
+            if (!open) setLabelTargets(null);
+          }}
+        />
+      )}
 
       {organizationId && (
         <ProductFormDialog

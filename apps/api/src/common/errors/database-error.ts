@@ -21,6 +21,20 @@ const CONSTRAINT_MESSAGES: Record<string, string> = {
   reservation_not_active: 'The reservation is no longer active.',
   reservation_mismatch: 'The reservation does not match this issue.',
   reservation_already_fulfilled: 'The reservation was already fulfilled.',
+  stock_count_already_open: 'An open count already exists for this stock location.',
+  stock_count_not_open: 'This stock count is no longer open.',
+  stock_count_empty: 'Record at least one line before posting the count.',
+  stock_count_below_reserved: 'The counted quantity is below the reserved quantity.',
+  product_not_countable: 'Serialized products are tracked per device, not by quantity.',
+};
+
+const NOT_FOUND_MESSAGES: Record<string, string> = {
+  reservation_not_found: 'Reservation not found.',
+  stock_count_not_found: 'Stock count not found.',
+  product_not_found: 'Product not found.',
+  device_not_found: 'Device not found.',
+  warehouse_not_found: 'Warehouse not found.',
+  location_not_found: 'Location not found.',
 };
 
 /**
@@ -94,8 +108,14 @@ export function toDatabaseErrorDescriptor(error: unknown): ErrorDescriptor | nul
       return {
         status: 404,
         code: 'not_found',
-        message:
-          rawMessage === 'reservation_not_found' ? 'Reservation not found.' : 'Record not found.',
+        message: NOT_FOUND_MESSAGES[rawMessage] ?? 'Record not found.',
+        details,
+      };
+    case '55000':
+      return {
+        status: 500,
+        code: 'operation_unavailable',
+        message: 'The operation could not be completed. Try again.',
         details,
       };
     case '22023':
