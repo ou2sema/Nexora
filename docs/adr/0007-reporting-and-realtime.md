@@ -93,10 +93,9 @@ condition. Realtime is therefore an optimization, not a correctness dependency.
   parent category to include children must select each category.
 - The 50,000-row cap bounds memory and response time at the cost of requiring narrower
   filters for very large tenants.
-- Live-update verification requires the hosted publication migration; until it is applied,
-  the 30-second poll is the visible refresh path on hosted. The poll was verified hosted by
-  posting a receipt through the API and watching the open dashboard move from 14 to 15 units
-  and 8 to 9 movements without a reload. Event delivery itself remains unverified hosted.
-  This is stated explicitly in the setup notes rather than hidden.
+- The publication migration is hosted-applied as of 2026-10-30. Event delivery was verified
+  end to end: a `stock_movements` INSERT reached a page channel in about one second, and the
+  open dashboard refreshed from 17 to 18 units without a reload. The 30-second poll remains
+  as a backstop, not the visible refresh path.
 - Phase 6 can build notifications and scheduled reports on the same aggregates without
   changing the ledger or the report endpoints.

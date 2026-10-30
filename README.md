@@ -14,8 +14,8 @@ and organization-scoped reporting.
 > were completed on 2026-10-30. Phase 5 adds server-side report aggregation with warehouse,
 > category, and window filters, stock valuation, movement trends, low-stock alerts, CSV
 > exports, and RLS-authorized realtime updates backed by an unconditional 30-second poll. It
-> is verified locally and against the hosted project; live socket delivery awaits the hosted
-> publication migration. Nothing is production-ready yet.
+> is verified locally and against the hosted project, including the publication migration and
+> end-to-end socket delivery. Nothing is production-ready yet.
 
 ## Stack
 

@@ -215,9 +215,11 @@ The local dev servers pointed at the hosted project, signed in as the owner:
   receipt left the open dashboard at 12, exposing the connected-but-not-delivering socket.
   After the hook began polling unconditionally, the open dashboard moved 14 → 15 units and
   8 → 9 movements within 30 seconds with no reload.
-
-Live event delivery through the socket is **not** verified hosted; it requires applying the
-migration below and watching the same refresh happen without polling.
+- The publication migration was then pushed hosted (dry run listed only
+  `20261030120000_reporting_realtime.sql`; `pg_publication_tables` confirmed
+  `devices`, `stock_balances`, `stock_movements`, and `stock_reservations`). A page-level
+  channel received an inserted movement in about one second, and the open dashboard advanced
+  from 17 to 18 units without a reload, so socket delivery is verified end to end.
 
 ## Quality gates
 
