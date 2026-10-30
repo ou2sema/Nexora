@@ -10,9 +10,9 @@ and organization-scoped reporting.
 > traceability, idempotent mutations, and reconciliation repair, and was exercised against the
 > hosted project. Phase 4 adds GTIN-validated barcode generation, a single scan pipeline,
 > server-rendered label PDFs, camera scanning with a manual fallback, and scan-assisted
-> receiving and inventory counts that post through the ledger. The Phase 4 migration is not yet
-> applied to the hosted project, so the signed-in scanning console has not run there. Nothing is
-> production-ready yet.
+> receiving and inventory counts that post through the ledger. The Phase 4 migration was
+> applied to the hosted database on 2026-10-30 and its objects were verified read-only, but the
+> signed-in scanning console has not yet been exercised there. Nothing is production-ready yet.
 
 ## Stack
 

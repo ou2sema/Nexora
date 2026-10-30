@@ -149,8 +149,8 @@ Scanning page:
 6. Deny camera permission, or use a browser without `BarcodeDetector`, and confirm manual
    entry still works. The camera panel states which engine is active.
 
-Hosted runs need the Phase 4 migration first (see below), because the hosted database does
-not have the count tables yet.
+Hosted runs now have the Phase 4 schema. The signed-in scan, label, and count pass against the
+hosted project remains to be recorded.
 
 ## Quality gates
 
@@ -214,11 +214,17 @@ percent-encoded):
 npx supabase db push --db-url $env:DATABASE_URL --include-seed
 ```
 
-Current hosted state (project `kohrmjzwmtqnwrmkymez`, checked 2026-10-29): the Phase 1–3
-migrations (tenancy, catalog, stock ledger, serialized devices) are applied, RLS is enabled on
-every table, and the demo seed has run against the first signed-up user, who is owner of “SBS
-VISION” with 7 products and 2 warehouses. A Phase 2 hosted end-to-end check passed: a real
-Supabase password grant produced a token the API accepted, the callers' organizations were
+The direct database host (`db.<project-ref>.supabase.co`) is IPv6-only for this project. On a
+network without an IPv6 route, use the session pooler instead: host
+`aws-0-eu-west-1.pooler.supabase.com`, port `5432`, user `postgres.<project-ref>`, database
+`postgres`, TLS required. The pooler URL is also shown in Dashboard → Connect → Session
+pooler. `migration list` and `db push` work through it.
+
+Current hosted state (project `kohrmjzwmtqnwrmkymez`, checked 2026-10-30): the Phase 1–4
+migrations (tenancy, catalog, stock ledger, serialized devices, barcode workflows) are applied,
+RLS is enabled on every table, and the demo seed has run against the first signed-up user, who is
+owner of “SBS VISION” with 7 products and 2 warehouses. A Phase 2 hosted end-to-end check passed:
+a real Supabase password grant produced a token the API accepted, the callers' organizations were
 isolated, and a foreign organization returned `404`. The temporary verification account was
 removed; only the owner remains.
 
@@ -233,10 +239,12 @@ drift. The same pass registered a serialized device, moved it, and walked its st
 remains in the tenant. The root `.env` `DATABASE_URL` holds the real connection string; never
 commit it.
 
-The Phase 4 migration (`20261030100000_barcode_workflows.sql`) is implemented and verified by
-the local PGlite/API suites (17 tests) but is **not applied to the hosted project**. Until it
-is pushed, the hosted API has no `stock_counts` tables or barcode RPCs, so the signed-in
-scanning console works locally only against a database that has the migration.
+The Phase 4 migration (`20261030100000_barcode_workflows.sql`) was pushed on 2026-10-30 with
+`npx supabase db push --db-url "<session-pooler-url>" --yes` after a dry run listed exactly that
+one migration. A read-only check then confirmed `stock_counts`, `stock_count_lines`, the
+one-open-count index, `app.post_stock_count`, and `app.assign_product_barcode` exist in the
+hosted project, and `stock_counts` was empty. The signed-in scanning console has still only been
+exercised locally; no hosted UI pass has been recorded for Phase 4.
 
 Re-running the command above seeds idempotently. The seed raises `seed_requires_auth_user`
 when no account exists.
@@ -345,6 +353,10 @@ rerun; `npm run build:apps` before the suite prevents the stale build.
 **Sign-in fails with "Invalid login credentials"** — the user does not exist in the Supabase
 project behind `VITE_SUPABASE_URL`, or the password is wrong. Sign-up may also require email
 confirmation depending on project settings.
+
+**`supabase db push` fails with `hostname resolving error` or `ENETUNREACH`** — the direct
+database host is IPv6-only and this network has no IPv6 route. Use the session-pooler URL
+described under [Database](#database) instead.
 
 **`Error: Environment variable VITE_SUPABASE_URL is missing`** — `apps/web/.env.local` is
 absent or incomplete. Recreate it as shown above.
