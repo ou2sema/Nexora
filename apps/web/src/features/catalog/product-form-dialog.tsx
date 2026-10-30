@@ -47,6 +47,14 @@ const priceField = z
     message: 'Use a positive amount with up to 3 decimals',
   });
 
+const thresholdField = z
+  .string()
+  .trim()
+  .refine(
+    (value) => value === '' || (/^\d+(\.\d{1,4})?$/.test(value) && Number(value) <= 1_000_000_000),
+    { message: 'Use a non-negative quantity with up to 4 decimals' },
+  );
+
 const schema = z.object({
   sku: z.string().trim().min(1, 'Enter a SKU').max(64),
   name: z.string().trim().min(1, 'Enter a product name').max(200),
@@ -63,6 +71,7 @@ const schema = z.object({
     }),
   purchasePrice: priceField,
   salePrice: priceField,
+  reorderThreshold: thresholdField,
   isSerialized: z.boolean(),
   status: z.enum(['active', 'inactive', 'discontinued']),
 });
@@ -100,6 +109,7 @@ export function ProductFormDialog({
       barcode: '',
       purchasePrice: '',
       salePrice: '',
+      reorderThreshold: '',
       isSerialized: false,
       status: 'active',
     },
@@ -125,6 +135,7 @@ export function ProductFormDialog({
       barcode: values.barcode || null,
       purchasePriceMinor: parsePriceInput(values.purchasePrice),
       salePriceMinor: parsePriceInput(values.salePrice),
+      reorderThreshold: values.reorderThreshold === '' ? 0 : Number(values.reorderThreshold),
       isSerialized: values.isSerialized,
       status: values.status as ProductStatus,
     };
@@ -304,16 +315,49 @@ export function ProductFormDialog({
               </select>
             </div>
 
-            <div className="flex items-end pb-2">
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  className="size-4 rounded border-slate-300 text-indigo-600"
-                  {...register('isSerialized')}
-                />
-                Track individual serial numbers
+            <div>
+              <label
+                htmlFor="product-reorder-threshold"
+                className="block text-sm font-medium text-slate-700"
+              >
+                Reorder threshold
               </label>
+              <input
+                id="product-reorder-threshold"
+                type="text"
+                inputMode="decimal"
+                placeholder="0"
+                className={fieldClass}
+                aria-invalid={Boolean(errors.reorderThreshold)}
+                aria-describedby={
+                  errors.reorderThreshold ? 'product-reorder-threshold-error' : undefined
+                }
+                {...register('reorderThreshold')}
+              />
+              {errors.reorderThreshold && (
+                <p
+                  id="product-reorder-threshold-error"
+                  role="alert"
+                  className="mt-1 text-xs text-rose-700"
+                >
+                  {errors.reorderThreshold.message}
+                </p>
+              )}
             </div>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                className="size-4 rounded border-slate-300 text-indigo-600"
+                {...register('isSerialized')}
+              />
+              Track individual serial numbers
+            </label>
+            <p className="mt-1 text-xs text-slate-500">
+              Low-stock alerts use the threshold; 0 disables them.
+            </p>
           </div>
 
           {errorMessage && (

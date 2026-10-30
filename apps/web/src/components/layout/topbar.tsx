@@ -3,6 +3,7 @@ import { LogOut, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/features/auth/auth-provider';
 import { OrganizationSwitcher } from '@/features/organizations/organization-switcher';
+import { LowStockBell } from '@/features/reports/low-stock-bell';
 
 interface TopbarProps {
   onOpenNav: () => void;
@@ -26,9 +27,7 @@ export function Topbar({ onOpenNav }: TopbarProps) {
         <OrganizationSwitcher />
       </div>
 
-      <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 sm:inline">
-        Phase 2
-      </span>
+      <LowStockBell />
 
       <span className="hidden max-w-[14rem] truncate text-sm text-slate-600 md:block">
         {session?.user.email}

@@ -1,7 +1,7 @@
 import { PackagePlus, Printer, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import type { ProductStatus } from '@mystock/contracts';
+import type { ProductStatus, ProductSummary } from '@mystock/contracts';
 import { formatTnd } from '@mystock/domain';
 
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { useBrands, useCategories, useProducts } from '@/features/catalog/api';
 import { LabelDialog, type LabelTarget } from '@/features/scanning/label-dialog';
 import { useAssignBarcode } from '@/features/scanning/api';
 import { ProductFormDialog } from '@/features/catalog/product-form-dialog';
+import { ReorderThresholdDialog } from '@/features/catalog/reorder-threshold-dialog';
 import { useOrganization } from '@/features/organizations/organization-provider';
 import { cn } from '@/lib/cn';
 
@@ -45,6 +46,7 @@ export function ProductsPage() {
   const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [labelTargets, setLabelTargets] = useState<LabelTarget[] | null>(null);
+  const [thresholdTarget, setThresholdTarget] = useState<ProductSummary | null>(null);
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
   const assignBarcode = useAssignBarcode(organizationId ?? '');
 
@@ -190,6 +192,9 @@ export function ProductsPage() {
                   <th scope="col" className="px-4 py-3 font-semibold">
                     Tracking
                   </th>
+                  <th scope="col" className="px-4 py-3 text-right font-semibold">
+                    Reorder at
+                  </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
                     Status
                   </th>
@@ -217,6 +222,9 @@ export function ProductsPage() {
                     </td>
                     <td className="px-4 py-3 text-slate-600">
                       {product.isSerialized ? 'Serialized' : 'Quantity'}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-slate-700">
+                      {product.reorderThreshold > 0 ? product.reorderThreshold : '—'}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -248,6 +256,15 @@ export function ProductsPage() {
                             }}
                           >
                             Assign barcode
+                          </Button>
+                        )}
+                        {canWrite && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setThresholdTarget(product)}
+                          >
+                            Threshold
                           </Button>
                         )}
                         <Button
@@ -329,6 +346,17 @@ export function ProductsPage() {
           onOpenChange={setDialogOpen}
           categories={categories.data ?? []}
           brands={brands.data ?? []}
+        />
+      )}
+
+      {organizationId && (
+        <ReorderThresholdDialog
+          organizationId={organizationId}
+          product={thresholdTarget}
+          open={Boolean(thresholdTarget)}
+          onOpenChange={(open) => {
+            if (!open) setThresholdTarget(null);
+          }}
         />
       )}
     </div>

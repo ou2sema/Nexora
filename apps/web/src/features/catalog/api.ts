@@ -9,6 +9,7 @@ import type {
   ProductListResponse,
   ProductStatus,
   ProductSummary,
+  ProductUpdateInput,
   StorageLocationCreateInput,
   StorageLocationSummary,
   WarehouseCreateInput,
@@ -109,6 +110,21 @@ export function useCreateProduct(organizationId: string) {
     '/products',
     'POST',
   );
+}
+
+export function useUpdateProduct(organizationId: string) {
+  const token = useAccessToken();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ productId, input }: { productId: string; input: ProductUpdateInput }) =>
+      apiRequest<ProductSummary>(`/organizations/${organizationId}/products/${productId}`, {
+        method: 'PATCH',
+        token,
+        body: input,
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: organizationKey(organizationId) }),
+  });
 }
 
 export function useCreateCategory(organizationId: string) {

@@ -156,6 +156,69 @@ inside the guard window was ignored, a denied camera permission left manual entr
 inventory count at `MAIN / A-01` recorded `CABLE-01` at 9 and posted with 0 adjustments
 (on-hand unchanged). No defects surfaced.
 
+## Reporting and realtime verification
+
+The Phase 5 API suite runs without a hosted project:
+
+```powershell
+npm run test --workspace @mystock/api -- test/api/reports.test.ts
+```
+
+Expected: 9 passing tests. They post a receipt, issue, transfer, and reservation, insert one
+serialized device, then recompute on-hand, reserved, available, serialized counts, valuation,
+movement totals, and the daily series from the raw tables in separate queries and assert the
+report matches exactly. The suite also covers warehouse and category filters, window
+validation, viewer access, cross-tenant `404`s, low-stock boundaries and pagination, and both
+CSV exports including field quoting and filter behavior.
+
+Full gates on 2026-10-30: `format:check`, `lint`, `typecheck`, and `build` clean; 184 Vitest
+tests across the workspaces (135 API, including the 9 report tests); 16 headed Playwright
+checks (8 specs × desktop/mobile) with the Allure report at 100%.
+
+To exercise the dashboard by hand, start both apps and sign in:
+
+1. The dashboard shows quantities, cost and retail valuation, ledger activity, the low-stock
+   list, and a per-warehouse table. Changing warehouse, category, or window updates every
+   section together.
+2. **Products → Threshold** opens the reorder-threshold editor for any product (also available
+   when adding a product). Set a threshold above current availability; the top-bar bell shows
+   a count and the dashboard low-stock list gains the product.
+3. Post a receipt on **Stock levels**, then return to the dashboard. The totals and movement
+   series reflect the committed movement: realtime invalidates the queries immediately once
+   the tables are published, and the 30-second poll refreshes the open dashboard even when
+   the channel reports connected but delivers no events.
+4. **Stock levels CSV** and **Movements CSV** download dated files using the current filters.
+   Open them in a spreadsheet and compare the quantity columns with the stock levels and
+   movement pages.
+5. A viewer can open the report, low-stock list, and exports; a member of another organization
+   receives `404 organization_not_found`.
+
+The realtime publication is added by `20261030120000_reporting_realtime.sql`. Polling is not
+conditional on the socket state: Supabase reports `SUBSCRIBED` for a channel whose tables are
+missing from the publication, and a hosted run showed the dashboard staying stale under that
+condition. The 30-second poll is the correctness path; the subscription is the fast path.
+
+### Hosted check (2026-10-30)
+
+The local dev servers pointed at the hosted project, signed in as the owner:
+
+- The dashboard rendered the hosted totals (11 units on hand, 1 serialized in stock, cost
+  TND 3,293.500, retail TND 4,062.900, 6 movements, window 2026-09-30 – 2026-10-30).
+- **Products → Threshold** set `CABLE-01` to 15; the row shows 15, the bell announces
+  "Low stock alerts: 1 product", and the dashboard lists `11 / 15 · short 4`.
+- Selecting the MAIN warehouse issued `reports/overview?warehouseId=…` and scoped the
+  low-stock query to the same warehouse; "Last 7 days" changed the window to
+  2026-10-23 – 2026-10-30 and the series start.
+- **Stock levels CSV** downloaded the header plus two `CABLE-01` rows with on-hand 9 and 2;
+  **Movements CSV** downloaded six rows whose quantities match the movement page.
+- A receipt posted through the UI moved the dashboard from 11 to 12 units; a further API
+  receipt left the open dashboard at 12, exposing the connected-but-not-delivering socket.
+  After the hook began polling unconditionally, the open dashboard moved 14 → 15 units and
+  8 → 9 movements within 30 seconds with no reload.
+
+Live event delivery through the socket is **not** verified hosted; it requires applying the
+migration below and watching the same refresh happen without polling.
+
 ## Quality gates
 
 ```powershell
@@ -174,13 +237,14 @@ alphabetically, so `@mystock/api` would otherwise build against a stale or missi
 
 The schema is plain SQL in `supabase/migrations`, applied in filename order:
 
-| Migration                               | Contents                                                         |
-| --------------------------------------- | ---------------------------------------------------------------- |
-| `20261029120000_tenancy.sql`            | organizations, memberships, helper functions, base RLS           |
-| `20261029121000_catalog.sql`            | products, categories, brands, warehouses, storage locations      |
-| `20261029130000_stock_ledger.sql`       | ledger, balances, reservations, idempotency, reconciliation RPCs |
-| `20261029140000_serialized_devices.sql` | devices, device events, lifecycle transitions                    |
-| `20261030100000_barcode_workflows.sql`  | GTIN checks, barcode assignment, stock counts and posting RPCs   |
+| Migration                               | Contents                                                                    |
+| --------------------------------------- | --------------------------------------------------------------------------- |
+| `20261029120000_tenancy.sql`            | organizations, memberships, helper functions, base RLS                      |
+| `20261029121000_catalog.sql`            | products, categories, brands, warehouses, storage locations                 |
+| `20261029130000_stock_ledger.sql`       | ledger, balances, reservations, idempotency, reconciliation RPCs            |
+| `20261029140000_serialized_devices.sql` | devices, device events, lifecycle transitions                               |
+| `20261030100000_barcode_workflows.sql`  | GTIN checks, barcode assignment, stock counts and posting RPCs              |
+| `20261030120000_reporting_realtime.sql` | guarded realtime publication for balances, movements, reservations, devices |
 
 Demo data lives in `supabase/seed.sql` and requires at least one signed-up user (it raises
 `seed_requires_auth_user` otherwise).
