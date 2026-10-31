@@ -464,11 +464,18 @@ invitation row. The signed-in Team page in the “MyStock” tenant listed the o
 pending invitation, and the API returned 200 for members and invitations, an empty pending
 list for the owner, and `409 invitation_already_pending` for a duplicate invite.
 
-Hosted acceptance, role change, and removal are not yet exercised: the owner created a pending
-invitation to `ou2sema@gmail.com`, and the remaining steps need that invitee's own sign-in
-(no throwaway GoTrue account can be used — GoTrue rejects synthetic auth rows). The invitation
-expires on 2026-11-14. Phase 9 is otherwise verified hosted; the acceptance path itself is
-covered by the database and headed local-stack suites above.
+Hosted acceptance was verified on 2026-10-31. The owner's first invitation was revoked before
+acceptance, so a fresh viewer invitation was created through the API, then accepted through
+`app.accept_invitation` under the invitee's own JWT claims (`authenticated` role) — tooling never
+handles an account password, so the sign-in form and banner were not used for this step (that
+path is covered by the headed local-stack suite). The acceptance created the MyStock viewer
+membership, stamped `accepted_at`, and cleared the invitee's pending list; a replay returned the
+same organization id, and calling the RPC with the owner's claims was rejected with
+`invitation_email_mismatch` (`42501`). The owner's Team page then showed 2 members with
+`ou2sema@gmail.com` as Viewer and the invitation history showing Accepted plus the earlier
+Revoked row. Hosted role change and removal are still unexercised (they would alter the accepted
+membership); both are covered by the database and headed suites above. A pending invitation to
+`test@gmail.com` created during this pass remains in the tenant.
 
 ## Quality gates
 
@@ -553,9 +560,9 @@ owner of “SBS VISION” with 7 products and 2 warehouses. A Phase 2 hosted end
 passed: a real Supabase password grant produced a token the API accepted, the callers'
 organizations were isolated, and a foreign organization returned `404`. The temporary
 verification account was removed; only the owner remains. Phase 8 added no schema. Phase 9
-(`20261031140000_team_access.sql`) was applied on 2026-10-31; the hosted Team page, API, and
-tenant isolation are verified, while invitation acceptance and the member-management steps
-still need the invitee's own sign-in (see “Team access verification”).
+(`20261031140000_team_access.sql`) was applied on 2026-10-31; the hosted Team page, API,
+tenant isolation, and invitation acceptance are verified, while hosted role change and removal
+are still unexercised (see “Team access verification”).
 
 The Phase 3 migrations (`20261029130000_stock_ledger.sql` and
 `20261029140000_serialized_devices.sql`) were pushed to the hosted project on 2026-10-29 with
