@@ -24,8 +24,8 @@ and organization-scoped reporting.
 > disposal of serialized devices), sales returns that restock the order location, post-time
 > over-return revalidation, and an on-demand supplier performance report; it is verified
 > locally, and on 2026-10-31 its migration was pushed to the hosted project, where a signed-in
-> purchase return posted a matching ledger adjustment and the supplier metrics updated. Nothing
-> is production-ready yet.
+> pass posted a purchase return and a sales return with matching ledger movements. Nothing is
+> production-ready yet.
 
 ## Stack
 

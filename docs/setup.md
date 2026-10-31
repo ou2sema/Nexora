@@ -349,8 +349,20 @@ A signed-in pass followed in the same “MyStock” tenant against the hosted AP
   HTTP 400 `constraint_violation` — “The return exceeds the quantity received and not yet
   returned.” — and a follow-up query confirmed it left no extra return row and no extra
   movement.
+- **Sales return**: created and posted `SR-2026-0001` against the fulfilled `SO-2026-0001`
+  (customer “Societe Retail Test”) with reason “Hosted verification: customer return”,
+  reference `HOSTED-SR-2026-10-31`, and one unit. The order line then showed RETURNED 1 and
+  “New sales return” became disabled. Hosted rows show the return `posted`, its line at
+  quantity 1, and one receipt movement of `+1.0000` with `reference_type = sales_return` at
+  `MAIN / A-01`, leaving balances 16 + 2 = 18 across 15 movements with zero drift. The
+  dashboard refreshed to 18 units on hand, 15 movements, and received 22 / issued 7 / net 18;
+  the supplier card stayed at a 100% return rate, because supplier metrics count only purchase
+  returns.
 
-The posted return and its movement remain in that tenant.
+A later dry run (`npx supabase db push --db-url "$DATABASE_URL" --dry-run`) reported “Remote
+database is up to date”, confirming hosted carries the full Phase 7 schema.
+
+Both posted returns and their movements remain in that tenant.
 
 ## Quality gates
 
