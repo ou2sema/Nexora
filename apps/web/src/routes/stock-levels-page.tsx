@@ -18,6 +18,7 @@ import {
   StockPostingDialog,
   StockTransferDialog,
 } from '@/features/stock/stock-dialogs';
+import { useI18n } from '@/i18n/provider';
 import { cn } from '@/lib/cn';
 
 const PAGE_SIZE = 25;
@@ -35,11 +36,8 @@ function useDebouncedValue<T>(value: T, delay = 300): T {
   return debounced;
 }
 
-function formatQuantity(value: number): string {
-  return new Intl.NumberFormat('en-TN', { maximumFractionDigits: 4 }).format(value);
-}
-
 export function StockLevelsPage() {
+  const { t, formatQuantity, errorMessage } = useI18n();
   const { organization } = useOrganization();
   const organizationId = organization?.organizationId ?? null;
   const canWrite =
@@ -74,31 +72,42 @@ export function StockLevelsPage() {
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const metrics = [
-    { label: 'On hand', value: summary.data?.onHand ?? null, icon: Boxes },
-    { label: 'Reserved', value: summary.data?.reserved ?? null, icon: LockKeyhole },
-    { label: 'Available', value: summary.data?.available ?? null, icon: ArrowUpFromLine },
-    { label: 'Stocked products', value: summary.data?.productCount ?? null, icon: ClipboardList },
+    { label: t('stock.metrics.onHand'), value: summary.data?.onHand ?? null, icon: Boxes },
+    {
+      label: t('stock.metrics.reserved'),
+      value: summary.data?.reserved ?? null,
+      icon: LockKeyhole,
+    },
+    {
+      label: t('stock.metrics.available'),
+      value: summary.data?.available ?? null,
+      icon: ArrowUpFromLine,
+    },
+    {
+      label: t('stock.metrics.productCount'),
+      value: summary.data?.productCount ?? null,
+      icon: ClipboardList,
+    },
   ];
 
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Stock levels</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Quantities derived from the immutable stock ledger. Available stock excludes active
-            reservations.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            {t('stock.title')}
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">{t('stock.description')}</p>
         </div>
 
         <div className="flex flex-wrap gap-2">
           <Button disabled={!canWrite} onClick={() => setPostingMode('receipt')}>
             <Boxes aria-hidden="true" className="size-4" />
-            Receive
+            {t('stock.actions.receive')}
           </Button>
           <Button variant="secondary" disabled={!canWrite} onClick={() => setPostingMode('issue')}>
             <ArrowUpFromLine aria-hidden="true" className="size-4" />
-            Issue
+            {t('stock.actions.issue')}
           </Button>
           <Button
             variant="secondary"
@@ -106,22 +115,22 @@ export function StockLevelsPage() {
             onClick={() => setPostingMode('adjustment')}
           >
             <SlidersHorizontal aria-hidden="true" className="size-4" />
-            Adjust
+            {t('stock.actions.adjust')}
           </Button>
           <Button variant="secondary" disabled={!canWrite} onClick={() => setTransferOpen(true)}>
-            <ArrowLeftRight aria-hidden="true" className="size-4" />
-            Transfer
+            <ArrowLeftRight aria-hidden="true" className="size-4 rtl:-scale-x-100" />
+            {t('stock.actions.transfer')}
           </Button>
           <Button variant="secondary" disabled={!canWrite} onClick={() => setReserveOpen(true)}>
             <LockKeyhole aria-hidden="true" className="size-4" />
-            Reserve
+            {t('stock.actions.reserve')}
           </Button>
         </div>
       </header>
 
       {!canWrite && (
         <p className="rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">
-          Your viewer role is read-only. Owners, admins and managers can post stock movements.
+          {t('stock.readOnly')}
         </p>
       )}
 
@@ -138,7 +147,7 @@ export function StockLevelsPage() {
                 metric.value === null ? 'text-slate-400' : 'text-slate-900',
               )}
             >
-              {metric.value === null ? '—' : formatQuantity(metric.value)}
+              {metric.value === null ? t('common.notAvailable') : formatQuantity(metric.value)}
             </dd>
           </div>
         ))}
@@ -148,13 +157,13 @@ export function StockLevelsPage() {
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center">
           <div className="flex-1">
             <label htmlFor="stock-search" className="sr-only">
-              Search stock
+              {t('stock.searchLabel')}
             </label>
             <input
               id="stock-search"
               type="search"
               value={search}
-              placeholder="Search by product name or SKU"
+              placeholder={t('stock.searchPlaceholder')}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500"
               onChange={(event) => {
                 setSearch(event.target.value);
@@ -165,7 +174,7 @@ export function StockLevelsPage() {
 
           <div>
             <label htmlFor="stock-warehouse-filter" className="sr-only">
-              Filter by warehouse
+              {t('stock.warehouseFilterLabel')}
             </label>
             <select
               id="stock-warehouse-filter"
@@ -176,7 +185,7 @@ export function StockLevelsPage() {
                 setPage(1);
               }}
             >
-              <option value="">All warehouses</option>
+              <option value="">{t('stock.allWarehouses')}</option>
               {(warehouses.data ?? []).map((warehouse) => (
                 <option key={warehouse.id} value={warehouse.id}>
                   {warehouse.code} · {warehouse.name}
@@ -189,9 +198,7 @@ export function StockLevelsPage() {
         {levels.isError ? (
           <div className="p-6">
             <p role="alert" className="text-sm text-rose-700">
-              {levels.error instanceof Error
-                ? levels.error.message
-                : 'Stock levels failed to load.'}
+              {levels.error ? errorMessage(levels.error, 'stock.loadError') : t('stock.loadError')}
             </p>
             <Button
               variant="secondary"
@@ -199,15 +206,11 @@ export function StockLevelsPage() {
               className="mt-3"
               onClick={() => void levels.refetch()}
             >
-              Try again
+              {t('common.retry')}
             </Button>
           </div>
         ) : levels.isPending ? (
-          <div
-            className="divide-y divide-slate-100"
-            role="status"
-            aria-label="Loading stock levels"
-          >
+          <div className="divide-y divide-slate-100" role="status" aria-label={t('stock.loading')}>
             {Array.from({ length: 5 }).map((_, index) => (
               <div key={index} className="flex animate-pulse items-center gap-4 px-4 py-4">
                 <div className="h-4 w-1/3 rounded bg-slate-200" />
@@ -222,36 +225,36 @@ export function StockLevelsPage() {
               <Boxes aria-hidden="true" className="size-6" />
             </span>
             <h2 className="mt-4 text-base font-semibold text-slate-900">
-              {search || warehouseId ? 'No matching stock lines' : 'No stock recorded yet'}
+              {search || warehouseId ? t('stock.emptyFilteredTitle') : t('stock.emptyTitle')}
             </h2>
             <p className="mt-2 max-w-md text-sm text-slate-600">
               {search || warehouseId
-                ? 'Adjust the search or warehouse filter to see more results.'
+                ? t('stock.emptyFilteredBody')
                 : canWrite
-                  ? 'Post a receipt to create the first ledger entry and balance projection.'
-                  : 'A receipt from an owner, admin or manager will create the first stock line.'}
+                  ? t('stock.emptyCanWriteBody')
+                  : t('stock.emptyReadOnlyBody')}
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <caption className="sr-only">Stock levels by product and storage location</caption>
+            <table className="w-full text-start text-sm">
+              <caption className="sr-only">{t('stock.tableCaption')}</caption>
               <thead className="text-xs uppercase tracking-wide text-slate-500">
                 <tr className="border-b border-slate-200">
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Product
+                    {t('common.product')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Location
+                    {t('common.location')}
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right font-semibold">
-                    On hand
+                  <th scope="col" className="px-4 py-3 text-end font-semibold">
+                    {t('stock.columns.onHand')}
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right font-semibold">
-                    Reserved
+                  <th scope="col" className="px-4 py-3 text-end font-semibold">
+                    {t('stock.columns.reserved')}
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right font-semibold">
-                    Available
+                  <th scope="col" className="px-4 py-3 text-end font-semibold">
+                    {t('stock.columns.available')}
                   </th>
                 </tr>
               </thead>
@@ -263,23 +266,27 @@ export function StockLevelsPage() {
                   >
                     <td className="px-4 py-3">
                       <p className="font-medium text-slate-900">{level.productName}</p>
-                      <p className="mt-0.5 font-mono text-xs text-slate-500">{level.sku}</p>
+                      <p className="mt-0.5 font-mono text-xs text-slate-500">
+                        <span dir="ltr">{level.sku}</span>
+                      </p>
                     </td>
                     <td className="px-4 py-3 text-slate-600">
                       <p>{level.warehouseName}</p>
                       <p className="font-mono text-xs text-slate-500">
-                        {level.warehouseCode} / {level.locationCode}
+                        <span dir="ltr">
+                          {level.warehouseCode} / {level.locationCode}
+                        </span>
                       </p>
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-900">
+                    <td className="px-4 py-3 text-end tabular-nums text-slate-900">
                       {formatQuantity(level.onHand)}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-600">
+                    <td className="px-4 py-3 text-end tabular-nums text-slate-600">
                       {formatQuantity(level.reserved)}
                     </td>
                     <td
                       className={cn(
-                        'px-4 py-3 text-right font-medium tabular-nums',
+                        'px-4 py-3 text-end font-medium tabular-nums',
                         level.available <= 0 ? 'text-rose-700' : 'text-emerald-700',
                       )}
                     >
@@ -297,7 +304,7 @@ export function StockLevelsPage() {
             total={total}
             page={page}
             pageCount={pageCount}
-            noun="stock line"
+            nounKey="common.noun.stockLines"
             onPrevious={() => setPage((current) => Math.max(1, current - 1))}
             onNext={() => setPage((current) => current + 1)}
           />

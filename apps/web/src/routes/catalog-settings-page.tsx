@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Tags } from 'lucide-react';
+import { useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -13,25 +14,16 @@ import {
   useCreateCategory,
 } from '@/features/catalog/api';
 import { useOrganization } from '@/features/organizations/organization-provider';
-import { ApiError } from '@/lib/api-client';
+import { useI18n } from '@/i18n/provider';
 
 const fieldClass =
   'mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500';
 
-const categorySchema = z.object({
-  name: z.string().trim().min(1, 'Enter a category name').max(120),
-  parentId: z.string(),
-});
-
-type CategoryValues = z.infer<typeof categorySchema>;
-
-const brandSchema = z.object({
-  name: z.string().trim().min(1, 'Enter a brand name').max(120),
-});
-
-type BrandValues = z.infer<typeof brandSchema>;
+type CategoryValues = { name: string; parentId: string };
+type BrandValues = { name: string };
 
 export function CatalogSettingsPage() {
+  const { t } = useI18n();
   const { organization } = useOrganization();
   const organizationId = organization?.organizationId ?? null;
   const canWrite =
@@ -45,24 +37,26 @@ export function CatalogSettingsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Catalog settings</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Categories and brands shared by every product in this organization.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+          {t('catalogSettings.title')}
+        </h1>
+        <p className="mt-1 text-sm text-slate-600">{t('catalogSettings.description')}</p>
       </header>
 
       {!canWrite && (
         <p className="rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">
-          Your viewer role is read-only. Owners, admins and managers can edit these lists.
+          {t('catalogSettings.readOnly')}
         </p>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-slate-200 bg-white">
           <div className="border-b border-slate-100 p-5">
-            <h2 className="text-base font-semibold text-slate-900">Categories</h2>
+            <h2 className="text-base font-semibold text-slate-900">
+              {t('catalogSettings.categories.title')}
+            </h2>
             <p className="mt-1 text-sm text-slate-600">
-              Optional hierarchy used for filtering and reports.
+              {t('catalogSettings.categories.description')}
             </p>
           </div>
 
@@ -80,8 +74,10 @@ export function CatalogSettingsPage() {
 
         <section className="rounded-xl border border-slate-200 bg-white">
           <div className="border-b border-slate-100 p-5">
-            <h2 className="text-base font-semibold text-slate-900">Brands</h2>
-            <p className="mt-1 text-sm text-slate-600">Manufacturer or commercial brand names.</p>
+            <h2 className="text-base font-semibold text-slate-900">
+              {t('catalogSettings.brands.title')}
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">{t('catalogSettings.brands.description')}</p>
           </div>
 
           {canWrite && organizationId && <BrandForm organizationId={organizationId} />}
@@ -105,23 +101,29 @@ function CategoryForm({
   organizationId: string;
   categories: CategorySummary[];
 }) {
+  const { t, errorMessage } = useI18n();
   const mutation = useCreateCategory(organizationId);
+  const schema = useMemo(
+    () =>
+      z.object({
+        name: z.string().trim().min(1, t('catalogSettings.categories.nameRequired')).max(120),
+        parentId: z.string(),
+      }),
+    [t],
+  );
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors },
   } = useForm<CategoryValues>({
-    resolver: zodResolver(categorySchema),
+    resolver: zodResolver(schema),
     defaultValues: { name: '', parentId: '' },
   });
 
-  const errorMessage =
-    mutation.error instanceof ApiError
-      ? mutation.error.message
-      : mutation.error
-        ? 'The category could not be created.'
-        : null;
+  const error = mutation.error
+    ? errorMessage(mutation.error, 'catalogSettings.categories.failed')
+    : null;
 
   return (
     <form
@@ -142,12 +144,12 @@ function CategoryForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label htmlFor="category-name" className="block text-sm font-medium text-slate-700">
-            New category
+            {t('catalogSettings.categories.new')}
           </label>
           <input
             id="category-name"
             className={fieldClass}
-            placeholder="Cameras"
+            placeholder={t('catalogSettings.categories.namePlaceholder')}
             aria-invalid={Boolean(errors.name)}
             aria-describedby={errors.name ? 'category-name-error' : undefined}
             {...register('name')}
@@ -161,10 +163,10 @@ function CategoryForm({
 
         <div>
           <label htmlFor="category-parent" className="block text-sm font-medium text-slate-700">
-            Parent (optional)
+            {t('catalogSettings.categories.parent')}
           </label>
           <select id="category-parent" className={fieldClass} {...register('parentId')}>
-            <option value="">Top level</option>
+            <option value="">{t('catalogSettings.categories.topLevel')}</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
@@ -174,37 +176,42 @@ function CategoryForm({
         </div>
       </div>
 
-      {errorMessage && (
+      {error && (
         <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
-          {errorMessage}
+          {error}
         </p>
       )}
 
       <Button type="submit" size="sm" disabled={mutation.isPending}>
-        {mutation.isPending ? 'Adding…' : 'Add category'}
+        {mutation.isPending ? t('catalogSettings.adding') : t('catalogSettings.categories.create')}
       </Button>
     </form>
   );
 }
 
 function BrandForm({ organizationId }: { organizationId: string }) {
+  const { t, errorMessage } = useI18n();
   const mutation = useCreateBrand(organizationId);
+  const schema = useMemo(
+    () =>
+      z.object({
+        name: z.string().trim().min(1, t('catalogSettings.brands.nameRequired')).max(120),
+      }),
+    [t],
+  );
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors },
   } = useForm<BrandValues>({
-    resolver: zodResolver(brandSchema),
+    resolver: zodResolver(schema),
     defaultValues: { name: '' },
   });
 
-  const errorMessage =
-    mutation.error instanceof ApiError
-      ? mutation.error.message
-      : mutation.error
-        ? 'The brand could not be created.'
-        : null;
+  const error = mutation.error
+    ? errorMessage(mutation.error, 'catalogSettings.brands.failed')
+    : null;
 
   return (
     <form
@@ -221,12 +228,12 @@ function BrandForm({ organizationId }: { organizationId: string }) {
     >
       <div>
         <label htmlFor="brand-name" className="block text-sm font-medium text-slate-700">
-          New brand
+          {t('catalogSettings.brands.new')}
         </label>
         <input
           id="brand-name"
           className={fieldClass}
-          placeholder="Apple"
+          placeholder={t('catalogSettings.brands.namePlaceholder')}
           aria-invalid={Boolean(errors.name)}
           aria-describedby={errors.name ? 'brand-name-error' : undefined}
           {...register('name')}
@@ -238,14 +245,14 @@ function BrandForm({ organizationId }: { organizationId: string }) {
         )}
       </div>
 
-      {errorMessage && (
+      {error && (
         <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
-          {errorMessage}
+          {error}
         </p>
       )}
 
       <Button type="submit" size="sm" disabled={mutation.isPending}>
-        {mutation.isPending ? 'Adding…' : 'Add brand'}
+        {mutation.isPending ? t('catalogSettings.adding') : t('catalogSettings.brands.create')}
       </Button>
     </form>
   );
@@ -262,9 +269,15 @@ function CategoryList({
   isError: boolean;
   onRetry: () => void;
 }) {
+  const { t } = useI18n();
+
   if (isLoading) {
     return (
-      <div className="space-y-3 p-5" role="status" aria-label="Loading categories">
+      <div
+        className="space-y-3 p-5"
+        role="status"
+        aria-label={t('catalogSettings.categories.loading')}
+      >
         {Array.from({ length: 3 }).map((_, index) => (
           <div key={index} className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
         ))}
@@ -276,10 +289,10 @@ function CategoryList({
     return (
       <div className="p-5">
         <p role="alert" className="text-sm text-rose-700">
-          Categories failed to load.
+          {t('catalogSettings.categories.loadFailed')}
         </p>
         <Button variant="secondary" size="sm" className="mt-2" onClick={onRetry}>
-          Try again
+          {t('common.retry')}
         </Button>
       </div>
     );
@@ -289,7 +302,7 @@ function CategoryList({
     return (
       <p className="flex items-center gap-2 p-5 text-sm text-slate-600">
         <Tags aria-hidden="true" className="size-4 text-slate-400" />
-        No categories yet.
+        {t('catalogSettings.categories.empty')}
       </p>
     );
   }
@@ -304,11 +317,15 @@ function CategoryList({
             <p className="font-medium text-slate-800">{category.name}</p>
             <p className="text-xs text-slate-500">
               {category.parentId
-                ? `Inside ${names.get(category.parentId) ?? 'unknown'}`
-                : 'Top level'}
+                ? t('catalogSettings.categories.inside', {
+                    name: names.get(category.parentId) ?? t('catalogSettings.categories.unknown'),
+                  })
+                : t('catalogSettings.categories.topLevel')}
             </p>
           </div>
-          <span className="font-mono text-xs text-slate-500">{category.slug}</span>
+          <span dir="ltr" className="font-mono text-xs text-slate-500">
+            {category.slug}
+          </span>
         </li>
       ))}
     </ul>
@@ -326,9 +343,11 @@ function BrandList({
   isError: boolean;
   onRetry: () => void;
 }) {
+  const { t } = useI18n();
+
   if (isLoading) {
     return (
-      <div className="space-y-3 p-5" role="status" aria-label="Loading brands">
+      <div className="space-y-3 p-5" role="status" aria-label={t('catalogSettings.brands.loading')}>
         {Array.from({ length: 3 }).map((_, index) => (
           <div key={index} className="h-4 w-1/2 animate-pulse rounded bg-slate-100" />
         ))}
@@ -340,10 +359,10 @@ function BrandList({
     return (
       <div className="p-5">
         <p role="alert" className="text-sm text-rose-700">
-          Brands failed to load.
+          {t('catalogSettings.brands.loadFailed')}
         </p>
         <Button variant="secondary" size="sm" className="mt-2" onClick={onRetry}>
-          Try again
+          {t('common.retry')}
         </Button>
       </div>
     );
@@ -353,7 +372,7 @@ function BrandList({
     return (
       <p className="flex items-center gap-2 p-5 text-sm text-slate-600">
         <Tags aria-hidden="true" className="size-4 text-slate-400" />
-        No brands yet.
+        {t('catalogSettings.brands.empty')}
       </p>
     );
   }

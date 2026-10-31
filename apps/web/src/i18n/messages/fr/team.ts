@@ -1,0 +1,73 @@
+import type { TeamMessages } from '../en/team';
+
+export const team: TeamMessages = {
+  'team.title': 'Équipe',
+  'team.description': 'Membres et accès pour {organizationName}.',
+  'team.inviteMember': 'Inviter un membre',
+  'team.inviteViewer': 'Inviter un lecteur',
+  'team.managerNotice':
+    'Les gestionnaires peuvent inviter des lecteurs. Les propriétaires et les administrateurs gèrent les rôles et les invitations.',
+  'team.readOnlyNotice':
+    'Votre rôle {role} peut consulter l’équipe. Les propriétaires et les administrateurs gèrent les membres et les invitations.',
+  'team.readOnlyRole': 'en lecture seule',
+  'team.roleChangeFailed': 'Le rôle n’a pas pu être modifié.',
+  'team.revokeFailed': 'L’invitation n’a pas pu être révoquée.',
+  'team.membersHeading': 'Membres',
+  'team.total': '{count} au total',
+  'team.membersLoadFailed': 'Le chargement des membres de l’équipe a échoué.',
+  'team.loadingMembers': 'Chargement des membres',
+  'team.membersCaption': 'Membres de l’organisation',
+  'team.memberColumn': 'Membre',
+  'team.joinedColumn': 'Date d’adhésion',
+  'team.roleLabel': 'Rôle',
+  'team.you': 'Vous',
+  'team.unnamedMember': 'Membre sans nom',
+  'team.memberFallback': 'membre',
+  'team.roleFor': 'Rôle de {email}',
+  'team.cannotRemoveSelf': 'Vous ne pouvez pas vous retirer vous-même',
+  'team.ownerOnlyRemoveOwner': 'Seul un propriétaire peut retirer un propriétaire',
+  'team.invitationsHeading': 'Invitations',
+  'team.expireAfter': 'Expire après 14 jours',
+  'team.invitationsHelp':
+    'MyStock n’envoie pas d’e-mail. Partagez l’invitation avec la personne ; elle lui apparaîtra après sa connexion avec l’adresse invitée.',
+  'team.invitationsLoadFailed': 'Le chargement des invitations a échoué.',
+  'team.loadingInvitations': 'Chargement des invitations',
+  'team.noInvitationsTitle': 'Aucune invitation pour le moment',
+  'team.noInvitationsBody':
+    'Invitez un collègue par e-mail et partagez directement l’invitation avec lui.',
+  'team.invitationsCaption': 'Invitations de l’organisation',
+  'team.timelineColumn': 'Chronologie',
+  'team.invitedByPrefix': 'Invitation de',
+  'team.inviterRemoved': 'Compte de l’invitant supprimé',
+  'team.expires': 'Expire le {date}',
+  'team.sent': 'Envoyée le {date}',
+  'team.revoking': 'Révocation…',
+  'team.revoke': 'Révoquer',
+  'team.noOrganization':
+    'Sélectionnez une organisation pour consulter son équipe, ou demandez à un administrateur de la plateforme de vous y ajouter.',
+  'team.administrationLink': 'Administration →',
+  'invite.title': 'Inviter un membre de l’équipe',
+  'invite.description':
+    'L’invitation apparaîtra pour cette adresse e-mail après la connexion. MyStock n’envoie pas d’e-mail ; demandez à la personne de rechercher l’invitation en attente.',
+  'invite.emailRequired': 'Saisissez une adresse e-mail',
+  'invite.emailInvalid': 'Saisissez une adresse e-mail valide',
+  'invite.managersViewersOnly': 'Les gestionnaires peuvent uniquement inviter des lecteurs.',
+  'invite.ownershipNote':
+    'La propriété est transférée en modifiant un membre existant, et non par invitation.',
+  'invite.createFailed': 'L’invitation n’a pas pu être créée.',
+  'invite.sending': 'Envoi…',
+  'invite.send': 'Envoyer l’invitation',
+  'memberDialog.title': 'Retirer un membre de l’équipe',
+  'memberDialog.description':
+    '{name} perd immédiatement l’accès à cette organisation. Son historique de stock reste intact.',
+  'memberDialog.thisMember': 'ce membre',
+  'memberDialog.removeFailed': 'Le membre n’a pas pu être retiré.',
+  'memberDialog.removing': 'Retrait…',
+  'memberDialog.removeMember': 'Retirer le membre',
+  'pendingInvitations.title': 'Invitations en attente',
+  'pendingInvitations.description':
+    'Acceptez une invitation pour rejoindre une organisation avec ce compte.',
+  'pendingInvitations.roleLine': 'Rôle {role} · expire le {date}',
+  'pendingInvitations.accept': 'Accepter l’invitation',
+  'pendingInvitations.acceptFailed': 'L’invitation n’a pas pu être acceptée.',
+};

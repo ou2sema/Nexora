@@ -9,11 +9,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { useI18n } from '@/i18n/provider';
 import { CreateOrganizationForm } from './create-organization-form';
 import { useOrganization } from './organization-provider';
 
 export function OrganizationSwitcher() {
   const { memberships, organization, platformAdmin, selectOrganization } = useOrganization();
+  const { t } = useI18n();
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
@@ -21,7 +23,7 @@ export function OrganizationSwitcher() {
       {organization ? (
         <label className="flex min-w-0 items-center gap-2">
           <Building2 aria-hidden="true" className="hidden size-4 text-slate-400 sm:block" />
-          <span className="sr-only">Organization</span>
+          <span className="sr-only">{t('organizations.label')}</span>
           <select
             value={organization.organizationId}
             onChange={(event) => selectOrganization(event.target.value)}
@@ -35,22 +37,20 @@ export function OrganizationSwitcher() {
           </select>
         </label>
       ) : (
-        <p className="text-sm font-medium text-slate-500">No organization</p>
+        <p className="text-sm font-medium text-slate-500">{t('organizations.none')}</p>
       )}
 
       {platformAdmin && (
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
-            <Button variant="ghost" size="sm" aria-label="Create organization">
+            <Button variant="ghost" size="sm" aria-label={t('organizations.createAction')}>
               <Plus aria-hidden="true" className="size-4" />
-              <span className="hidden sm:inline">New org</span>
+              <span className="hidden sm:inline">{t('organizations.newShort')}</span>
             </Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogTitle>Create organization</DialogTitle>
-            <DialogDescription>
-              You become the owner. The slug is derived from the name and must be unique.
-            </DialogDescription>
+            <DialogTitle>{t('organizations.createTitle')}</DialogTitle>
+            <DialogDescription>{t('organizations.createDescription')}</DialogDescription>
             <div className="mt-4">
               <CreateOrganizationForm onCreated={() => setCreateOpen(false)} />
             </div>

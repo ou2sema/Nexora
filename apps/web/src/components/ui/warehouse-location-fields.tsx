@@ -2,6 +2,7 @@ import type { UseFormRegisterReturn } from 'react-hook-form';
 
 import type { WarehouseSummary } from '@mystock/contracts';
 
+import { useI18n } from '@/i18n/provider';
 import { fieldClass } from '@/lib/form-field';
 
 interface WarehouseLocationFieldsProps {
@@ -20,9 +21,10 @@ export function WarehouseLocationFields({
   warehouseField,
   locationField,
   selectedWarehouseId,
-  warehouseLabel = 'Warehouse',
-  locationLabel = 'Storage location',
+  warehouseLabel,
+  locationLabel,
 }: WarehouseLocationFieldsProps) {
+  const { t } = useI18n();
   const selectedWarehouse = warehouses.find((warehouse) => warehouse.id === selectedWarehouseId);
   const locations = selectedWarehouse?.locations ?? [];
 
@@ -33,10 +35,10 @@ export function WarehouseLocationFields({
           htmlFor={`${idPrefix}-warehouse`}
           className="block text-sm font-medium text-slate-700"
         >
-          {warehouseLabel}
+          {warehouseLabel ?? t('common.warehouse')}
         </label>
         <select id={`${idPrefix}-warehouse`} className={fieldClass} {...warehouseField}>
-          <option value="">Select a warehouse</option>
+          <option value="">{t('common.selectWarehouse')}</option>
           {warehouses.map((warehouse) => (
             <option key={warehouse.id} value={warehouse.id}>
               {warehouse.code} · {warehouse.name}
@@ -50,7 +52,7 @@ export function WarehouseLocationFields({
           htmlFor={`${idPrefix}-location`}
           className="block text-sm font-medium text-slate-700"
         >
-          {locationLabel}
+          {locationLabel ?? t('common.storageLocation')}
         </label>
         <select
           id={`${idPrefix}-location`}
@@ -59,7 +61,7 @@ export function WarehouseLocationFields({
           {...locationField}
         >
           <option value="">
-            {selectedWarehouse ? 'Select a location' : 'Choose a warehouse first'}
+            {selectedWarehouse ? t('common.selectLocation') : t('common.chooseWarehouseFirst')}
           </option>
           {locations.map((location) => (
             <option key={location.id} value={location.id}>
@@ -68,9 +70,7 @@ export function WarehouseLocationFields({
           ))}
         </select>
         {selectedWarehouse && locations.length === 0 && (
-          <p className="mt-1 text-xs text-amber-700">
-            This warehouse has no storage locations yet.
-          </p>
+          <p className="mt-1 text-xs text-amber-700">{t('common.noLocations')}</p>
         )}
       </div>
     </div>

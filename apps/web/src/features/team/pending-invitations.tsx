@@ -1,15 +1,16 @@
 import { Mail } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { ApiError } from '@/lib/api-client';
+import { useI18n } from '@/i18n/provider';
 import { useAcceptInvitation, usePendingInvitations } from './api';
-import { formatDate, roleLabels } from './labels';
+import { roleKeys } from './labels';
 
 /**
  * Rendered above the page content: an invitee can accept without first having
  * an organization, and the shell reruns /me after acceptance.
  */
 export function PendingInvitations() {
+  const { t, formatDate, errorMessage } = useI18n();
   const pending = usePendingInvitations();
   const accept = useAcceptInvitation();
   const items = pending.data?.items ?? [];
@@ -24,12 +25,10 @@ export function PendingInvitations() {
       <div className="flex items-center gap-2">
         <Mail aria-hidden="true" className="size-4 text-indigo-700" />
         <h2 id="pending-invitations-heading" className="text-sm font-semibold text-indigo-900">
-          Pending invitations
+          {t('pendingInvitations.title')}
         </h2>
       </div>
-      <p className="mt-1 text-sm text-indigo-800">
-        Accept an invitation to join an organization on this account.
-      </p>
+      <p className="mt-1 text-sm text-indigo-800">{t('pendingInvitations.description')}</p>
 
       <ul className="mt-3 space-y-2">
         {items.map((item) => (
@@ -40,11 +39,14 @@ export function PendingInvitations() {
             <div>
               <p className="text-sm font-medium text-slate-900">{item.organizationName}</p>
               <p className="text-xs text-slate-500">
-                Role {roleLabels[item.role]} · expires {formatDate(item.expiresAt)}
+                {t('pendingInvitations.roleLine', {
+                  role: t(roleKeys[item.role]),
+                  date: formatDate(item.expiresAt),
+                })}
               </p>
             </div>
             <Button size="sm" disabled={accept.isPending} onClick={() => accept.mutate(item.id)}>
-              Accept invitation
+              {t('pendingInvitations.accept')}
             </Button>
           </li>
         ))}
@@ -52,9 +54,7 @@ export function PendingInvitations() {
 
       {accept.error && (
         <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
-          {accept.error instanceof ApiError
-            ? accept.error.message
-            : 'The invitation could not be accepted.'}
+          {errorMessage(accept.error, 'pendingInvitations.acceptFailed')}
         </p>
       )}
     </section>

@@ -9,9 +9,9 @@ import {
   DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ApiError } from '@/lib/api-client';
+import { useI18n } from '@/i18n/provider';
 import { useRemoveMember } from './api';
-import { roleLabels } from './labels';
+import { roleKeys } from './labels';
 
 interface RemoveMemberDialogProps {
   organizationId: string;
@@ -26,15 +26,11 @@ export function RemoveMemberDialog({
   open,
   onOpenChange,
 }: RemoveMemberDialogProps) {
+  const { t, errorMessage } = useI18n();
   const mutation = useRemoveMember(organizationId);
 
-  const label = member?.email ?? 'this member';
-  const errorMessage =
-    mutation.error instanceof ApiError
-      ? mutation.error.message
-      : mutation.error
-        ? 'The member could not be removed.'
-        : null;
+  const label = member?.email ?? t('memberDialog.thisMember');
+  const error = mutation.error ? errorMessage(mutation.error, 'memberDialog.removeFailed') : null;
 
   const submit = async () => {
     if (!member) return;
@@ -50,27 +46,28 @@ export function RemoveMemberDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogTitle>Remove team member</DialogTitle>
-        <DialogDescription>
-          {label} loses access to this organization immediately. Their stock history stays intact.
-        </DialogDescription>
+        <DialogTitle>{t('memberDialog.title')}</DialogTitle>
+        <DialogDescription>{t('memberDialog.description', { name: label })}</DialogDescription>
 
         {member && (
           <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-            {member.email ?? 'Unnamed member'} · {roleLabels[member.role]}
+            <span dir={member.email ? 'ltr' : undefined}>
+              {member.email ?? t('team.unnamedMember')}
+            </span>{' '}
+            · {t(roleKeys[member.role])}
           </p>
         )}
 
-        {errorMessage && (
+        {error && (
           <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
-            {errorMessage}
+            {error}
           </p>
         )}
 
         <DialogFooter>
           <DialogClose asChild>
             <Button type="button" variant="secondary">
-              Cancel
+              {t('common.cancel')}
             </Button>
           </DialogClose>
           <Button
@@ -79,7 +76,7 @@ export function RemoveMemberDialog({
             className="bg-rose-600 hover:bg-rose-700"
             onClick={() => void submit()}
           >
-            {mutation.isPending ? 'Removing…' : 'Remove member'}
+            {mutation.isPending ? t('memberDialog.removing') : t('memberDialog.removeMember')}
           </Button>
         </DialogFooter>
       </DialogContent>

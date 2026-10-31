@@ -8,16 +8,18 @@ import { PaginationFooter } from '@/components/ui/pagination-footer';
 import { useWarehouses } from '@/features/catalog/api';
 import { useOrganization } from '@/features/organizations/organization-provider';
 import { useStockMovements } from '@/features/stock/api';
+import type { MessageKey } from '@/i18n/messages';
+import { useI18n } from '@/i18n/provider';
 import { cn } from '@/lib/cn';
 
 const PAGE_SIZE = 25;
 
-const movementLabels: Record<StockMovementType, string> = {
-  receipt: 'Receipt',
-  issue: 'Issue',
-  adjustment: 'Adjustment',
-  transfer_out: 'Transfer out',
-  transfer_in: 'Transfer in',
+const movementLabelKeys: Record<StockMovementType, MessageKey> = {
+  receipt: 'movements.type.receipt',
+  issue: 'movements.type.issue',
+  adjustment: 'movements.type.adjustment',
+  transfer_out: 'movements.type.transferOut',
+  transfer_in: 'movements.type.transferIn',
 };
 
 const movementStyles: Record<StockMovementType, string> = {
@@ -28,16 +30,8 @@ const movementStyles: Record<StockMovementType, string> = {
   transfer_in: 'bg-indigo-50 text-indigo-800 ring-indigo-200',
 };
 
-const dateTime = new Intl.DateTimeFormat('en-GB', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
-
-function formatQuantity(value: number): string {
-  return new Intl.NumberFormat('en-TN', { maximumFractionDigits: 4 }).format(value);
-}
-
 export function StockMovementsPage() {
+  const { t, formatQuantity, formatDateTime, errorMessage } = useI18n();
   const { organization } = useOrganization();
   const organizationId = organization?.organizationId ?? null;
   const [movementType, setMovementType] = useState<StockMovementType | ''>('');
@@ -58,17 +52,17 @@ export function StockMovementsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Stock movements</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Append-only ledger of every quantity change. Entries can never be edited or deleted.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+          {t('movements.title')}
+        </h1>
+        <p className="mt-1 text-sm text-slate-600">{t('movements.description')}</p>
       </header>
 
       <section className="rounded-xl border border-slate-200 bg-white">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center">
           <div>
             <label htmlFor="movement-type-filter" className="sr-only">
-              Filter by movement type
+              {t('movements.typeFilterLabel')}
             </label>
             <select
               id="movement-type-filter"
@@ -79,10 +73,10 @@ export function StockMovementsPage() {
                 setPage(1);
               }}
             >
-              <option value="">All movement types</option>
-              {(Object.keys(movementLabels) as StockMovementType[]).map((type) => (
+              <option value="">{t('movements.allTypes')}</option>
+              {(Object.keys(movementLabelKeys) as StockMovementType[]).map((type) => (
                 <option key={type} value={type}>
-                  {movementLabels[type]}
+                  {t(movementLabelKeys[type])}
                 </option>
               ))}
             </select>
@@ -90,7 +84,7 @@ export function StockMovementsPage() {
 
           <div>
             <label htmlFor="movement-warehouse-filter" className="sr-only">
-              Filter by warehouse
+              {t('movements.warehouseFilterLabel')}
             </label>
             <select
               id="movement-warehouse-filter"
@@ -101,7 +95,7 @@ export function StockMovementsPage() {
                 setPage(1);
               }}
             >
-              <option value="">All warehouses</option>
+              <option value="">{t('movements.allWarehouses')}</option>
               {(warehouses.data ?? []).map((warehouse) => (
                 <option key={warehouse.id} value={warehouse.id}>
                   {warehouse.code} · {warehouse.name}
@@ -114,9 +108,9 @@ export function StockMovementsPage() {
         {movements.isError ? (
           <div className="p-6">
             <p role="alert" className="text-sm text-rose-700">
-              {movements.error instanceof Error
-                ? movements.error.message
-                : 'Movements failed to load.'}
+              {movements.error
+                ? errorMessage(movements.error, 'movements.loadError')
+                : t('movements.loadError')}
             </p>
             <Button
               variant="secondary"
@@ -124,11 +118,15 @@ export function StockMovementsPage() {
               className="mt-3"
               onClick={() => void movements.refetch()}
             >
-              Try again
+              {t('common.retry')}
             </Button>
           </div>
         ) : movements.isPending ? (
-          <div className="divide-y divide-slate-100" role="status" aria-label="Loading movements">
+          <div
+            className="divide-y divide-slate-100"
+            role="status"
+            aria-label={t('movements.loading')}
+          >
             {Array.from({ length: 5 }).map((_, index) => (
               <div key={index} className="flex animate-pulse items-center gap-4 px-4 py-4">
                 <div className="h-4 w-1/4 rounded bg-slate-200" />
@@ -142,37 +140,37 @@ export function StockMovementsPage() {
             <span className="grid size-12 place-items-center rounded-full bg-slate-100 text-slate-500">
               <ScrollText aria-hidden="true" className="size-6" />
             </span>
-            <h2 className="mt-4 text-base font-semibold text-slate-900">No movements recorded</h2>
-            <p className="mt-2 max-w-md text-sm text-slate-600">
-              Receipts, issues, adjustments and transfers appear here the moment they are posted.
-            </p>
+            <h2 className="mt-4 text-base font-semibold text-slate-900">
+              {t('movements.emptyTitle')}
+            </h2>
+            <p className="mt-2 max-w-md text-sm text-slate-600">{t('movements.emptyBody')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <caption className="sr-only">Posted stock movements, newest first</caption>
+            <table className="w-full text-start text-sm">
+              <caption className="sr-only">{t('movements.tableCaption')}</caption>
               <thead className="text-xs uppercase tracking-wide text-slate-500">
                 <tr className="border-b border-slate-200">
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    When
+                    {t('movements.columns.when')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Product
+                    {t('common.product')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Type
+                    {t('movements.columns.type')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Location
+                    {t('common.location')}
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right font-semibold">
-                    Change
+                  <th scope="col" className="px-4 py-3 text-end font-semibold">
+                    {t('movements.columns.change')}
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right font-semibold">
-                    On hand after
+                  <th scope="col" className="px-4 py-3 text-end font-semibold">
+                    {t('movements.columns.onHandAfter')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Reason
+                    {t('common.reason')}
                   </th>
                 </tr>
               </thead>
@@ -180,12 +178,12 @@ export function StockMovementsPage() {
                 {movements.data.items.map((movement) => (
                   <tr key={movement.id} className="hover:bg-slate-50">
                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                      {dateTime.format(new Date(movement.createdAt))}
+                      {formatDateTime(movement.createdAt)}
                     </td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-slate-900">{movement.productName}</p>
                       <p className="mt-0.5 font-mono text-xs text-slate-500">
-                        {movement.productSku}
+                        <span dir="ltr">{movement.productSku}</span>
                       </p>
                     </td>
                     <td className="px-4 py-3">
@@ -195,28 +193,32 @@ export function StockMovementsPage() {
                           movementStyles[movement.movementType],
                         )}
                       >
-                        {movementLabels[movement.movementType]}
+                        {t(movementLabelKeys[movement.movementType])}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-slate-600">
                       <p className="font-mono text-xs">
-                        {movement.warehouseCode} / {movement.locationCode}
+                        <span dir="ltr">
+                          {movement.warehouseCode} / {movement.locationCode}
+                        </span>
                       </p>
                     </td>
                     <td
                       className={cn(
-                        'px-4 py-3 text-right font-medium tabular-nums',
+                        'px-4 py-3 text-end font-medium tabular-nums',
                         movement.quantityDelta > 0 ? 'text-emerald-700' : 'text-rose-700',
                       )}
                     >
-                      {movement.quantityDelta > 0 ? '+' : ''}
-                      {formatQuantity(movement.quantityDelta)}
+                      <span dir="ltr">
+                        {movement.quantityDelta > 0 ? '+' : ''}
+                        {formatQuantity(movement.quantityDelta)}
+                      </span>
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-700">
+                    <td className="px-4 py-3 text-end tabular-nums text-slate-700">
                       {formatQuantity(movement.onHandAfter)}
                     </td>
                     <td className="max-w-[16rem] px-4 py-3 text-slate-600">
-                      {movement.reason ?? '—'}
+                      {movement.reason ?? t('common.notAvailable')}
                     </td>
                   </tr>
                 ))}
@@ -230,7 +232,7 @@ export function StockMovementsPage() {
             total={total}
             page={page}
             pageCount={pageCount}
-            noun="movement"
+            nounKey="common.noun.movements"
             onPrevious={() => setPage((current) => Math.max(1, current - 1))}
             onNext={() => setPage((current) => current + 1)}
           />

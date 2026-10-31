@@ -7,7 +7,8 @@ import { join, resolve } from 'node:path';
 import EmbeddedPostgres from 'embedded-postgres';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 
-const PG_PORT = 55432;
+// Overridable so a lingering local database on the default port does not block the suite.
+const PG_PORT = Number(process.env.E2E_PG_PORT ?? 55432);
 const AUTH_PORT = 4200;
 const API_PORT = 4101;
 const WEB_ORIGIN = 'http://localhost:5174';

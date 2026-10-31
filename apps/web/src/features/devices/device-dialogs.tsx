@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { WarehouseLocationFields } from '@/components/ui/warehouse-location-fields';
-import { ApiError } from '@/lib/api-client';
+import { useI18n } from '@/i18n/provider';
 import { cn } from '@/lib/cn';
 import { fieldClass } from '@/lib/form-field';
 import {
@@ -31,49 +31,11 @@ import {
   useRegisterDevice,
 } from './api';
 import {
-  deviceConditionLabels,
-  deviceEventLabels,
-  deviceStatusLabels,
+  deviceConditionKeys,
+  deviceEventKeys,
+  deviceStatusKeys,
   deviceStatusStyles,
 } from './labels';
-
-const dateTime = new Intl.DateTimeFormat('en-GB', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
-
-function dialogError(error: unknown, fallback: string): string | null {
-  if (error instanceof ApiError) return error.message;
-  return error ? fallback : null;
-}
-
-const registerSchema = z
-  .object({
-    productId: z.string().min(1, 'Select a serialized product'),
-    serialNumber: z.string().trim().min(1, 'Enter the serial number').max(120),
-    imei: z
-      .string()
-      .trim()
-      .refine((value) => value === '' || /^[0-9]{14,17}$/.test(value), {
-        message: 'Use 14 to 17 digits',
-      }),
-    condition: z.enum(['new', 'used', 'refurbished', 'damaged', 'defective']),
-    warehouseId: z.string().min(1, 'Select a warehouse'),
-    locationId: z.string().min(1, 'Select a storage location'),
-    warrantyStartOn: z.string(),
-    warrantyEndOn: z.string(),
-    supplierReference: z.string().trim().max(120),
-    note: z.string().trim().max(500),
-  })
-  .refine(
-    (values) =>
-      !values.warrantyStartOn ||
-      !values.warrantyEndOn ||
-      values.warrantyEndOn >= values.warrantyStartOn,
-    { message: 'Warranty end must not precede its start', path: ['warrantyEndOn'] },
-  );
-
-type RegisterValues = z.infer<typeof registerSchema>;
 
 interface RegisterDeviceDialogProps {
   organizationId: string;
@@ -90,7 +52,45 @@ export function RegisterDeviceDialog({
   open,
   onOpenChange,
 }: RegisterDeviceDialogProps) {
+  const { t, errorMessage } = useI18n();
   const mutation = useRegisterDevice(organizationId);
+
+  const schema = useMemo(
+    () =>
+      z
+        .object({
+          productId: z.string().min(1, t('deviceDialog.validation.productRequired')),
+          serialNumber: z
+            .string()
+            .trim()
+            .min(1, t('deviceDialog.validation.serialRequired'))
+            .max(120, t('deviceDialog.validation.serialTooLong')),
+          imei: z
+            .string()
+            .trim()
+            .refine((value) => value === '' || /^[0-9]{14,17}$/.test(value), {
+              message: t('deviceDialog.validation.imeiDigits'),
+            }),
+          condition: z.enum(['new', 'used', 'refurbished', 'damaged', 'defective']),
+          warehouseId: z.string().min(1, t('common.selectWarehouse')),
+          locationId: z.string().min(1, t('deviceDialog.validation.locationRequired')),
+          warrantyStartOn: z.string(),
+          warrantyEndOn: z.string(),
+          supplierReference: z.string().trim().max(120),
+          note: z.string().trim().max(500),
+        })
+        .refine(
+          (values) =>
+            !values.warrantyStartOn ||
+            !values.warrantyEndOn ||
+            values.warrantyEndOn >= values.warrantyStartOn,
+          { message: t('deviceDialog.validation.warrantyOrder'), path: ['warrantyEndOn'] },
+        ),
+    [t],
+  );
+
+  type RegisterValues = z.infer<typeof schema>;
+
   const {
     register,
     handleSubmit,
@@ -99,7 +99,7 @@ export function RegisterDeviceDialog({
     watch,
     formState: { errors },
   } = useForm<RegisterValues>({
-    resolver: zodResolver(registerSchema),
+    resolver: zodResolver(schema),
     defaultValues: {
       productId: '',
       serialNumber: '',
@@ -125,7 +125,9 @@ export function RegisterDeviceDialog({
     setValue('locationId', '');
   }, [productId, warehouseId, setValue]);
 
-  const errorMessage = dialogError(mutation.error, 'The device could not be registered.');
+  const submitError = mutation.error
+    ? errorMessage(mutation.error, 'deviceDialog.registerFailed')
+    : null;
 
   const submit = handleSubmit(async (values) => {
     try {
@@ -155,18 +157,16 @@ export function RegisterDeviceDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
-        <DialogTitle>Register device</DialogTitle>
-        <DialogDescription>
-          Each serial number is unique per organization and gets an append-only event history.
-        </DialogDescription>
+        <DialogTitle>{t('deviceDialog.register')}</DialogTitle>
+        <DialogDescription>{t('deviceDialog.registerDescription')}</DialogDescription>
 
         <form noValidate className="mt-5 space-y-4" onSubmit={submit}>
           <div>
             <label htmlFor="device-product" className="block text-sm font-medium text-slate-700">
-              Serialized product
+              {t('deviceDialog.serializedProduct')}
             </label>
             <select id="device-product" className={fieldClass} {...register('productId')}>
-              <option value="">Select a product</option>
+              <option value="">{t('deviceDialog.selectProduct')}</option>
               {serializedProducts.map((product) => (
                 <option key={product.id} value={product.id}>
                   {product.sku} · {product.name}
@@ -180,7 +180,7 @@ export function RegisterDeviceDialog({
             )}
             {serializedProducts.length === 0 && (
               <p className="mt-1 text-xs text-amber-700">
-                No active serialized products. Enable serial tracking on a product first.
+                {t('deviceDialog.noSerializedProducts')}
               </p>
             )}
           </div>
@@ -188,11 +188,12 @@ export function RegisterDeviceDialog({
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="sm:col-span-2">
               <label htmlFor="device-serial" className="block text-sm font-medium text-slate-700">
-                Serial number
+                {t('deviceDialog.serialNumber')}
               </label>
               <input
                 id="device-serial"
                 type="text"
+                dir="ltr"
                 autoComplete="off"
                 className={fieldClass}
                 aria-invalid={Boolean(errors.serialNumber)}
@@ -211,12 +212,12 @@ export function RegisterDeviceDialog({
                 htmlFor="device-condition"
                 className="block text-sm font-medium text-slate-700"
               >
-                Condition
+                {t('devices.column.condition')}
               </label>
               <select id="device-condition" className={fieldClass} {...register('condition')}>
-                {(Object.keys(deviceConditionLabels) as DeviceCondition[]).map((condition) => (
+                {(Object.keys(deviceConditionKeys) as DeviceCondition[]).map((condition) => (
                   <option key={condition} value={condition}>
-                    {deviceConditionLabels[condition]}
+                    {t(deviceConditionKeys[condition])}
                   </option>
                 ))}
               </select>
@@ -225,11 +226,12 @@ export function RegisterDeviceDialog({
 
           <div>
             <label htmlFor="device-imei" className="block text-sm font-medium text-slate-700">
-              IMEI (optional)
+              {t('deviceDialog.imeiOptional')}
             </label>
             <input
               id="device-imei"
               type="text"
+              dir="ltr"
               inputMode="numeric"
               autoComplete="off"
               className={fieldClass}
@@ -258,7 +260,7 @@ export function RegisterDeviceDialog({
                 htmlFor="device-warranty-start"
                 className="block text-sm font-medium text-slate-700"
               >
-                Warranty start (optional)
+                {t('deviceDialog.warrantyStart')}
               </label>
               <input
                 id="device-warranty-start"
@@ -273,7 +275,7 @@ export function RegisterDeviceDialog({
                 htmlFor="device-warranty-end"
                 className="block text-sm font-medium text-slate-700"
               >
-                Warranty end (optional)
+                {t('deviceDialog.warrantyEnd')}
               </label>
               <input
                 id="device-warranty-end"
@@ -296,11 +298,12 @@ export function RegisterDeviceDialog({
                 htmlFor="device-supplier-reference"
                 className="block text-sm font-medium text-slate-700"
               >
-                Supplier reference (optional)
+                {t('deviceDialog.supplierReferenceOptional')}
               </label>
               <input
                 id="device-supplier-reference"
                 type="text"
+                dir="ltr"
                 className={fieldClass}
                 {...register('supplierReference')}
               />
@@ -308,26 +311,26 @@ export function RegisterDeviceDialog({
 
             <div>
               <label htmlFor="device-note" className="block text-sm font-medium text-slate-700">
-                Note (optional)
+                {t('deviceDialog.noteOptional')}
               </label>
               <input id="device-note" type="text" className={fieldClass} {...register('note')} />
             </div>
           </div>
 
-          {errorMessage && (
+          {submitError && (
             <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
-              {errorMessage}
+              {submitError}
             </p>
           )}
 
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancel
+                {t('common.cancel')}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Registering…' : 'Register device'}
+              {mutation.isPending ? t('deviceDialog.registering') : t('deviceDialog.register')}
             </Button>
           </DialogFooter>
         </form>
@@ -335,21 +338,6 @@ export function RegisterDeviceDialog({
     </Dialog>
   );
 }
-
-const statusSchema = z.object({
-  status: z.enum(['in_stock', 'reserved', 'sold', 'returned', 'in_repair', 'lost', 'disposed']),
-  note: z.string().trim().max(500),
-});
-
-type StatusValues = z.infer<typeof statusSchema>;
-
-const moveSchema = z.object({
-  warehouseId: z.string().min(1, 'Select a warehouse'),
-  locationId: z.string().min(1, 'Select a storage location'),
-  note: z.string().trim().max(500),
-});
-
-type MoveValues = z.infer<typeof moveSchema>;
 
 interface DeviceDetailDialogProps {
   organizationId: string;
@@ -366,10 +354,42 @@ export function DeviceDetailDialog({
   canWrite,
   onOpenChange,
 }: DeviceDetailDialogProps) {
+  const { t, errorMessage, formatDateTime } = useI18n();
   const device = useDevice(organizationId, deviceId);
   const events = useDeviceEvents(organizationId, deviceId);
   const statusMutation = useChangeDeviceStatus(organizationId, deviceId ?? '');
   const moveMutation = useMoveDevice(organizationId, deviceId ?? '');
+
+  const statusSchema = useMemo(
+    () =>
+      z.object({
+        status: z.enum([
+          'in_stock',
+          'reserved',
+          'sold',
+          'returned',
+          'in_repair',
+          'lost',
+          'disposed',
+        ]),
+        note: z.string().trim().max(500),
+      }),
+    [t],
+  );
+
+  type StatusValues = z.infer<typeof statusSchema>;
+
+  const moveSchema = useMemo(
+    () =>
+      z.object({
+        warehouseId: z.string().min(1, t('common.selectWarehouse')),
+        locationId: z.string().min(1, t('deviceDialog.validation.locationRequired')),
+        note: z.string().trim().max(500),
+      }),
+    [t],
+  );
+
+  type MoveValues = z.infer<typeof moveSchema>;
 
   const statusForm = useForm<StatusValues>({
     resolver: zodResolver(statusSchema),
@@ -393,31 +413,37 @@ export function DeviceDetailDialog({
     moveForm.setValue('locationId', '');
   }, [moveWarehouseId, moveForm]);
 
-  const statusError = dialogError(statusMutation.error, 'The status change failed.');
-  const moveError = dialogError(moveMutation.error, 'The move failed.');
+  const statusError = statusMutation.error
+    ? errorMessage(statusMutation.error, 'deviceDialog.statusFailed')
+    : null;
+  const moveError = moveMutation.error
+    ? errorMessage(moveMutation.error, 'deviceDialog.moveFailed')
+    : null;
 
   return (
     <Dialog open={Boolean(deviceId)} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogTitle>
-          {device.data ? `${device.data.productName} · ${device.data.serialNumber}` : 'Device'}
+          {device.data
+            ? `${device.data.productName} · ${device.data.serialNumber}`
+            : t('common.device')}
         </DialogTitle>
         <DialogDescription>
           {device.data
-            ? `${device.data.productSku} · ${deviceStatusLabels[device.data.status]}`
-            : 'Loading device details…'}
+            ? `${device.data.productSku} · ${t(deviceStatusKeys[device.data.status])}`
+            : t('deviceDialog.loadingDetails')}
         </DialogDescription>
 
         {device.isError ? (
           <p role="alert" className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
-            {device.error instanceof Error ? device.error.message : 'The device failed to load.'}
+            {errorMessage(device.error, 'deviceDialog.loadFailed')}
           </p>
         ) : device.data ? (
           <div className="mt-5 space-y-6">
             <dl className="grid gap-3 rounded-lg bg-slate-50 p-4 text-sm sm:grid-cols-2">
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Status
+                  {t('common.status')}
                 </dt>
                 <dd className="mt-1">
                   <span
@@ -426,35 +452,37 @@ export function DeviceDetailDialog({
                       deviceStatusStyles[device.data.status],
                     )}
                   >
-                    {deviceStatusLabels[device.data.status]}
+                    {t(deviceStatusKeys[device.data.status])}
                   </span>
                 </dd>
               </div>
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Condition
+                  {t('devices.column.condition')}
                 </dt>
                 <dd className="mt-1 text-slate-800">
-                  {deviceConditionLabels[device.data.condition]}
+                  {t(deviceConditionKeys[device.data.condition])}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Location
+                  {t('common.location')}
                 </dt>
-                <dd className="mt-1 font-mono text-xs text-slate-800">
+                <dd dir="ltr" className="mt-1 font-mono text-xs text-slate-800">
                   {device.data.warehouseCode} / {device.data.locationCode}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  IMEI
+                  {t('deviceDialog.imei')}
                 </dt>
-                <dd className="mt-1 font-mono text-xs text-slate-800">{device.data.imei ?? '—'}</dd>
+                <dd dir="ltr" className="mt-1 font-mono text-xs text-slate-800">
+                  {device.data.imei ?? '—'}
+                </dd>
               </div>
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Warranty
+                  {t('deviceDialog.warranty')}
                 </dt>
                 <dd className="mt-1 text-slate-800">
                   {device.data.warrantyStartOn || device.data.warrantyEndOn
@@ -464,9 +492,11 @@ export function DeviceDetailDialog({
               </div>
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Supplier reference
+                  {t('deviceDialog.supplierReference')}
                 </dt>
-                <dd className="mt-1 text-slate-800">{device.data.supplierReference ?? '—'}</dd>
+                <dd dir="ltr" className="mt-1 text-slate-800">
+                  {device.data.supplierReference ?? '—'}
+                </dd>
               </div>
             </dl>
 
@@ -474,7 +504,7 @@ export function DeviceDetailDialog({
               <div className="grid gap-6 lg:grid-cols-2">
                 <section aria-labelledby="device-status-heading">
                   <h3 id="device-status-heading" className="text-sm font-semibold text-slate-900">
-                    Change status
+                    {t('deviceDialog.changeStatus')}
                   </h3>
                   <form
                     noValidate
@@ -492,20 +522,20 @@ export function DeviceDetailDialog({
                     })}
                   >
                     <select
-                      aria-label="New device status"
+                      aria-label={t('deviceDialog.newStatus')}
                       className={fieldClass}
                       {...statusForm.register('status')}
                     >
-                      {(Object.keys(deviceStatusLabels) as DeviceStatus[]).map((status) => (
+                      {(Object.keys(deviceStatusKeys) as DeviceStatus[]).map((status) => (
                         <option key={status} value={status}>
-                          {deviceStatusLabels[status]}
+                          {t(deviceStatusKeys[status])}
                         </option>
                       ))}
                     </select>
                     <input
                       type="text"
-                      aria-label="Status change note"
-                      placeholder="Note (optional)"
+                      aria-label={t('deviceDialog.statusNote')}
+                      placeholder={t('deviceDialog.noteOptional')}
                       className={fieldClass}
                       {...statusForm.register('note')}
                     />
@@ -515,14 +545,16 @@ export function DeviceDetailDialog({
                       </p>
                     )}
                     <Button type="submit" size="sm" disabled={statusMutation.isPending}>
-                      {statusMutation.isPending ? 'Updating…' : 'Update status'}
+                      {statusMutation.isPending
+                        ? t('deviceDialog.updating')
+                        : t('deviceDialog.updateStatus')}
                     </Button>
                   </form>
                 </section>
 
                 <section aria-labelledby="device-move-heading">
                   <h3 id="device-move-heading" className="text-sm font-semibold text-slate-900">
-                    Move to another location
+                    {t('deviceDialog.moveTitle')}
                   </h3>
                   <form
                     noValidate
@@ -549,8 +581,8 @@ export function DeviceDetailDialog({
                     />
                     <input
                       type="text"
-                      aria-label="Move note"
-                      placeholder="Note (optional)"
+                      aria-label={t('deviceDialog.moveNote')}
+                      placeholder={t('deviceDialog.noteOptional')}
                       className={fieldClass}
                       {...moveForm.register('note')}
                     />
@@ -565,7 +597,7 @@ export function DeviceDetailDialog({
                       </p>
                     )}
                     <Button type="submit" size="sm" disabled={moveMutation.isPending}>
-                      {moveMutation.isPending ? 'Moving…' : 'Move device'}
+                      {moveMutation.isPending ? t('deviceDialog.moving') : t('deviceDialog.move')}
                     </Button>
                   </form>
                 </section>
@@ -574,15 +606,15 @@ export function DeviceDetailDialog({
 
             <section aria-labelledby="device-history-heading">
               <h3 id="device-history-heading" className="text-sm font-semibold text-slate-900">
-                Event history
+                {t('deviceDialog.eventHistory')}
               </h3>
               {events.isError ? (
                 <p role="alert" className="mt-2 text-sm text-rose-700">
-                  The event history failed to load.
+                  {t('deviceDialog.eventsFailed')}
                 </p>
               ) : events.isPending ? (
                 <p className="mt-2 text-sm text-slate-500" role="status">
-                  Loading history…
+                  {t('deviceDialog.loadingHistory')}
                 </p>
               ) : (
                 <ol className="mt-2 space-y-2">
@@ -593,17 +625,19 @@ export function DeviceDetailDialog({
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="font-medium text-slate-800">
-                          {deviceEventLabels[event.eventType]}
+                          {t(deviceEventKeys[event.eventType])}
                         </span>
                         <span className="text-xs text-slate-500">
-                          {dateTime.format(new Date(event.createdAt))}
+                          {formatDateTime(event.createdAt)}
                         </span>
                       </div>
                       <p className="mt-1 text-xs text-slate-600">
                         {event.statusFrom && event.statusTo
-                          ? `${deviceStatusLabels[event.statusFrom]} → ${deviceStatusLabels[event.statusTo]}`
+                          ? `${t(deviceStatusKeys[event.statusFrom])} → ${t(deviceStatusKeys[event.statusTo])}`
                           : null}
-                        {event.locationTo && !event.statusFrom ? 'Location updated' : null}
+                        {event.locationTo && !event.statusFrom
+                          ? t('deviceDialog.locationUpdated')
+                          : null}
                         {event.note ? ` · ${event.note}` : ''}
                       </p>
                     </li>
@@ -614,7 +648,7 @@ export function DeviceDetailDialog({
           </div>
         ) : (
           <p className="mt-4 text-sm text-slate-500" role="status">
-            Loading device…
+            {t('deviceDialog.loadingDevice')}
           </p>
         )}
       </DialogContent>

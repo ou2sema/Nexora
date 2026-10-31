@@ -44,7 +44,12 @@ and organization-scoped reporting.
 > (`npm run check:integrity`), an idempotent operator script for granting the platform flag, the
 > full local-stack Playwright suite in CI, and route-level code splitting. It is verified
 > locally; its migration has not yet been applied to the hosted project, and the documented
-> restore drill has not been executed. Nothing is production-ready yet.
+> restore drill has not been executed. Phase 12 localizes the interface into French and
+> Arabic: typed message catalogs with compile-time key parity, CLDR plural categories, a
+> per-device language switch with browser detection, right-to-left layout, locale-aware
+> money/date/quantity formatting with Latin digits in Arabic, and translated API and
+> authentication errors. It needs no schema change; PDFs, CSV exports, and labels remain
+> English. Nothing is production-ready yet.
 
 ## Stack
 
@@ -57,7 +62,7 @@ and organization-scoped reporting.
 | Tests     | Vitest (PGlite + embedded PostgreSQL), Playwright, Allure                |
 | Scanning  | BarcodeDetector + ZXing fallback, `bwip-js` labels, `pdf-lib` PDFs       |
 | Money     | TND only, integer millimes, `formatTnd` (see ADR-0002)                   |
-| Interface | English only (see ADR-0002)                                              |
+| Interface | English, French, Arabic; per-device locale, RTL (see ADR-0014)           |
 
 Architecture decisions live in [`docs/adr/`](docs/adr/). The Phase 0 assessment is summarized in
 [`docs/adr/0001-stack-and-platform-boundaries.md`](docs/adr/0001-stack-and-platform-boundaries.md).
@@ -78,7 +83,9 @@ specified in [ADR-0011](docs/adr/0011-team-access.md). Platform administration a
 operator flag are specified in [ADR-0012](docs/adr/0012-platform-administration.md).
 The Phase 11 hardening measures — audit trail, boot-time schema probe, integrity CLI, CI
 coverage, and route splitting — are specified in
-[ADR-0013](docs/adr/0013-operational-hardening.md).
+[ADR-0013](docs/adr/0013-operational-hardening.md). Interface localization, typed catalogs,
+plurals, RTL, and error translation are specified in
+[ADR-0014](docs/adr/0014-interface-localization.md).
 
 ## Layout
 

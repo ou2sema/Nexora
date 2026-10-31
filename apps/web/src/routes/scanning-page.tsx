@@ -12,20 +12,27 @@ import {
 import { type FormEvent, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 
-import type { ProductSummary, ScanResult, StockCount, WarehouseSummary } from '@mystock/contracts';
+import type {
+  ProductSummary,
+  ScanResult,
+  StockCount,
+  StockCountStatus,
+  WarehouseSummary,
+} from '@mystock/contracts';
 
 import { Button } from '@/components/ui/button';
 import { useWarehouses } from '@/features/catalog/api';
 import {
-  deviceConditionLabels,
-  deviceStatusLabels,
+  deviceConditionKeys,
+  deviceStatusKeys,
   deviceStatusStyles,
 } from '@/features/devices/labels';
 import { useOrganization } from '@/features/organizations/organization-provider';
 import { usePostStockMovement } from '@/features/stock/api';
+import type { MessageKey } from '@/i18n/messages';
+import { useI18n } from '@/i18n/provider';
 import { cn } from '@/lib/cn';
 import { fieldClass } from '@/lib/form-field';
-import { ApiError } from '@/lib/api-client';
 import { CameraScanner } from '@/features/scanning/camera-scanner';
 import { LabelDialog, type LabelTarget } from '@/features/scanning/label-dialog';
 import {
@@ -41,13 +48,11 @@ import { useAccessToken } from '@/features/auth/auth-provider';
 
 type Mode = 'receive' | 'count';
 
-function formatQuantity(value: number): string {
-  return new Intl.NumberFormat('en-TN', { maximumFractionDigits: 4 }).format(value);
-}
-
-function messageOf(error: unknown, fallback: string): string {
-  return error instanceof ApiError ? error.message : fallback;
-}
+const countStatusKeys: Record<StockCountStatus, MessageKey> = {
+  open: 'scan.count.status.open',
+  posted: 'scan.count.status.posted',
+  cancelled: 'scan.count.status.cancelled',
+};
 
 function parseQuantity(value: string): number | null {
   const normalized = value.trim().replace(',', '.');
@@ -65,6 +70,8 @@ function ScanResultCard({
   result: ScanResult;
   onPrint: (targets: LabelTarget[]) => void;
 }) {
+  const { t, formatQuantity, formatDateTime } = useI18n();
+
   if (result.kind === 'device') {
     const { device } = result;
     return (
@@ -72,9 +79,9 @@ function ScanResultCard({
         <header className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">
-              Serialized device
+              {t('scan.result.serializedDevice')}
             </p>
-            <h2 className="mt-1 font-mono text-lg font-semibold text-slate-900">
+            <h2 dir="ltr" className="mt-1 font-mono text-lg font-semibold text-slate-900">
               {device.serialNumber}
             </h2>
             <p className="text-sm text-slate-600">
@@ -87,28 +94,30 @@ function ScanResultCard({
               deviceStatusStyles[device.status],
             )}
           >
-            {deviceStatusLabels[device.status]}
+            {t(deviceStatusKeys[device.status])}
           </span>
         </header>
 
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-slate-500">IMEI</dt>
-            <dd className="font-mono text-slate-900">{device.imei ?? '—'}</dd>
+            <dt className="text-slate-500">{t('scan.result.imei')}</dt>
+            <dd dir="ltr" className="font-mono text-slate-900">
+              {device.imei ?? '—'}
+            </dd>
           </div>
           <div>
-            <dt className="text-slate-500">Condition</dt>
-            <dd className="text-slate-900">{deviceConditionLabels[device.condition]}</dd>
+            <dt className="text-slate-500">{t('scan.result.condition')}</dt>
+            <dd className="text-slate-900">{t(deviceConditionKeys[device.condition])}</dd>
           </div>
           <div>
-            <dt className="text-slate-500">Location</dt>
-            <dd className="font-mono text-slate-900">
+            <dt className="text-slate-500">{t('common.location')}</dt>
+            <dd dir="ltr" className="font-mono text-slate-900">
               {device.warehouseCode} / {device.locationCode}
             </dd>
           </div>
           <div>
-            <dt className="text-slate-500">Received</dt>
-            <dd className="text-slate-900">{new Date(device.receivedAt).toLocaleString()}</dd>
+            <dt className="text-slate-500">{t('scan.result.received')}</dt>
+            <dd className="text-slate-900">{formatDateTime(device.receivedAt)}</dd>
           </div>
         </dl>
 
@@ -127,12 +136,12 @@ function ScanResultCard({
             }
           >
             <Printer aria-hidden="true" className="size-4" />
-            Print label
+            {t('scan.printLabel')}
           </Button>
           <Button variant="ghost" size="sm" asChild>
             <Link to="/devices">
               <Smartphone aria-hidden="true" className="size-4" />
-              Open device history
+              {t('scan.openDeviceHistory')}
             </Link>
           </Button>
         </div>
@@ -146,13 +155,19 @@ function ScanResultCard({
       <header className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">
-            {product.isSerialized ? 'Serialized product' : 'Quantity product'}
+            {product.isSerialized
+              ? t('scan.result.serializedProduct')
+              : t('scan.result.quantityProduct')}
           </p>
           <h2 className="mt-1 text-lg font-semibold text-slate-900">{product.name}</h2>
-          <p className="font-mono text-sm text-slate-600">{product.sku}</p>
+          <p dir="ltr" className="font-mono text-sm text-slate-600">
+            {product.sku}
+          </p>
         </div>
-        <div className="text-right">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Available</p>
+        <div className="text-end">
+          <p className="text-xs uppercase tracking-wide text-slate-500">
+            {t('scan.result.available')}
+          </p>
           <p
             className={cn(
               'text-2xl font-semibold tabular-nums',
@@ -166,52 +181,56 @@ function ScanResultCard({
 
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
         <div>
-          <dt className="text-slate-500">Barcode</dt>
-          <dd className="font-mono text-slate-900">{product.barcode ?? 'Not assigned'}</dd>
+          <dt className="text-slate-500">{t('scan.result.barcode')}</dt>
+          <dd dir="ltr" className="font-mono text-slate-900">
+            {product.barcode ?? t('scan.result.notAssigned')}
+          </dd>
         </div>
         <div>
-          <dt className="text-slate-500">Internal code</dt>
-          <dd className="font-mono text-slate-900">{product.internalCode ?? '—'}</dd>
+          <dt className="text-slate-500">{t('scan.result.internalCode')}</dt>
+          <dd dir="ltr" className="font-mono text-slate-900">
+            {product.internalCode ?? '—'}
+          </dd>
         </div>
         <div>
-          <dt className="text-slate-500">On hand</dt>
+          <dt className="text-slate-500">{t('scan.result.onHand')}</dt>
           <dd className="tabular-nums text-slate-900">{formatQuantity(totals.onHand)}</dd>
         </div>
       </dl>
 
       {stockLines.length > 0 ? (
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <caption className="sr-only">Stock lines for the scanned product</caption>
+          <table className="w-full text-start text-sm">
+            <caption className="sr-only">{t('scan.result.stockLinesCaption')}</caption>
             <thead className="text-xs uppercase tracking-wide text-slate-500">
               <tr className="border-b border-slate-200">
-                <th scope="col" className="py-2 pr-4 font-semibold">
-                  Location
+                <th scope="col" className="py-2 pe-4 font-semibold">
+                  {t('common.location')}
                 </th>
-                <th scope="col" className="py-2 pr-4 text-right font-semibold">
-                  On hand
+                <th scope="col" className="py-2 pe-4 text-end font-semibold">
+                  {t('scan.result.onHand')}
                 </th>
-                <th scope="col" className="py-2 pr-4 text-right font-semibold">
-                  Reserved
+                <th scope="col" className="py-2 pe-4 text-end font-semibold">
+                  {t('scan.result.reserved')}
                 </th>
-                <th scope="col" className="py-2 text-right font-semibold">
-                  Available
+                <th scope="col" className="py-2 text-end font-semibold">
+                  {t('scan.result.available')}
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {stockLines.map((line) => (
                 <tr key={`${line.warehouseId}-${line.locationId}`}>
-                  <td className="py-2 pr-4 font-mono text-xs text-slate-700">
+                  <td dir="ltr" className="py-2 pe-4 font-mono text-xs text-slate-700">
                     {line.warehouseCode} / {line.locationCode}
                   </td>
-                  <td className="py-2 pr-4 text-right tabular-nums text-slate-900">
+                  <td className="py-2 pe-4 text-end tabular-nums text-slate-900">
                     {formatQuantity(line.onHand)}
                   </td>
-                  <td className="py-2 pr-4 text-right tabular-nums text-slate-600">
+                  <td className="py-2 pe-4 text-end tabular-nums text-slate-600">
                     {formatQuantity(line.reserved)}
                   </td>
-                  <td className="py-2 text-right tabular-nums text-slate-900">
+                  <td className="py-2 text-end tabular-nums text-slate-900">
                     {formatQuantity(line.available)}
                   </td>
                 </tr>
@@ -221,7 +240,7 @@ function ScanResultCard({
         </div>
       ) : (
         <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-          No stock has been posted for this product yet.
+          {t('scan.result.noStock')}
         </p>
       )}
 
@@ -240,7 +259,7 @@ function ScanResultCard({
           }
         >
           <Printer aria-hidden="true" className="size-4" />
-          Print label
+          {t('scan.printLabel')}
         </Button>
       </div>
     </article>
@@ -260,20 +279,21 @@ function LocationPicker({
   onChange: (warehouseId: string, locationId: string) => void;
   disabled?: boolean;
 }) {
+  const { t } = useI18n();
   const warehouse = warehouses.find((item) => item.id === warehouseId);
   const locations = warehouse?.locations ?? [];
 
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <label className="block text-sm font-medium text-slate-700">
-        Warehouse
+        {t('common.warehouse')}
         <select
           value={warehouseId}
           disabled={disabled}
           className={fieldClass}
           onChange={(event) => onChange(event.target.value, '')}
         >
-          <option value="">Select warehouse</option>
+          <option value="">{t('common.selectWarehouseShort')}</option>
           {warehouses.map((item) => (
             <option key={item.id} value={item.id}>
               {item.code} · {item.name}
@@ -282,14 +302,14 @@ function LocationPicker({
         </select>
       </label>
       <label className="block text-sm font-medium text-slate-700">
-        Storage location
+        {t('common.storageLocation')}
         <select
           value={locationId}
           disabled={disabled || !warehouseId}
           className={fieldClass}
           onChange={(event) => onChange(warehouseId, event.target.value)}
         >
-          <option value="">Select location</option>
+          <option value="">{t('common.selectLocationShort')}</option>
           {locations.map((item) => (
             <option key={item.id} value={item.id}>
               {item.code} · {item.name}
@@ -302,6 +322,7 @@ function LocationPicker({
 }
 
 export function ScanningPage() {
+  const { t, plural, errorMessage, formatQuantity, formatDate } = useI18n();
   const { organization } = useOrganization();
   const organizationId = organization?.organizationId ?? null;
   const token = useAccessToken();
@@ -360,7 +381,7 @@ export function ScanningPage() {
       previous.code.toLowerCase() === code.toLowerCase() &&
       now - previous.at < 1_500
     ) {
-      setNotice(`Duplicate scan ignored: ${code}`);
+      setNotice(t('scan.notice.duplicate', { code }));
       return;
     }
     lastScan.current = { code, at: now };
@@ -373,13 +394,13 @@ export function ScanningPage() {
       if (!options.quiet) {
         setNotice(
           scanned.kind === 'device'
-            ? `Resolved device ${scanned.device.serialNumber}.`
-            : `Resolved ${scanned.product.name}.`,
+            ? t('scan.notice.device', { serial: scanned.device.serialNumber })
+            : t('scan.notice.product', { product: scanned.product.name }),
         );
       }
     } catch (error) {
       setResult(null);
-      setScanError(messageOf(error, 'The code could not be resolved.'));
+      setScanError(errorMessage(error, 'scan.error.resolveFailed'));
     }
   };
 
@@ -394,16 +415,16 @@ export function ScanningPage() {
   const submitReceive = () => {
     if (!scannedProduct) return;
     if (scannedProduct.isSerialized) {
-      setNotice('Serialized units are received from the Devices page so each serial is traceable.');
+      setNotice(t('scan.notice.serializedReceive'));
       return;
     }
     const quantity = parseQuantity(receiveQuantity);
     if (quantity === null || quantity <= 0) {
-      setScanError('Enter a receipt quantity greater than zero with at most four decimals.');
+      setScanError(t('scan.error.receiptQuantity'));
       return;
     }
     if (!warehouseId || !locationId) {
-      setScanError('Choose the warehouse and storage location that received the stock.');
+      setScanError(t('scan.error.receiptLocation'));
       return;
     }
 
@@ -420,19 +441,23 @@ export function ScanningPage() {
       {
         onSuccess: (posted) => {
           setNotice(
-            `Received ${formatQuantity(quantity)} × ${scannedProduct.name}. On hand is now ${formatQuantity(posted.onHand)}.`,
+            t('scan.notice.received', {
+              quantity: formatQuantity(quantity),
+              product: scannedProduct.name,
+              onHand: formatQuantity(posted.onHand),
+            }),
           );
           lastScan.current = null;
           void handleScan(scannedProduct.barcode ?? scannedProduct.sku, { quiet: true });
         },
-        onError: (error) => setScanError(messageOf(error, 'The receipt could not be posted.')),
+        onError: (error) => setScanError(errorMessage(error, 'scan.error.receiptFailed')),
       },
     );
   };
 
   const submitStartCount = () => {
     if (!warehouseId || !locationId) {
-      setScanError('Choose the warehouse and storage location to count.');
+      setScanError(t('scan.error.countLocation'));
       return;
     }
     setScanError(null);
@@ -442,9 +467,9 @@ export function ScanningPage() {
         onSuccess: (started) => {
           setActiveCountId(started.countId);
           setConfirmPost(false);
-          setNotice('Stock count started. Scan products to record counted quantities.');
+          setNotice(t('scan.notice.countStarted'));
         },
-        onError: (error) => setScanError(messageOf(error, 'The count could not be started.')),
+        onError: (error) => setScanError(errorMessage(error, 'scan.error.countStartFailed')),
       },
     );
   };
@@ -454,14 +479,14 @@ export function ScanningPage() {
     setWarehouseId(selected.warehouseId);
     setLocationId(selected.locationId);
     setConfirmPost(false);
-    setNotice('Open count selected.');
+    setNotice(t('scan.notice.countSelected'));
   };
 
   const submitRecord = () => {
     if (!count || !scannedProduct) return;
     const quantity = parseQuantity(countQuantity);
     if (quantity === null) {
-      setScanError('Enter a counted quantity of zero or more with at most four decimals.');
+      setScanError(t('scan.error.countQuantity'));
       return;
     }
 
@@ -471,10 +496,14 @@ export function ScanningPage() {
       {
         onSuccess: (recorded) => {
           setNotice(
-            `${scannedProduct.name}: counted ${formatQuantity(recorded.countedQuantity)} (${countMode === 'set' ? 'absolute' : 'increment'}).`,
+            t('scan.notice.countRecorded', {
+              product: scannedProduct.name,
+              quantity: formatQuantity(recorded.countedQuantity),
+              mode: t(countMode === 'set' ? 'scan.mode.absolute' : 'scan.mode.increment'),
+            }),
           );
         },
-        onError: (error) => setScanError(messageOf(error, 'The count could not be recorded.')),
+        onError: (error) => setScanError(errorMessage(error, 'scan.error.countRecordFailed')),
       },
     );
   };
@@ -485,14 +514,17 @@ export function ScanningPage() {
     postCount.mutate(count.id, {
       onSuccess: (posted) => {
         setNotice(
-          `Count posted: ${posted.lineCount} line${posted.lineCount === 1 ? '' : 's'}, ${posted.adjustedLines} adjustment${posted.adjustedLines === 1 ? '' : 's'}.`,
+          t('scan.notice.posted', {
+            lines: plural('scan.lines', posted.lineCount),
+            adjustments: plural('scan.adjustments', posted.adjustedLines),
+          }),
         );
         setActiveCountId(null);
         setConfirmPost(false);
       },
       onError: (error) => {
         setConfirmPost(false);
-        setScanError(messageOf(error, 'The count could not be posted.'));
+        setScanError(errorMessage(error, 'scan.error.countPostFailed'));
       },
     });
   };
@@ -502,11 +534,11 @@ export function ScanningPage() {
     setScanError(null);
     discardCount.mutate(count.id, {
       onSuccess: () => {
-        setNotice('Count discarded. No adjustments were posted.');
+        setNotice(t('scan.notice.discarded'));
         setActiveCountId(null);
         setConfirmPost(false);
       },
-      onError: (error) => setScanError(messageOf(error, 'The count could not be discarded.')),
+      onError: (error) => setScanError(errorMessage(error, 'scan.error.countDiscardFailed')),
     });
   };
 
@@ -520,14 +552,11 @@ export function ScanningPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Scanning</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Scan or type a barcode, serial number or SKU, then receive stock or run a count at one
-          storage location.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{t('scan.title')}</h1>
+        <p className="mt-1 text-sm text-slate-600">{t('scan.subtitle')}</p>
       </header>
 
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Scanning workflow">
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label={t('scan.tabsLabel')}>
         <Button
           role="tab"
           aria-selected={mode === 'receive'}
@@ -535,7 +564,7 @@ export function ScanningPage() {
           onClick={() => setMode('receive')}
         >
           <ScanLine aria-hidden="true" className="size-4" />
-          Receive stock
+          {t('scan.tabs.receive')}
         </Button>
         <Button
           role="tab"
@@ -544,13 +573,13 @@ export function ScanningPage() {
           onClick={() => setMode('count')}
         >
           <ClipboardCheck aria-hidden="true" className="size-4" />
-          Inventory count
+          {t('scan.tabs.count')}
         </Button>
       </div>
 
       {!canWrite && (
         <p className="rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">
-          Your viewer role can look up scanned codes but cannot receive stock or record counts.
+          {t('scan.readOnly')}
         </p>
       )}
 
@@ -576,7 +605,7 @@ export function ScanningPage() {
 
       <section className="rounded-xl border border-slate-200 bg-white p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold text-slate-900">Scan a code</h2>
+          <h2 className="text-base font-semibold text-slate-900">{t('scan.lookupSection')}</h2>
           <Button
             variant="secondary"
             size="sm"
@@ -590,7 +619,7 @@ export function ScanningPage() {
             ) : (
               <Camera aria-hidden="true" className="size-4" />
             )}
-            {cameraOn ? 'Stop camera' : 'Scan with camera'}
+            {cameraOn ? t('scan.camera.stop') : t('scan.camera.start')}
           </Button>
         </div>
 
@@ -602,19 +631,20 @@ export function ScanningPage() {
 
         <form className="mt-4 flex flex-col gap-2 sm:flex-row" onSubmit={submitManual}>
           <label htmlFor="scan-code" className="sr-only">
-            Barcode, serial number or SKU
+            {t('scan.codeLabel')}
           </label>
           <input
             id="scan-code"
             value={manualCode}
-            placeholder="Type or use a hardware scanner"
+            dir="ltr"
+            placeholder={t('scan.codePlaceholder')}
             autoComplete="off"
             className={`${fieldClass} mt-0 flex-1`}
             onChange={(event) => setManualCode(event.target.value)}
           />
           <Button type="submit" disabled={!manualCode.trim()}>
             <ScanLine aria-hidden="true" className="size-4" />
-            Look up
+            {t('scan.lookup')}
           </Button>
         </form>
       </section>
@@ -628,11 +658,10 @@ export function ScanningPage() {
               <span className="grid size-12 place-items-center rounded-full bg-slate-100 text-slate-500">
                 <ScanLine aria-hidden="true" className="size-6" />
               </span>
-              <h2 className="mt-4 text-base font-semibold text-slate-900">Nothing scanned yet</h2>
-              <p className="mt-2 max-w-md text-sm text-slate-600">
-                Device serial numbers resolve first, then product barcodes, SKUs and internal codes.
-                Repeating the same scan within 1.5 seconds is ignored.
-              </p>
+              <h2 className="mt-4 text-base font-semibold text-slate-900">
+                {t('scan.empty.title')}
+              </h2>
+              <p className="mt-2 max-w-md text-sm text-slate-600">{t('scan.empty.body')}</p>
             </section>
           )}
 
@@ -640,39 +669,43 @@ export function ScanningPage() {
             <section className="rounded-xl border border-slate-200 bg-white">
               <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
                 <div>
-                  <h2 className="text-base font-semibold text-slate-900">Count lines</h2>
+                  <h2 className="text-base font-semibold text-slate-900">
+                    {t('scan.count.title')}
+                  </h2>
                   <p className="font-mono text-xs text-slate-500">
-                    {count.warehouseCode} / {count.locationCode} · {count.lineCount} line
-                    {count.lineCount === 1 ? '' : 's'} · variance{' '}
-                    {formatQuantity(countTotals.variance)}
+                    {t('scan.count.lineSummary', {
+                      location: `${count.warehouseCode} / ${count.locationCode}`,
+                      lines: plural('scan.lines', count.lineCount),
+                      variance: formatQuantity(countTotals.variance),
+                    })}
                   </p>
                 </div>
                 <span className="inline-flex rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold capitalize text-indigo-800 ring-1 ring-indigo-200">
-                  {count.status}
+                  {t(countStatusKeys[count.status])}
                 </span>
               </header>
 
               {count.lines.length === 0 ? (
                 <p className="px-5 py-8 text-center text-sm text-slate-600">
-                  Scan a product to record the first counted quantity.
+                  {t('scan.count.empty')}
                 </p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <caption className="sr-only">Recorded count lines</caption>
+                  <table className="w-full text-start text-sm">
+                    <caption className="sr-only">{t('scan.count.caption')}</caption>
                     <thead className="text-xs uppercase tracking-wide text-slate-500">
                       <tr className="border-b border-slate-200">
                         <th scope="col" className="px-5 py-3 font-semibold">
-                          Product
+                          {t('common.product')}
                         </th>
-                        <th scope="col" className="px-5 py-3 text-right font-semibold">
-                          On hand
+                        <th scope="col" className="px-5 py-3 text-end font-semibold">
+                          {t('scan.count.onHand')}
                         </th>
-                        <th scope="col" className="px-5 py-3 text-right font-semibold">
-                          Counted
+                        <th scope="col" className="px-5 py-3 text-end font-semibold">
+                          {t('scan.count.counted')}
                         </th>
-                        <th scope="col" className="px-5 py-3 text-right font-semibold">
-                          Variance
+                        <th scope="col" className="px-5 py-3 text-end font-semibold">
+                          {t('scan.count.varianceColumn')}
                         </th>
                       </tr>
                     </thead>
@@ -681,17 +714,19 @@ export function ScanningPage() {
                         <tr key={line.id}>
                           <td className="px-5 py-3">
                             <p className="font-medium text-slate-900">{line.productName}</p>
-                            <p className="font-mono text-xs text-slate-500">{line.productSku}</p>
+                            <p dir="ltr" className="font-mono text-xs text-slate-500">
+                              {line.productSku}
+                            </p>
                           </td>
-                          <td className="px-5 py-3 text-right tabular-nums text-slate-600">
+                          <td className="px-5 py-3 text-end tabular-nums text-slate-600">
                             {formatQuantity(line.onHand)}
                           </td>
-                          <td className="px-5 py-3 text-right tabular-nums text-slate-900">
+                          <td className="px-5 py-3 text-end tabular-nums text-slate-900">
                             {formatQuantity(line.countedQuantity)}
                           </td>
                           <td
                             className={cn(
-                              'px-5 py-3 text-right font-medium tabular-nums',
+                              'px-5 py-3 text-end font-medium tabular-nums',
                               line.variance === 0
                                 ? 'text-slate-500'
                                 : line.variance > 0
@@ -713,15 +748,17 @@ export function ScanningPage() {
                 {confirmPost ? (
                   <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
                     <p>
-                      Posting writes {countTotals.negative} adjustment
-                      {countTotals.negative === 1 ? '' : 's'} totalling{' '}
-                      {formatQuantity(countTotals.variance)} units to the stock ledger. This cannot
-                      be undone.
+                      {t('scan.count.confirm', {
+                        adjustments: plural('scan.adjustments', countTotals.negative),
+                        quantity: formatQuantity(countTotals.variance),
+                      })}
                     </p>
                     <div className="mt-2 flex gap-2">
                       <Button size="sm" disabled={postCount.isPending} onClick={submitPost}>
                         <Send aria-hidden="true" className="size-4" />
-                        {postCount.isPending ? 'Posting…' : 'Confirm post'}
+                        {postCount.isPending
+                          ? t('scan.count.posting')
+                          : t('scan.count.confirmPost')}
                       </Button>
                       <Button
                         variant="secondary"
@@ -729,7 +766,7 @@ export function ScanningPage() {
                         onClick={() => setConfirmPost(false)}
                         disabled={postCount.isPending}
                       >
-                        Keep counting
+                        {t('scan.count.keepCounting')}
                       </Button>
                     </div>
                   </div>
@@ -740,14 +777,14 @@ export function ScanningPage() {
                       onClick={() => setConfirmPost(true)}
                     >
                       <Send aria-hidden="true" className="size-4" />
-                      Post count
+                      {t('scan.count.post')}
                     </Button>
                     <Button
                       variant="secondary"
                       disabled={!canWrite || busy}
                       onClick={submitDiscard}
                     >
-                      Discard count
+                      {t('scan.count.discard')}
                     </Button>
                   </div>
                 )}
@@ -759,11 +796,8 @@ export function ScanningPage() {
         <aside className="space-y-6">
           {mode === 'receive' ? (
             <section className="rounded-xl border border-slate-200 bg-white p-5">
-              <h2 className="text-base font-semibold text-slate-900">Receive into</h2>
-              <p className="mt-1 text-sm text-slate-600">
-                A receipt increases on-hand stock at one location. Serialized products must be
-                registered as devices instead.
-              </p>
+              <h2 className="text-base font-semibold text-slate-900">{t('scan.receive.title')}</h2>
+              <p className="mt-1 text-sm text-slate-600">{t('scan.receive.description')}</p>
 
               <div className="mt-4">
                 <LocationPicker
@@ -779,7 +813,7 @@ export function ScanningPage() {
               </div>
 
               <label className="mt-3 block text-sm font-medium text-slate-700">
-                Quantity
+                {t('common.quantity')}
                 <input
                   type="number"
                   min={0}
@@ -797,16 +831,16 @@ export function ScanningPage() {
                 onClick={submitReceive}
               >
                 <Send aria-hidden="true" className="size-4" />
-                {receive.isPending ? 'Posting…' : 'Post receipt'}
+                {receive.isPending ? t('scan.receive.posting') : t('scan.receive.post')}
               </Button>
 
               {scannedProduct?.isSerialized && (
                 <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                  This product is serialized. Register the unit from{' '}
+                  {t('scan.receive.serializedBefore')}
                   <Link className="font-semibold text-indigo-700" to="/devices">
-                    Devices
-                  </Link>{' '}
-                  so its history stays traceable.
+                    {t('nav.devices')}
+                  </Link>
+                  {t('scan.receive.serializedAfter')}
                 </p>
               )}
             </section>
@@ -814,12 +848,10 @@ export function ScanningPage() {
             <>
               <section className="rounded-xl border border-slate-200 bg-white p-5">
                 <h2 className="text-base font-semibold text-slate-900">
-                  {count ? 'Record a counted product' : 'Start a count'}
+                  {count ? t('scan.count.recordTitle') : t('scan.count.startTitle')}
                 </h2>
                 <p className="mt-1 text-sm text-slate-600">
-                  {count
-                    ? 'Scan a product, then record the counted quantity. Increment adds to the current line; set replaces it.'
-                    : 'A count is scoped to one storage location, and only one count can be open per location.'}
+                  {count ? t('scan.count.recordDescription') : t('scan.count.startDescription')}
                 </p>
 
                 {!count ? (
@@ -842,7 +874,7 @@ export function ScanningPage() {
                       onClick={submitStartCount}
                     >
                       <ClipboardCheck aria-hidden="true" className="size-4" />
-                      {startCount.isPending ? 'Starting…' : 'Start count'}
+                      {startCount.isPending ? t('scan.count.starting') : t('scan.count.start')}
                     </Button>
                   </>
                 ) : (
@@ -851,14 +883,14 @@ export function ScanningPage() {
                       <>
                         <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
                           <span className="font-medium">{scannedProduct.name}</span>
-                          <span className="font-mono text-xs text-slate-500">
+                          <span dir="ltr" className="font-mono text-xs text-slate-500">
                             {' '}
                             · {scannedProduct.sku}
                           </span>
                         </p>
                         <div className="mt-3 grid grid-cols-2 gap-2">
                           <label className="block text-sm font-medium text-slate-700">
-                            Quantity
+                            {t('common.quantity')}
                             <input
                               type="number"
                               min={0}
@@ -869,7 +901,7 @@ export function ScanningPage() {
                             />
                           </label>
                           <label className="block text-sm font-medium text-slate-700">
-                            Mode
+                            {t('scan.count.mode')}
                             <select
                               value={countMode}
                               className={fieldClass}
@@ -877,8 +909,8 @@ export function ScanningPage() {
                                 setCountMode(event.target.value as 'increment' | 'set')
                               }
                             >
-                              <option value="increment">Add to line</option>
-                              <option value="set">Set exact</option>
+                              <option value="increment">{t('scan.count.addToLine')}</option>
+                              <option value="set">{t('scan.count.setExact')}</option>
                             </select>
                           </label>
                         </div>
@@ -888,17 +920,18 @@ export function ScanningPage() {
                           onClick={submitRecord}
                         >
                           <ClipboardCheck aria-hidden="true" className="size-4" />
-                          {recordCount.isPending ? 'Recording…' : 'Record count'}
+                          {recordCount.isPending
+                            ? t('scan.count.recording')
+                            : t('scan.count.record')}
                         </Button>
                       </>
                     ) : scannedProduct ? (
                       <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                        Serialized products are not counted by quantity. Each device is tracked in
-                        Devices instead.
+                        {t('scan.count.serializedHelp')}
                       </p>
                     ) : (
                       <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                        Scan a quantity product to record a count line.
+                        {t('scan.count.scanQuantityProduct')}
                       </p>
                     )}
                   </>
@@ -906,13 +939,13 @@ export function ScanningPage() {
               </section>
 
               <section className="rounded-xl border border-slate-200 bg-white p-5">
-                <h2 className="text-base font-semibold text-slate-900">Open counts</h2>
+                <h2 className="text-base font-semibold text-slate-900">
+                  {t('scan.count.openCounts')}
+                </h2>
                 {openCounts.isPending ? (
-                  <p className="mt-2 text-sm text-slate-500">Loading counts…</p>
+                  <p className="mt-2 text-sm text-slate-500">{t('scan.count.loadingOpen')}</p>
                 ) : (openCounts.data?.items.length ?? 0) === 0 ? (
-                  <p className="mt-2 text-sm text-slate-600">
-                    No count is open. Start one for a storage location.
-                  </p>
+                  <p className="mt-2 text-sm text-slate-600">{t('scan.count.noneOpen')}</p>
                 ) : (
                   <ul className="mt-3 divide-y divide-slate-100">
                     {openCounts.data?.items.map((item) => (
@@ -921,12 +954,14 @@ export function ScanningPage() {
                         className="flex items-center justify-between gap-3 py-2 text-sm"
                       >
                         <div>
-                          <p className="font-mono text-xs text-slate-700">
+                          <p dir="ltr" className="font-mono text-xs text-slate-700">
                             {item.warehouseCode} / {item.locationCode}
                           </p>
                           <p className="text-xs text-slate-500">
-                            {item.lineCount} line{item.lineCount === 1 ? '' : 's'} ·{' '}
-                            {new Date(item.createdAt).toLocaleDateString()}
+                            {t('scan.count.itemSummary', {
+                              lines: plural('scan.lines', item.lineCount),
+                              date: formatDate(item.createdAt),
+                            })}
                           </p>
                         </div>
                         <Button
@@ -935,7 +970,9 @@ export function ScanningPage() {
                           onClick={() => resumeCount(item)}
                           disabled={item.id === activeCountId}
                         >
-                          {item.id === activeCountId ? 'Selected' : 'Resume'}
+                          {item.id === activeCountId
+                            ? t('scan.count.selected')
+                            : t('scan.count.resume')}
                         </Button>
                       </li>
                     ))}
@@ -946,7 +983,7 @@ export function ScanningPage() {
           )}
 
           {activeCountId && !count && activeCount.isPending && (
-            <p className="text-sm text-slate-500">Loading the selected count…</p>
+            <p className="text-sm text-slate-500">{t('scan.count.loadingSelected')}</p>
           )}
         </aside>
       </div>

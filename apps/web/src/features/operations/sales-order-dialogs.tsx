@@ -1,11 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { z } from 'zod';
 
 import type { ProductSummary, WarehouseSummary } from '@mystock/contracts';
-import { formatTnd, toMinorUnits } from '@mystock/domain';
+import { toMinorUnits } from '@mystock/domain';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -17,7 +17,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { WarehouseLocationFields } from '@/components/ui/warehouse-location-fields';
-import { ApiError } from '@/lib/api-client';
+import type { MessageKey, MessageValues } from '@/i18n/messages';
+import { useI18n } from '@/i18n/provider';
 import { cn } from '@/lib/cn';
 import { fieldClass } from '@/lib/form-field';
 import {
@@ -27,13 +28,10 @@ import {
   useFulfilSalesOrder,
   useSalesOrder,
 } from './api';
-import { salesOrderStatusLabels, salesOrderStatusStyles } from './labels';
+import { salesOrderStatusKeys, salesOrderStatusStyles } from './labels';
 import { SalesReturnsSection } from './return-dialogs';
 
-function dialogError(error: unknown, fallback: string): string | null {
-  if (error instanceof ApiError) return error.message;
-  return error ? fallback : null;
-}
+type Translator = (key: MessageKey, values?: MessageValues) => string;
 
 function parsePriceInput(value: string): number | null {
   const normalized = value.trim().replace(',', '.');
@@ -49,49 +47,51 @@ function parsePriceInput(value: string): number | null {
   }
 }
 
-const priceField = z
-  .string()
-  .trim()
-  .refine((value) => value === '' || parsePriceInput(value) !== null, {
-    message: 'Use a positive amount with up to 3 decimals',
+function buildCreateSchema(t: Translator) {
+  const priceField = z
+    .string()
+    .trim()
+    .refine((value) => value === '' || parsePriceInput(value) !== null, {
+      message: t('sales.form.invalidPrice'),
+    });
+
+  const quantityField = z
+    .string()
+    .trim()
+    .refine((value) => /^\d+(\.\d{1,4})?$/.test(value) && Number(value) > 0, {
+      message: t('sales.form.invalidQuantity'),
+    });
+
+  const lineSchema = z.object({
+    productId: z.string().min(1, t('sales.form.selectProduct')),
+    quantity: quantityField,
+    unitPrice: priceField,
   });
 
-const quantityField = z
-  .string()
-  .trim()
-  .refine((value) => /^\d+(\.\d{1,4})?$/.test(value) && Number(value) > 0, {
-    message: 'Enter a quantity greater than zero',
-  });
+  return z
+    .object({
+      customerName: z.string().trim().min(1, t('sales.form.customerNameRequired')).max(160),
+      customerEmail: z
+        .string()
+        .trim()
+        .max(254)
+        .refine((value) => value === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), {
+          message: t('sales.form.invalidEmail'),
+        }),
+      customerPhone: z.string().trim().max(40),
+      warehouseId: z.string().min(1, t('common.selectWarehouse')),
+      locationId: z.string().min(1, t('common.selectLocation')),
+      reference: z.string().trim().max(120),
+      notes: z.string().trim().max(2000),
+      lines: z.array(lineSchema).min(1, t('sales.form.addLineRequired')).max(100),
+    })
+    .refine(
+      (values) => new Set(values.lines.map((line) => line.productId)).size === values.lines.length,
+      { message: t('sales.form.duplicateProduct'), path: ['lines'] },
+    );
+}
 
-const lineSchema = z.object({
-  productId: z.string().min(1, 'Select a product'),
-  quantity: quantityField,
-  unitPrice: priceField,
-});
-
-const createSchema = z
-  .object({
-    customerName: z.string().trim().min(1, 'Enter the customer name').max(160),
-    customerEmail: z
-      .string()
-      .trim()
-      .max(254)
-      .refine((value) => value === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), {
-        message: 'Enter a valid email address',
-      }),
-    customerPhone: z.string().trim().max(40),
-    warehouseId: z.string().min(1, 'Select a warehouse'),
-    locationId: z.string().min(1, 'Select a storage location'),
-    reference: z.string().trim().max(120),
-    notes: z.string().trim().max(2000),
-    lines: z.array(lineSchema).min(1, 'Add at least one line').max(100),
-  })
-  .refine(
-    (values) => new Set(values.lines.map((line) => line.productId)).size === values.lines.length,
-    { message: 'Each product may appear only once', path: ['lines'] },
-  );
-
-type CreateValues = z.infer<typeof createSchema>;
+type CreateValues = z.infer<ReturnType<typeof buildCreateSchema>>;
 
 const emptyLine = { productId: '', quantity: '', unitPrice: '' };
 
@@ -110,7 +110,9 @@ export function CreateSalesOrderDialog({
   open,
   onOpenChange,
 }: CreateSalesOrderDialogProps) {
+  const { t, errorMessage } = useI18n();
   const mutation = useCreateSalesOrder(organizationId);
+  const createSchema = useMemo(() => buildCreateSchema(t), [t]);
   const {
     register,
     control,
@@ -153,7 +155,7 @@ export function CreateSalesOrderDialog({
   const sellableProducts = products.filter(
     (product) => product.status === 'active' && !product.isSerialized,
   );
-  const errorMessage = dialogError(mutation.error, 'The outgoing order could not be created.');
+  const createError = mutation.error ? errorMessage(mutation.error, 'sales.create.failed') : null;
 
   const submit = handleSubmit(async (values) => {
     try {
@@ -181,16 +183,14 @@ export function CreateSalesOrderDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
-        <DialogTitle>New outgoing order</DialogTitle>
-        <DialogDescription>
-          Confirming reserves stock; fulfilling issues it. Serialized products are sold per device.
-        </DialogDescription>
+        <DialogTitle>{t('sales.newOrder')}</DialogTitle>
+        <DialogDescription>{t('sales.create.description')}</DialogDescription>
 
         <form noValidate className="mt-5 space-y-4" onSubmit={submit}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="so-customer" className="block text-sm font-medium text-slate-700">
-                Customer name
+                {t('sales.form.customerName')}
               </label>
               <input
                 id="so-customer"
@@ -207,11 +207,12 @@ export function CreateSalesOrderDialog({
             </div>
             <div>
               <label htmlFor="so-reference" className="block text-sm font-medium text-slate-700">
-                Reference (optional)
+                {t('sales.form.referenceOptional')}
               </label>
               <input
                 id="so-reference"
                 type="text"
+                dir="ltr"
                 className={fieldClass}
                 {...register('reference')}
               />
@@ -221,11 +222,12 @@ export function CreateSalesOrderDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="so-email" className="block text-sm font-medium text-slate-700">
-                Email (optional)
+                {t('sales.form.emailOptional')}
               </label>
               <input
                 id="so-email"
                 type="email"
+                dir="ltr"
                 className={fieldClass}
                 aria-invalid={Boolean(errors.customerEmail)}
                 {...register('customerEmail')}
@@ -238,11 +240,12 @@ export function CreateSalesOrderDialog({
             </div>
             <div>
               <label htmlFor="so-phone" className="block text-sm font-medium text-slate-700">
-                Phone (optional)
+                {t('sales.form.phoneOptional')}
               </label>
               <input
                 id="so-phone"
                 type="tel"
+                dir="ltr"
                 className={fieldClass}
                 {...register('customerPhone')}
               />
@@ -260,16 +263,14 @@ export function CreateSalesOrderDialog({
           <section aria-labelledby="so-lines-heading">
             <div className="flex items-center justify-between">
               <h3 id="so-lines-heading" className="text-sm font-semibold text-slate-900">
-                Lines
+                {t('sales.form.lines')}
               </h3>
               <Button type="button" variant="secondary" size="sm" onClick={() => append(emptyLine)}>
                 <Plus aria-hidden="true" className="size-4" />
-                Add line
+                {t('sales.form.addLine')}
               </Button>
             </div>
-            <p className="mt-1 text-xs text-slate-500">
-              Only active, non-serialized products can be sold through an order line.
-            </p>
+            <p className="mt-1 text-xs text-slate-500">{t('sales.form.linesHint')}</p>
 
             <div className="mt-2 space-y-3">
               {fields.map((field, index) => (
@@ -282,14 +283,14 @@ export function CreateSalesOrderDialog({
                       htmlFor={`so-line-product-${index}`}
                       className="block text-xs font-medium text-slate-600"
                     >
-                      Product
+                      {t('common.product')}
                     </label>
                     <select
                       id={`so-line-product-${index}`}
                       className={fieldClass}
                       {...register(`lines.${index}.productId`)}
                     >
-                      <option value="">Select a product</option>
+                      <option value="">{t('sales.form.selectProduct')}</option>
                       {sellableProducts.map((product) => (
                         <option key={product.id} value={product.id}>
                           {product.sku} · {product.name}
@@ -302,7 +303,7 @@ export function CreateSalesOrderDialog({
                       htmlFor={`so-line-quantity-${index}`}
                       className="block text-xs font-medium text-slate-600"
                     >
-                      Quantity
+                      {t('common.quantity')}
                     </label>
                     <input
                       id={`so-line-quantity-${index}`}
@@ -317,7 +318,7 @@ export function CreateSalesOrderDialog({
                       htmlFor={`so-line-price-${index}`}
                       className="block text-xs font-medium text-slate-600"
                     >
-                      Unit price (TND)
+                      {t('sales.form.unitPrice')}
                     </label>
                     <input
                       id={`so-line-price-${index}`}
@@ -333,7 +334,7 @@ export function CreateSalesOrderDialog({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      aria-label={`Remove line ${index + 1}`}
+                      aria-label={t('sales.form.removeLine', { index: index + 1 })}
                       disabled={fields.length === 1}
                       onClick={() => remove(index)}
                     >
@@ -367,25 +368,25 @@ export function CreateSalesOrderDialog({
 
           <div>
             <label htmlFor="so-notes" className="block text-sm font-medium text-slate-700">
-              Notes (optional)
+              {t('sales.form.notesOptional')}
             </label>
             <textarea id="so-notes" rows={2} className={fieldClass} {...register('notes')} />
           </div>
 
-          {errorMessage && (
+          {createError && (
             <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
-              {errorMessage}
+              {createError}
             </p>
           )}
 
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancel
+                {t('common.cancel')}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Creating…' : 'Create outgoing order'}
+              {mutation.isPending ? t('sales.create.creating') : t('sales.create.submit')}
             </Button>
           </DialogFooter>
         </form>
@@ -407,6 +408,7 @@ export function SalesOrderDetailDialog({
   canWrite,
   onOpenChange,
 }: SalesOrderDetailDialogProps) {
+  const { t, plural, errorMessage, formatQuantity, formatMoney } = useI18n();
   const order = useSalesOrder(organizationId, salesOrderId);
   const confirmMutation = useConfirmSalesOrder(organizationId);
   const fulfilMutation = useFulfilSalesOrder(organizationId);
@@ -423,32 +425,48 @@ export function SalesOrderDetailDialog({
   const data = order.data;
   const cancellable = data?.status === 'draft' || data?.status === 'confirmed';
 
-  const confirmError = dialogError(confirmMutation.error, 'The order could not be confirmed.');
-  const fulfilError = dialogError(fulfilMutation.error, 'The order could not be fulfilled.');
-  const cancelError = dialogError(cancelMutation.error, 'The order could not be cancelled.');
+  const confirmError = confirmMutation.error
+    ? errorMessage(confirmMutation.error, 'sales.detail.confirmFailed')
+    : null;
+  const fulfilError = fulfilMutation.error
+    ? errorMessage(fulfilMutation.error, 'sales.detail.fulfilFailed')
+    : null;
+  const cancelError = cancelMutation.error
+    ? errorMessage(cancelMutation.error, 'sales.detail.cancelFailed')
+    : null;
 
   return (
     <Dialog open={Boolean(salesOrderId)} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogTitle>
-          {data ? `${data.number} · ${data.customerName}` : 'Outgoing order'}
+          {data ? (
+            <>
+              <span dir="ltr">{data.number}</span> · {data.customerName}
+            </>
+          ) : (
+            t('sales.detail.title')
+          )}
         </DialogTitle>
         <DialogDescription>
           {data
-            ? `${salesOrderStatusLabels[data.status]} · ${data.warehouseCode} / ${data.locationCode}`
-            : 'Loading outgoing order…'}
+            ? t('sales.detail.subtitle', {
+                status: t(salesOrderStatusKeys[data.status]),
+                warehouse: data.warehouseCode,
+                location: data.locationCode,
+              })
+            : t('sales.detail.loading')}
         </DialogDescription>
 
         {order.isError ? (
           <p role="alert" className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
-            {order.error instanceof Error ? order.error.message : 'The order failed to load.'}
+            {errorMessage(order.error, 'sales.detail.loadFailed')}
           </p>
         ) : data ? (
           <div className="mt-5 space-y-6">
             <dl className="grid gap-3 rounded-lg bg-slate-50 p-4 text-sm sm:grid-cols-3">
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Status
+                  {t('common.status')}
                 </dt>
                 <dd className="mt-1">
                   <span
@@ -457,44 +475,46 @@ export function SalesOrderDetailDialog({
                       salesOrderStatusStyles[data.status],
                     )}
                   >
-                    {salesOrderStatusLabels[data.status]}
+                    {t(salesOrderStatusKeys[data.status])}
                   </span>
                 </dd>
               </div>
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Contact
+                  {t('sales.detail.contact')}
                 </dt>
                 <dd className="mt-1 text-slate-800">
-                  {data.customerEmail ?? data.customerPhone ?? '—'}
+                  {data.customerEmail ?? data.customerPhone ?? t('common.notAvailable')}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Reference
+                  {t('common.reference')}
                 </dt>
-                <dd className="mt-1 text-slate-800">{data.reference ?? '—'}</dd>
+                <dd className="mt-1 text-slate-800">
+                  {data.reference ?? t('common.notAvailable')}
+                </dd>
               </div>
             </dl>
 
             <div className="overflow-x-auto rounded-lg border border-slate-200">
-              <table className="w-full text-left text-sm">
+              <table className="w-full text-start text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
                     <th scope="col" className="px-3 py-2 font-semibold">
-                      Product
+                      {t('common.product')}
                     </th>
-                    <th scope="col" className="px-3 py-2 text-right font-semibold">
-                      Quantity
+                    <th scope="col" className="px-3 py-2 text-end font-semibold">
+                      {t('common.quantity')}
                     </th>
-                    <th scope="col" className="px-3 py-2 text-right font-semibold">
-                      Returned
+                    <th scope="col" className="px-3 py-2 text-end font-semibold">
+                      {t('sales.detail.returned')}
                     </th>
-                    <th scope="col" className="px-3 py-2 text-right font-semibold">
-                      Unit price
+                    <th scope="col" className="px-3 py-2 text-end font-semibold">
+                      {t('sales.detail.unitPrice')}
                     </th>
                     <th scope="col" className="px-3 py-2 font-semibold">
-                      Reservation
+                      {t('sales.detail.reservation')}
                     </th>
                   </tr>
                 </thead>
@@ -503,17 +523,25 @@ export function SalesOrderDetailDialog({
                     <tr key={line.id}>
                       <td className="px-3 py-2">
                         <p className="text-slate-800">{line.productName}</p>
-                        <p className="font-mono text-xs text-slate-500">{line.productSku}</p>
+                        <p dir="ltr" className="font-mono text-xs text-slate-500">
+                          {line.productSku}
+                        </p>
                       </td>
-                      <td className="px-3 py-2 text-right text-slate-700">{line.quantity}</td>
-                      <td className="px-3 py-2 text-right text-slate-700">
-                        {line.quantityReturned}
+                      <td className="px-3 py-2 text-end text-slate-700">
+                        {formatQuantity(line.quantity)}
                       </td>
-                      <td className="px-3 py-2 text-right text-slate-700">
-                        {line.unitPriceMinor === null ? '—' : formatTnd(line.unitPriceMinor)}
+                      <td className="px-3 py-2 text-end text-slate-700">
+                        {formatQuantity(line.quantityReturned)}
                       </td>
-                      <td className="px-3 py-2 font-mono text-xs text-slate-500">
-                        {line.reservationId ? `${line.reservationId.slice(0, 8)}…` : '—'}
+                      <td className="px-3 py-2 text-end text-slate-700">
+                        {line.unitPriceMinor === null
+                          ? t('common.notAvailable')
+                          : formatMoney(line.unitPriceMinor)}
+                      </td>
+                      <td dir="ltr" className="px-3 py-2 font-mono text-xs text-slate-500">
+                        {line.reservationId
+                          ? `${line.reservationId.slice(0, 8)}…`
+                          : t('common.notAvailable')}
                       </td>
                     </tr>
                   ))}
@@ -540,14 +568,18 @@ export function SalesOrderDetailDialog({
                       try {
                         const result = await confirmMutation.mutateAsync(data.id);
                         setNotice(
-                          `Reserved ${result.reservedQuantity} unit${result.reservedQuantity === 1 ? '' : 's'} for ${result.number}.`,
+                          plural('sales.detail.reserved', result.reservedQuantity, {
+                            order: result.number,
+                          }),
                         );
                       } catch {
                         // mutation.error renders below.
                       }
                     }}
                   >
-                    {confirmMutation.isPending ? 'Confirming…' : 'Confirm and reserve stock'}
+                    {confirmMutation.isPending
+                      ? t('sales.detail.confirming')
+                      : t('sales.detail.confirm')}
                   </Button>
                 )}
 
@@ -559,14 +591,18 @@ export function SalesOrderDetailDialog({
                       try {
                         const result = await fulfilMutation.mutateAsync(data.id);
                         setNotice(
-                          `Issued ${result.issuedQuantity} unit${result.issuedQuantity === 1 ? '' : 's'} for ${result.number}.`,
+                          plural('sales.detail.issued', result.issuedQuantity, {
+                            order: result.number,
+                          }),
                         );
                       } catch {
                         // mutation.error renders below.
                       }
                     }}
                   >
-                    {fulfilMutation.isPending ? 'Fulfilling…' : 'Fulfil and issue stock'}
+                    {fulfilMutation.isPending
+                      ? t('sales.detail.fulfilling')
+                      : t('sales.detail.fulfil')}
                   </Button>
                 )}
               </div>
@@ -584,16 +620,14 @@ export function SalesOrderDetailDialog({
                 className="rounded-lg border border-rose-100 bg-rose-50/50 p-4"
               >
                 <h3 id="so-cancel-heading" className="text-sm font-semibold text-slate-900">
-                  Cancel order
+                  {t('sales.cancel.heading')}
                 </h3>
-                <p className="mt-1 text-xs text-slate-600">
-                  Cancelling releases any reservation held for this order.
-                </p>
+                <p className="mt-1 text-xs text-slate-600">{t('sales.cancel.help')}</p>
                 <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                   <input
-                    aria-label="Cancellation reason"
+                    aria-label={t('sales.cancel.reasonLabel')}
                     type="text"
-                    placeholder="Reason (optional)"
+                    placeholder={t('sales.cancel.reasonPlaceholder')}
                     className={fieldClass}
                     value={reason}
                     onChange={(event) => setReason(event.target.value)}
@@ -610,7 +644,11 @@ export function SalesOrderDetailDialog({
                           input: { reason: reason || null },
                         });
                         setNotice(
-                          `Order ${result.number} was cancelled and ${result.releasedReservations} reservation${result.releasedReservations === 1 ? '' : 's'} released.`,
+                          plural(
+                            'sales.detail.cancelledWithReservations',
+                            result.releasedReservations,
+                            { order: result.number },
+                          ),
                         );
                         setReason('');
                       } catch {
@@ -618,7 +656,9 @@ export function SalesOrderDetailDialog({
                       }
                     }}
                   >
-                    {cancelMutation.isPending ? 'Cancelling…' : 'Cancel order'}
+                    {cancelMutation.isPending
+                      ? t('sales.cancel.cancelling')
+                      : t('sales.cancel.submit')}
                   </Button>
                 </div>
                 {cancelError && (
@@ -639,7 +679,7 @@ export function SalesOrderDetailDialog({
           </div>
         ) : (
           <p className="mt-4 text-sm text-slate-500" role="status">
-            Loading order…
+            {t('sales.detail.loadingOrder')}
           </p>
         )}
       </DialogContent>

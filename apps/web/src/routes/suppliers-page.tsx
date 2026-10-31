@@ -8,6 +8,7 @@ import { PaginationFooter } from '@/components/ui/pagination-footer';
 import { useSetSupplierActive, useSuppliers } from '@/features/operations/api';
 import { SupplierDialog } from '@/features/operations/supplier-dialog';
 import { useOrganization } from '@/features/organizations/organization-provider';
+import { useI18n } from '@/i18n/provider';
 import { cn } from '@/lib/cn';
 
 const PAGE_SIZE = 25;
@@ -25,6 +26,7 @@ function useDebouncedValue<T>(value: T, delay = 300): T {
 
 export function SuppliersPage() {
   const { organization } = useOrganization();
+  const { t, errorMessage } = useI18n();
   const organizationId = organization?.organizationId ?? null;
   const canWrite =
     organization?.role === 'owner' ||
@@ -63,28 +65,26 @@ export function SuppliersPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Suppliers</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Vendor directory used by purchase orders. Names are unique per organization.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            {t('suppliers.title')}
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">{t('suppliers.description')}</p>
         </div>
         <Button disabled={!canWrite} onClick={openCreate}>
           <Plus aria-hidden="true" className="size-4" />
-          New supplier
+          {t('suppliers.newSupplier')}
         </Button>
       </header>
 
       {!canWrite && (
         <p className="rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">
-          Your viewer role is read-only. Owners, admins and managers maintain suppliers.
+          {t('suppliers.viewerReadOnly')}
         </p>
       )}
 
       {activation.error && (
         <p role="alert" className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-800">
-          {activation.error instanceof Error
-            ? activation.error.message
-            : 'The activation change failed.'}
+          {errorMessage(activation.error, 'suppliers.activationFailed')}
         </p>
       )}
 
@@ -92,18 +92,18 @@ export function SuppliersPage() {
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <label htmlFor="supplier-search" className="sr-only">
-              Search suppliers
+              {t('suppliers.searchLabel')}
             </label>
             <Search
               aria-hidden="true"
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
             />
             <input
               id="supplier-search"
               type="search"
               value={search}
-              placeholder="Search by name, contact or email"
-              className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm text-slate-900 shadow-sm focus:border-indigo-500"
+              placeholder={t('suppliers.searchPlaceholder')}
+              className="w-full rounded-lg border border-slate-300 py-2 ps-9 pe-3 text-sm text-slate-900 shadow-sm focus:border-indigo-500"
               onChange={(event) => {
                 setSearch(event.target.value);
                 setPage(1);
@@ -113,7 +113,7 @@ export function SuppliersPage() {
 
           <div>
             <label htmlFor="supplier-active" className="sr-only">
-              Filter by active state
+              {t('suppliers.filterLabel')}
             </label>
             <select
               id="supplier-active"
@@ -124,9 +124,9 @@ export function SuppliersPage() {
                 setPage(1);
               }}
             >
-              <option value="">All suppliers</option>
-              <option value="true">Active</option>
-              <option value="false">Inactive</option>
+              <option value="">{t('suppliers.allSuppliers')}</option>
+              <option value="true">{t('suppliers.active')}</option>
+              <option value="false">{t('suppliers.inactive')}</option>
             </select>
           </div>
         </div>
@@ -134,9 +134,7 @@ export function SuppliersPage() {
         {suppliers.isError ? (
           <div className="p-6">
             <p role="alert" className="text-sm text-rose-700">
-              {suppliers.error instanceof Error
-                ? suppliers.error.message
-                : 'Suppliers failed to load.'}
+              {errorMessage(suppliers.error, 'suppliers.loadFailed')}
             </p>
             <Button
               variant="secondary"
@@ -144,11 +142,15 @@ export function SuppliersPage() {
               className="mt-3"
               onClick={() => void suppliers.refetch()}
             >
-              Try again
+              {t('common.retry')}
             </Button>
           </div>
         ) : suppliers.isPending ? (
-          <div className="divide-y divide-slate-100" role="status" aria-label="Loading suppliers">
+          <div
+            className="divide-y divide-slate-100"
+            role="status"
+            aria-label={t('suppliers.loading')}
+          >
             {Array.from({ length: 4 }).map((_, index) => (
               <div key={index} className="flex animate-pulse items-center gap-4 px-4 py-4">
                 <div className="h-4 w-1/3 rounded bg-slate-200" />
@@ -163,36 +165,36 @@ export function SuppliersPage() {
               <Building2 aria-hidden="true" className="size-6" />
             </span>
             <h2 className="mt-4 text-base font-semibold text-slate-900">
-              {search || isActive ? 'No matching suppliers' : 'No suppliers yet'}
+              {search || isActive ? t('suppliers.emptyMatching') : t('suppliers.emptyNone')}
             </h2>
             <p className="mt-2 max-w-md text-sm text-slate-600">
               {search || isActive
-                ? 'Adjust the search or filter to see more results.'
+                ? t('suppliers.emptyMatchingDescription')
                 : canWrite
-                  ? 'Add the first supplier to start raising purchase orders.'
-                  : 'An owner, admin or manager can add the first supplier.'}
+                  ? t('suppliers.emptyCreateDescription')
+                  : t('suppliers.emptyViewerDescription')}
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <caption className="sr-only">Supplier directory</caption>
+            <table className="w-full text-start text-sm">
+              <caption className="sr-only">{t('suppliers.tableCaption')}</caption>
               <thead className="text-xs uppercase tracking-wide text-slate-500">
                 <tr className="border-b border-slate-200">
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Supplier
+                    {t('common.supplier')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Contact
+                    {t('suppliers.contact')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Location
+                    {t('common.location')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Status
+                    {t('common.status')}
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right font-semibold">
-                    Actions
+                  <th scope="col" className="px-4 py-3 text-end font-semibold">
+                    {t('common.actions')}
                   </th>
                 </tr>
               </thead>
@@ -203,19 +205,24 @@ export function SuppliersPage() {
                       <p className="font-medium text-slate-900">{supplier.name}</p>
                       {supplier.taxId && (
                         <p className="mt-0.5 font-mono text-xs text-slate-500">
-                          Tax ID {supplier.taxId}
+                          {t('suppliers.taxId')} <span dir="ltr">{supplier.taxId}</span>
                         </p>
                       )}
                     </td>
                     <td className="px-4 py-3 text-slate-600">
-                      <p>{supplier.contactName ?? '—'}</p>
-                      <p className="text-xs text-slate-500">
+                      <p>{supplier.contactName ?? t('common.notAvailable')}</p>
+                      <p dir="ltr" className="text-xs text-slate-500">
                         {supplier.email ?? supplier.phone ?? ''}
                       </p>
                     </td>
                     <td className="px-4 py-3 text-slate-600">
-                      {supplier.city ?? '—'}
-                      {supplier.countryCode ? `, ${supplier.countryCode}` : ''}
+                      {supplier.city ?? t('common.notAvailable')}
+                      {supplier.countryCode ? (
+                        <>
+                          {', '}
+                          <span dir="ltr">{supplier.countryCode}</span>
+                        </>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -226,7 +233,7 @@ export function SuppliersPage() {
                             : 'bg-slate-100 text-slate-600 ring-slate-200',
                         )}
                       >
-                        {supplier.isActive ? 'Active' : 'Inactive'}
+                        {supplier.isActive ? t('suppliers.active') : t('suppliers.inactive')}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -238,7 +245,7 @@ export function SuppliersPage() {
                           onClick={() => openEdit(supplier)}
                         >
                           <Pencil aria-hidden="true" className="size-4" />
-                          Edit
+                          {t('common.edit')}
                         </Button>
                         <Button
                           variant="secondary"
@@ -252,7 +259,9 @@ export function SuppliersPage() {
                           }
                         >
                           <Power aria-hidden="true" className="size-4" />
-                          {supplier.isActive ? 'Deactivate' : 'Reactivate'}
+                          {supplier.isActive
+                            ? t('suppliers.deactivate')
+                            : t('suppliers.reactivate')}
                         </Button>
                       </div>
                     </td>
@@ -268,7 +277,7 @@ export function SuppliersPage() {
             total={total}
             page={page}
             pageCount={pageCount}
-            noun="supplier"
+            nounKey="common.noun.suppliers"
             onPrevious={() => setPage((current) => Math.max(1, current - 1))}
             onNext={() => setPage((current) => current + 1)}
           />

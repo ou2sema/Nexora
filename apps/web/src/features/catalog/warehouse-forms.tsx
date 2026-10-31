@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -14,27 +14,19 @@ import {
   DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ApiError } from '@/lib/api-client';
+import { useI18n } from '@/i18n/provider';
 import { useCreateLocation, useCreateWarehouse } from './api';
 
 const fieldClass =
   'mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500';
 
-const warehouseSchema = z.object({
-  code: z
-    .string()
-    .trim()
-    .regex(/^[A-Za-z0-9-]{2,16}$/, 'Use 2 to 16 letters, digits or hyphens'),
-  name: z.string().trim().min(1, 'Enter a warehouse name').max(120),
-  city: z.string().trim().max(120),
-  countryCode: z
-    .string()
-    .trim()
-    .refine((value) => value === '' || /^[A-Za-z]{2}$/.test(value), 'Use a two-letter code'),
-  addressLine: z.string().trim().max(200),
-});
-
-type WarehouseValues = z.infer<typeof warehouseSchema>;
+type WarehouseValues = {
+  code: string;
+  name: string;
+  city: string;
+  countryCode: string;
+  addressLine: string;
+};
 
 interface WarehouseFormDialogProps {
   organizationId: string;
@@ -47,7 +39,30 @@ export function WarehouseFormDialog({
   open,
   onOpenChange,
 }: WarehouseFormDialogProps) {
+  const { t, errorMessage } = useI18n();
   const mutation = useCreateWarehouse(organizationId);
+
+  const warehouseSchema = useMemo(
+    () =>
+      z.object({
+        code: z
+          .string()
+          .trim()
+          .regex(/^[A-Za-z0-9-]{2,16}$/, t('warehouseForms.codeInvalid')),
+        name: z.string().trim().min(1, t('warehouseForms.nameRequired')).max(120),
+        city: z.string().trim().max(120),
+        countryCode: z
+          .string()
+          .trim()
+          .refine(
+            (value) => value === '' || /^[A-Za-z]{2}$/.test(value),
+            t('warehouseForms.countryCodeInvalid'),
+          ),
+        addressLine: z.string().trim().max(200),
+      }),
+    [t],
+  );
+
   const {
     register,
     handleSubmit,
@@ -62,20 +77,15 @@ export function WarehouseFormDialog({
     if (open) reset();
   }, [open, reset]);
 
-  const errorMessage =
-    mutation.error instanceof ApiError
-      ? mutation.error.message
-      : mutation.error
-        ? 'The warehouse could not be created.'
-        : null;
+  const saveError = mutation.error
+    ? errorMessage(mutation.error, 'warehouseForms.warehouseCreateFailed')
+    : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogTitle>Add warehouse</DialogTitle>
-        <DialogDescription>
-          Warehouse codes are unique within the organization and stored in uppercase.
-        </DialogDescription>
+        <DialogTitle>{t('warehouseForms.warehouseTitle')}</DialogTitle>
+        <DialogDescription>{t('warehouseForms.warehouseDescription')}</DialogDescription>
 
         <form
           noValidate
@@ -99,10 +109,11 @@ export function WarehouseFormDialog({
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <label htmlFor="warehouse-code" className="block text-sm font-medium text-slate-700">
-                Code
+                {t('warehouseForms.code')}
               </label>
               <input
                 id="warehouse-code"
+                dir="ltr"
                 className={fieldClass}
                 aria-invalid={Boolean(errors.code)}
                 aria-describedby={errors.code ? 'warehouse-code-error' : undefined}
@@ -117,7 +128,7 @@ export function WarehouseFormDialog({
 
             <div className="sm:col-span-2">
               <label htmlFor="warehouse-name" className="block text-sm font-medium text-slate-700">
-                Name
+                {t('common.name')}
               </label>
               <input
                 id="warehouse-name"
@@ -137,7 +148,7 @@ export function WarehouseFormDialog({
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="sm:col-span-2">
               <label htmlFor="warehouse-city" className="block text-sm font-medium text-slate-700">
-                City
+                {t('warehouseForms.city')}
               </label>
               <input id="warehouse-city" className={fieldClass} {...register('city')} />
             </div>
@@ -146,10 +157,11 @@ export function WarehouseFormDialog({
                 htmlFor="warehouse-country"
                 className="block text-sm font-medium text-slate-700"
               >
-                Country
+                {t('warehouseForms.country')}
               </label>
               <input
                 id="warehouse-country"
+                dir="ltr"
                 className={fieldClass}
                 maxLength={2}
                 {...register('countryCode')}
@@ -164,25 +176,25 @@ export function WarehouseFormDialog({
 
           <div>
             <label htmlFor="warehouse-address" className="block text-sm font-medium text-slate-700">
-              Address
+              {t('warehouseForms.address')}
             </label>
             <input id="warehouse-address" className={fieldClass} {...register('addressLine')} />
           </div>
 
-          {errorMessage && (
+          {saveError && (
             <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
-              {errorMessage}
+              {saveError}
             </p>
           )}
 
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancel
+                {t('common.cancel')}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Saving…' : 'Create warehouse'}
+              {mutation.isPending ? t('common.saving') : t('warehouseForms.createWarehouse')}
             </Button>
           </DialogFooter>
         </form>
@@ -191,15 +203,10 @@ export function WarehouseFormDialog({
   );
 }
 
-const locationSchema = z.object({
-  code: z
-    .string()
-    .trim()
-    .regex(/^[A-Za-z0-9-]{1,24}$/, 'Use 1 to 24 letters, digits or hyphens'),
-  name: z.string().trim().min(1, 'Enter a location name').max(120),
-});
-
-type LocationValues = z.infer<typeof locationSchema>;
+type LocationValues = {
+  code: string;
+  name: string;
+};
 
 interface LocationFormDialogProps {
   organizationId: string;
@@ -214,7 +221,21 @@ export function LocationFormDialog({
   open,
   onOpenChange,
 }: LocationFormDialogProps) {
+  const { t, errorMessage } = useI18n();
   const mutation = useCreateLocation(organizationId, warehouse.id);
+
+  const locationSchema = useMemo(
+    () =>
+      z.object({
+        code: z
+          .string()
+          .trim()
+          .regex(/^[A-Za-z0-9-]{1,24}$/, t('warehouseForms.locationCodeInvalid')),
+        name: z.string().trim().min(1, t('warehouseForms.locationNameRequired')).max(120),
+      }),
+    [t],
+  );
+
   const {
     register,
     handleSubmit,
@@ -229,19 +250,16 @@ export function LocationFormDialog({
     if (open) reset();
   }, [open, reset]);
 
-  const errorMessage =
-    mutation.error instanceof ApiError
-      ? mutation.error.message
-      : mutation.error
-        ? 'The storage location could not be created.'
-        : null;
+  const saveError = mutation.error
+    ? errorMessage(mutation.error, 'warehouseForms.locationCreateFailed')
+    : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogTitle>Add storage location</DialogTitle>
+        <DialogTitle>{t('warehouseForms.locationTitle')}</DialogTitle>
         <DialogDescription>
-          {warehouse.name} · codes are unique inside this warehouse.
+          {t('warehouseForms.locationDescription', { warehouseName: warehouse.name })}
         </DialogDescription>
 
         <form
@@ -262,10 +280,11 @@ export function LocationFormDialog({
         >
           <div>
             <label htmlFor="location-code" className="block text-sm font-medium text-slate-700">
-              Code
+              {t('warehouseForms.code')}
             </label>
             <input
               id="location-code"
+              dir="ltr"
               className={fieldClass}
               aria-invalid={Boolean(errors.code)}
               aria-describedby={errors.code ? 'location-code-error' : undefined}
@@ -280,7 +299,7 @@ export function LocationFormDialog({
 
           <div>
             <label htmlFor="location-name" className="block text-sm font-medium text-slate-700">
-              Name
+              {t('common.name')}
             </label>
             <input
               id="location-name"
@@ -296,20 +315,20 @@ export function LocationFormDialog({
             )}
           </div>
 
-          {errorMessage && (
+          {saveError && (
             <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
-              {errorMessage}
+              {saveError}
             </p>
           )}
 
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancel
+                {t('common.cancel')}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Saving…' : 'Create location'}
+              {mutation.isPending ? t('common.saving') : t('warehouseForms.createLocation')}
             </Button>
           </DialogFooter>
         </form>

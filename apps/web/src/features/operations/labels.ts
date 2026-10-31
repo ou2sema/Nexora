@@ -1,11 +1,13 @@
 import type { PurchaseOrderStatus, SalesOrderStatus } from '@mystock/contracts';
 
-export const purchaseOrderStatusLabels: Record<PurchaseOrderStatus, string> = {
-  draft: 'Draft',
-  ordered: 'Ordered',
-  partially_received: 'Partially received',
-  received: 'Received',
-  cancelled: 'Cancelled',
+import type { MessageKey } from '@/i18n/messages';
+
+export const purchaseOrderStatusKeys: Record<PurchaseOrderStatus, MessageKey> = {
+  draft: 'purchasing.status.draft',
+  ordered: 'purchasing.status.ordered',
+  partially_received: 'purchasing.status.partially_received',
+  received: 'purchasing.status.received',
+  cancelled: 'purchasing.status.cancelled',
 };
 
 export const purchaseOrderStatusStyles: Record<PurchaseOrderStatus, string> = {
@@ -16,11 +18,11 @@ export const purchaseOrderStatusStyles: Record<PurchaseOrderStatus, string> = {
   cancelled: 'bg-rose-50 text-rose-800 ring-rose-200',
 };
 
-export const salesOrderStatusLabels: Record<SalesOrderStatus, string> = {
-  draft: 'Draft',
-  confirmed: 'Confirmed',
-  fulfilled: 'Fulfilled',
-  cancelled: 'Cancelled',
+export const salesOrderStatusKeys: Record<SalesOrderStatus, MessageKey> = {
+  draft: 'sales.status.draft',
+  confirmed: 'sales.status.confirmed',
+  fulfilled: 'sales.status.fulfilled',
+  cancelled: 'sales.status.cancelled',
 };
 
 export const salesOrderStatusStyles: Record<SalesOrderStatus, string> = {

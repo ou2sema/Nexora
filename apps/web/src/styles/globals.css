@@ -2,7 +2,8 @@
 
 @theme {
   --font-sans:
-    'Segoe UI Variable Text', 'Segoe UI', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    'Segoe UI Variable Text', 'Segoe UI', 'Noto Naskh Arabic', Tahoma, ui-sans-serif, system-ui,
+    -apple-system, sans-serif;
   --font-mono: ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
   --color-ink-950: #0b1220;
   --color-ink-900: #111c2e;
@@ -17,12 +18,22 @@
   body {
     font-family: var(--font-sans);
   }
+
+  :lang(ar) {
+    letter-spacing: normal;
+  }
+
+  :lang(ar) .tracking-tight,
+  :lang(ar) .tracking-wider,
+  :lang(ar) .tracking-widest {
+    letter-spacing: normal;
+  }
 }
 
 @layer utilities {
   .skip-link {
     position: absolute;
-    left: 1rem;
+    inset-inline-start: 1rem;
     top: -100%;
     z-index: 60;
     border-radius: 0.5rem;

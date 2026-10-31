@@ -7,9 +7,20 @@ import { Button } from '@/components/ui/button';
 import { PaginationFooter } from '@/components/ui/pagination-footer';
 import { useOrganization } from '@/features/organizations/organization-provider';
 import { useReleaseReservation, useStockReservations } from '@/features/stock/api';
+import type { MessageKey } from '@/i18n/messages';
+import { useI18n } from '@/i18n/provider';
 import { cn } from '@/lib/cn';
 
 const PAGE_SIZE = 25;
+
+const reservationStatuses: ReservationStatus[] = ['active', 'released', 'fulfilled', 'expired'];
+
+const statusLabelKeys: Record<ReservationStatus, MessageKey> = {
+  active: 'reservations.status.active',
+  released: 'reservations.status.released',
+  fulfilled: 'reservations.status.fulfilled',
+  expired: 'reservations.status.expired',
+};
 
 const statusStyles: Record<ReservationStatus, string> = {
   active: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
@@ -18,16 +29,8 @@ const statusStyles: Record<ReservationStatus, string> = {
   expired: 'bg-amber-50 text-amber-800 ring-amber-200',
 };
 
-const dateTime = new Intl.DateTimeFormat('en-GB', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
-
-function formatQuantity(value: number): string {
-  return new Intl.NumberFormat('en-TN', { maximumFractionDigits: 4 }).format(value);
-}
-
 export function ReservationsPage() {
+  const { t, formatQuantity, formatDateTime, errorMessage } = useI18n();
   const { organization } = useOrganization();
   const organizationId = organization?.organizationId ?? null;
   const canWrite =
@@ -47,20 +50,20 @@ export function ReservationsPage() {
 
   const total = reservations.data?.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const releaseError = release.error instanceof Error ? release.error.message : null;
+  const releaseError = release.error ? errorMessage(release.error) : null;
 
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Reservations</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Held quantities reduce availability without touching physical on-hand stock.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            {t('reservations.title')}
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">{t('reservations.description')}</p>
         </div>
         <div>
           <label htmlFor="reservation-status-filter" className="sr-only">
-            Filter by status
+            {t('reservations.statusFilterLabel')}
           </label>
           <select
             id="reservation-status-filter"
@@ -71,11 +74,12 @@ export function ReservationsPage() {
               setPage(1);
             }}
           >
-            <option value="">All statuses</option>
-            <option value="active">Active</option>
-            <option value="released">Released</option>
-            <option value="fulfilled">Fulfilled</option>
-            <option value="expired">Expired</option>
+            <option value="">{t('reservations.allStatuses')}</option>
+            {reservationStatuses.map((value) => (
+              <option key={value} value={value}>
+                {t(statusLabelKeys[value])}
+              </option>
+            ))}
           </select>
         </div>
       </header>
@@ -90,9 +94,9 @@ export function ReservationsPage() {
         {reservations.isError ? (
           <div className="p-6">
             <p role="alert" className="text-sm text-rose-700">
-              {reservations.error instanceof Error
-                ? reservations.error.message
-                : 'Reservations failed to load.'}
+              {reservations.error
+                ? errorMessage(reservations.error, 'reservations.loadError')
+                : t('reservations.loadError')}
             </p>
             <Button
               variant="secondary"
@@ -100,14 +104,14 @@ export function ReservationsPage() {
               className="mt-3"
               onClick={() => void reservations.refetch()}
             >
-              Try again
+              {t('common.retry')}
             </Button>
           </div>
         ) : reservations.isPending ? (
           <div
             className="divide-y divide-slate-100"
             role="status"
-            aria-label="Loading reservations"
+            aria-label={t('reservations.loading')}
           >
             {Array.from({ length: 4 }).map((_, index) => (
               <div key={index} className="flex animate-pulse items-center gap-4 px-4 py-4">
@@ -123,39 +127,36 @@ export function ReservationsPage() {
               <LockKeyhole aria-hidden="true" className="size-6" />
             </span>
             <h2 className="mt-4 text-base font-semibold text-slate-900">
-              {status ? 'No reservations with this status' : 'No reservations yet'}
+              {status ? t('reservations.emptyFilteredTitle') : t('reservations.emptyTitle')}
             </h2>
-            <p className="mt-2 max-w-md text-sm text-slate-600">
-              Reservations are created from the stock levels page and can be released or fulfilled
-              later.
-            </p>
+            <p className="mt-2 max-w-md text-sm text-slate-600">{t('reservations.emptyBody')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <caption className="sr-only">Stock reservations</caption>
+            <table className="w-full text-start text-sm">
+              <caption className="sr-only">{t('reservations.tableCaption')}</caption>
               <thead className="text-xs uppercase tracking-wide text-slate-500">
                 <tr className="border-b border-slate-200">
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Product
+                    {t('common.product')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Location
+                    {t('common.location')}
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right font-semibold">
-                    Quantity
-                  </th>
-                  <th scope="col" className="px-4 py-3 font-semibold">
-                    Status
+                  <th scope="col" className="px-4 py-3 text-end font-semibold">
+                    {t('common.quantity')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Expires
+                    {t('common.status')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Created
+                    {t('reservations.columns.expires')}
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right font-semibold">
-                    Action
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    {t('reservations.columns.created')}
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-end font-semibold">
+                    {t('reservations.columns.action')}
                   </th>
                 </tr>
               </thead>
@@ -165,15 +166,17 @@ export function ReservationsPage() {
                     <td className="px-4 py-3">
                       <p className="font-medium text-slate-900">{reservation.productName}</p>
                       <p className="mt-0.5 font-mono text-xs text-slate-500">
-                        {reservation.productSku}
+                        <span dir="ltr">{reservation.productSku}</span>
                       </p>
                     </td>
                     <td className="px-4 py-3 text-slate-600">
                       <p className="font-mono text-xs">
-                        {reservation.warehouseCode} / {reservation.locationCode}
+                        <span dir="ltr">
+                          {reservation.warehouseCode} / {reservation.locationCode}
+                        </span>
                       </p>
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-900">
+                    <td className="px-4 py-3 text-end tabular-nums text-slate-900">
                       {formatQuantity(reservation.quantity)}
                     </td>
                     <td className="px-4 py-3">
@@ -183,18 +186,18 @@ export function ReservationsPage() {
                           statusStyles[reservation.status],
                         )}
                       >
-                        {reservation.status}
+                        {t(statusLabelKeys[reservation.status])}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-slate-600">
                       {reservation.expiresAt
-                        ? dateTime.format(new Date(reservation.expiresAt))
-                        : '—'}
+                        ? formatDateTime(reservation.expiresAt)
+                        : t('common.notAvailable')}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                      {dateTime.format(new Date(reservation.createdAt))}
+                      {formatDateTime(reservation.createdAt)}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-end">
                       {reservation.status === 'active' ? (
                         <Button
                           variant="secondary"
@@ -202,10 +205,10 @@ export function ReservationsPage() {
                           disabled={!canWrite || release.isPending}
                           onClick={() => release.mutate(reservation.id)}
                         >
-                          Release
+                          {t('reservations.release')}
                         </Button>
                       ) : (
-                        <span className="text-xs text-slate-400">—</span>
+                        <span className="text-xs text-slate-400">{t('common.notAvailable')}</span>
                       )}
                     </td>
                   </tr>
@@ -220,7 +223,7 @@ export function ReservationsPage() {
             total={total}
             page={page}
             pageCount={pageCount}
-            noun="reservation"
+            nounKey="common.noun.reservations"
             onPrevious={() => setPage((current) => Math.max(1, current - 1))}
             onNext={() => setPage((current) => current + 1)}
           />

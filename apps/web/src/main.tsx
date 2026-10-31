@@ -5,6 +5,7 @@ import { RouterProvider } from 'react-router';
 
 import { router } from '@/app/router';
 import { AuthProvider } from '@/features/auth/auth-provider';
+import { I18nProvider } from '@/i18n/provider';
 import { queryClient } from '@/lib/query-client';
 
 import '@/styles/globals.css';
@@ -18,9 +19,11 @@ if (!rootElement) {
 createRoot(rootElement).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <RouterProvider router={router} />
-      </AuthProvider>
+      <I18nProvider>
+        <AuthProvider>
+          <RouterProvider router={router} />
+        </AuthProvider>
+      </I18nProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

@@ -20,9 +20,9 @@ import {
   useTeamMembers,
 } from '@/features/team/api';
 import { InviteDialog } from '@/features/team/invite-dialog';
-import { formatDate, invitationStatusLabels, roleLabels } from '@/features/team/labels';
+import { invitationStatusKeys, roleKeys } from '@/features/team/labels';
 import { RemoveMemberDialog } from '@/features/team/remove-member-dialog';
-import { ApiError } from '@/lib/api-client';
+import { useI18n } from '@/i18n/provider';
 import { cn } from '@/lib/cn';
 
 const invitationStatusClasses: Record<InvitationStatus, string> = {
@@ -34,11 +34,6 @@ const invitationStatusClasses: Record<InvitationStatus, string> = {
 
 const ALL_ROLES: MemberRole[] = ['owner', 'admin', 'manager', 'viewer'];
 const NON_OWNER_ROLES: MemberRole[] = ['admin', 'manager', 'viewer'];
-
-function errorText(error: unknown, fallback: string): string | null {
-  if (!error) return null;
-  return error instanceof ApiError ? error.message : fallback;
-}
 
 interface TeamViewProps {
   organizationId: string;
@@ -53,6 +48,7 @@ export function TeamView({
   role,
   platformAdmin = false,
 }: TeamViewProps) {
+  const { t, formatNumber, formatDate, errorMessage } = useI18n();
   const { session } = useAuth();
   const currentUserId = session?.user.id ?? null;
 
@@ -73,17 +69,23 @@ export function TeamView({
   const inviteRoles: InvitationRole[] = canAssignAnyRole
     ? ['viewer', 'manager', 'admin']
     : ['viewer'];
-  const inviteLabel = canAssignAnyRole ? 'Invite member' : 'Invite viewer';
+  const inviteLabel = canAssignAnyRole ? t('team.inviteMember') : t('team.inviteViewer');
 
-  const roleError = errorText(changeRole.error, 'The role could not be changed.');
-  const revokeError = errorText(revoke.error, 'The invitation could not be revoked.');
+  const roleError = changeRole.error
+    ? errorMessage(changeRole.error, 'team.roleChangeFailed')
+    : null;
+  const revokeError = revoke.error ? errorMessage(revoke.error, 'team.revokeFailed') : null;
 
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Team</h1>
-          <p className="mt-1 text-sm text-slate-600">Members and access for {organizationName}.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            {t('team.title')}
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">
+            {t('team.description', { organizationName })}
+          </p>
         </div>
         {canManageInvitations && (
           <Button onClick={() => setInviteOpen(true)}>
@@ -96,8 +98,10 @@ export function TeamView({
       {!canManageMembers && (
         <p className="rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">
           {role === 'manager'
-            ? 'Managers can invite viewers. Owners and admins manage roles and invitations.'
-            : `Your ${role ? roleLabels[role].toLowerCase() : 'read-only'} role can view the team. Owners and admins manage members and invitations.`}
+            ? t('team.managerNotice')
+            : t('team.readOnlyNotice', {
+                role: role ? t(roleKeys[role]).toLowerCase() : t('team.readOnlyRole'),
+              })}
         </p>
       )}
 
@@ -114,17 +118,19 @@ export function TeamView({
         <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-3">
           <Users aria-hidden="true" className="size-4 text-slate-500" />
           <h2 id="team-members-heading" className="text-sm font-semibold text-slate-900">
-            Members
+            {t('team.membersHeading')}
           </h2>
-          <span className="ml-auto text-xs text-slate-500">
-            {members.data ? `${members.data.items.length} total` : ''}
+          <span className="ms-auto text-xs text-slate-500">
+            {members.data
+              ? t('team.total', { count: formatNumber(members.data.items.length) })
+              : ''}
           </span>
         </div>
 
         {members.isError ? (
           <div className="p-6">
             <p role="alert" className="text-sm text-rose-700">
-              {errorText(members.error, 'Team members failed to load.')}
+              {errorMessage(members.error, 'team.membersLoadFailed')}
             </p>
             <Button
               variant="secondary"
@@ -132,11 +138,15 @@ export function TeamView({
               className="mt-3"
               onClick={() => void members.refetch()}
             >
-              Try again
+              {t('common.retry')}
             </Button>
           </div>
         ) : members.isPending ? (
-          <div className="divide-y divide-slate-100" role="status" aria-label="Loading members">
+          <div
+            className="divide-y divide-slate-100"
+            role="status"
+            aria-label={t('team.loadingMembers')}
+          >
             {Array.from({ length: 3 }).map((_, index) => (
               <div key={index} className="flex animate-pulse items-center gap-4 px-4 py-4">
                 <div className="h-4 w-1/3 rounded bg-slate-200" />
@@ -147,21 +157,21 @@ export function TeamView({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <caption className="sr-only">Organization members</caption>
+            <table className="w-full text-start text-sm">
+              <caption className="sr-only">{t('team.membersCaption')}</caption>
               <thead className="text-xs uppercase tracking-wide text-slate-500">
                 <tr className="border-b border-slate-200">
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Member
+                    {t('team.memberColumn')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Joined
+                    {t('team.joinedColumn')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Role
+                    {t('team.roleLabel')}
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right font-semibold">
-                    Actions
+                  <th scope="col" className="px-4 py-3 text-end font-semibold">
+                    {t('common.actions')}
                   </th>
                 </tr>
               </thead>
@@ -178,10 +188,12 @@ export function TeamView({
                     <tr key={member.userId} className="hover:bg-slate-50">
                       <td className="px-4 py-3">
                         <p className="font-medium text-slate-900">
-                          {member.email ?? 'Unnamed member'}
+                          <span dir={member.email ? 'ltr' : undefined}>
+                            {member.email ?? t('team.unnamedMember')}
+                          </span>
                           {isSelf && (
-                            <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                              You
+                            <span className="ms-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                              {t('team.you')}
                             </span>
                           )}
                         </p>
@@ -191,7 +203,9 @@ export function TeamView({
                       <td className="px-4 py-3">
                         {canChangeRole ? (
                           <select
-                            aria-label={`Role for ${member.email ?? 'member'}`}
+                            aria-label={t('team.roleFor', {
+                              email: member.email ?? t('team.memberFallback'),
+                            })}
                             className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-800 shadow-sm focus:border-indigo-500"
                             value={member.role}
                             disabled={rolePending}
@@ -204,13 +218,13 @@ export function TeamView({
                           >
                             {roleOptions.map((option) => (
                               <option key={option} value={option}>
-                                {roleLabels[option]}
+                                {t(roleKeys[option])}
                               </option>
                             ))}
                           </select>
                         ) : (
                           <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
-                            {roleLabels[member.role]}
+                            {t(roleKeys[member.role])}
                           </span>
                         )}
                       </td>
@@ -224,18 +238,20 @@ export function TeamView({
                               disabled={!canRemove}
                               title={
                                 isSelf
-                                  ? 'You cannot remove yourself'
+                                  ? t('team.cannotRemoveSelf')
                                   : !canRemove
-                                    ? 'Only an owner can remove an owner'
+                                    ? t('team.ownerOnlyRemoveOwner')
                                     : undefined
                               }
                               onClick={() => setRemoving(member)}
                             >
                               <UserMinus aria-hidden="true" className="size-4" />
-                              Remove
+                              {t('common.remove')}
                             </Button>
                           ) : (
-                            <span className="text-xs text-slate-400">—</span>
+                            <span className="text-xs text-slate-400">
+                              {t('common.notAvailable')}
+                            </span>
                           )}
                         </div>
                       </td>
@@ -256,14 +272,13 @@ export function TeamView({
           <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-3">
             <Mail aria-hidden="true" className="size-4 text-slate-500" />
             <h2 id="team-invitations-heading" className="text-sm font-semibold text-slate-900">
-              Invitations
+              {t('team.invitationsHeading')}
             </h2>
-            <span className="ml-auto text-xs text-slate-500">Expire after 14 days</span>
+            <span className="ms-auto text-xs text-slate-500">{t('team.expireAfter')}</span>
           </div>
 
           <p className="border-b border-slate-100 px-4 py-3 text-sm text-slate-600">
-            MyStock does not send email. Share the invitation with the person; it appears for them
-            after they sign in with the invited address.
+            {t('team.invitationsHelp')}
           </p>
 
           {revokeError && (
@@ -278,7 +293,7 @@ export function TeamView({
           {invitations.isError ? (
             <div className="p-6">
               <p role="alert" className="text-sm text-rose-700">
-                {errorText(invitations.error, 'Invitations failed to load.')}
+                {errorMessage(invitations.error, 'team.invitationsLoadFailed')}
               </p>
               <Button
                 variant="secondary"
@@ -286,14 +301,14 @@ export function TeamView({
                 className="mt-3"
                 onClick={() => void invitations.refetch()}
               >
-                Try again
+                {t('common.retry')}
               </Button>
             </div>
           ) : invitations.isPending ? (
             <div
               className="divide-y divide-slate-100"
               role="status"
-              aria-label="Loading invitations"
+              aria-label={t('team.loadingInvitations')}
             >
               {Array.from({ length: 2 }).map((_, index) => (
                 <div key={index} className="flex animate-pulse items-center gap-4 px-4 py-4">
@@ -308,31 +323,31 @@ export function TeamView({
               <span className="grid size-12 place-items-center rounded-full bg-slate-100 text-slate-500">
                 <ShieldCheck aria-hidden="true" className="size-6" />
               </span>
-              <h3 className="mt-4 text-base font-semibold text-slate-900">No invitations yet</h3>
-              <p className="mt-2 max-w-md text-sm text-slate-600">
-                Invite a colleague by email and share the invitation with them directly.
-              </p>
+              <h3 className="mt-4 text-base font-semibold text-slate-900">
+                {t('team.noInvitationsTitle')}
+              </h3>
+              <p className="mt-2 max-w-md text-sm text-slate-600">{t('team.noInvitationsBody')}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <caption className="sr-only">Organization invitations</caption>
+              <table className="w-full text-start text-sm">
+                <caption className="sr-only">{t('team.invitationsCaption')}</caption>
                 <thead className="text-xs uppercase tracking-wide text-slate-500">
                   <tr className="border-b border-slate-200">
                     <th scope="col" className="px-4 py-3 font-semibold">
-                      Email
+                      {t('common.email')}
                     </th>
                     <th scope="col" className="px-4 py-3 font-semibold">
-                      Role
+                      {t('team.roleLabel')}
                     </th>
                     <th scope="col" className="px-4 py-3 font-semibold">
-                      Status
+                      {t('common.status')}
                     </th>
                     <th scope="col" className="px-4 py-3 font-semibold">
-                      Timeline
+                      {t('team.timelineColumn')}
                     </th>
-                    <th scope="col" className="px-4 py-3 text-right font-semibold">
-                      Actions
+                    <th scope="col" className="px-4 py-3 text-end font-semibold">
+                      {t('common.actions')}
                     </th>
                   </tr>
                 </thead>
@@ -340,14 +355,21 @@ export function TeamView({
                   {invitations.data.items.map((invitation: InvitationSummary) => (
                     <tr key={invitation.id} className="hover:bg-slate-50">
                       <td className="px-4 py-3">
-                        <p className="font-medium text-slate-900">{invitation.email}</p>
+                        <p className="font-medium text-slate-900">
+                          <span dir="ltr">{invitation.email}</span>
+                        </p>
                         <p className="mt-0.5 text-xs text-slate-500">
-                          {invitation.invitedByEmail
-                            ? `Invited by ${invitation.invitedByEmail}`
-                            : 'Inviter account removed'}
+                          {invitation.invitedByEmail ? (
+                            <>
+                              {t('team.invitedByPrefix')}{' '}
+                              <span dir="ltr">{invitation.invitedByEmail}</span>
+                            </>
+                          ) : (
+                            t('team.inviterRemoved')
+                          )}
                         </p>
                       </td>
-                      <td className="px-4 py-3 text-slate-600">{roleLabels[invitation.role]}</td>
+                      <td className="px-4 py-3 text-slate-600">{t(roleKeys[invitation.role])}</td>
                       <td className="px-4 py-3">
                         <span
                           className={cn(
@@ -355,14 +377,16 @@ export function TeamView({
                             invitationStatusClasses[invitation.status],
                           )}
                         >
-                          {invitationStatusLabels[invitation.status]}
+                          {t(invitationStatusKeys[invitation.status])}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-slate-600">
                         {invitation.status === 'pending' || invitation.status === 'expired' ? (
-                          <span>Expires {formatDate(invitation.expiresAt)}</span>
+                          <span>
+                            {t('team.expires', { date: formatDate(invitation.expiresAt) })}
+                          </span>
                         ) : (
-                          <span>Sent {formatDate(invitation.createdAt)}</span>
+                          <span>{t('team.sent', { date: formatDate(invitation.createdAt) })}</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -375,11 +399,13 @@ export function TeamView({
                               onClick={() => revoke.mutate(invitation.id)}
                             >
                               {revoke.isPending && revoke.variables === invitation.id
-                                ? 'Revoking…'
-                                : 'Revoke'}
+                                ? t('team.revoking')
+                                : t('team.revoke')}
                             </Button>
                           ) : (
-                            <span className="text-xs text-slate-400">—</span>
+                            <span className="text-xs text-slate-400">
+                              {t('common.notAvailable')}
+                            </span>
                           )}
                         </div>
                       </td>
@@ -414,21 +440,19 @@ export function TeamView({
 }
 
 export function TeamPage() {
+  const { t } = useI18n();
   const { organization } = useOrganization();
 
   if (!organization) {
     return (
       <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Team</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Select an organization to view its team, or ask a platform administrator to add you to
-          one.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{t('team.title')}</h1>
+        <p className="mt-2 text-sm text-slate-600">{t('team.noOrganization')}</p>
         <Link
           to="/admin"
           className="mt-4 inline-block text-sm font-medium text-indigo-700 hover:text-indigo-900"
         >
-          Administration →
+          {t('team.administrationLink')}
         </Link>
       </div>
     );

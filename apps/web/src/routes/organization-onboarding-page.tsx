@@ -1,6 +1,10 @@
 import { Building2 } from 'lucide-react';
 
+import { useI18n } from '@/i18n/provider';
+
 export function OrganizationOnboardingPage() {
+  const { t } = useI18n();
+
   return (
     <div className="mx-auto max-w-xl">
       <div className="rounded-2xl border border-slate-200 bg-white p-8">
@@ -8,17 +12,10 @@ export function OrganizationOnboardingPage() {
           <Building2 aria-hidden="true" className="size-6" />
         </span>
         <h1 className="mt-5 text-2xl font-semibold tracking-tight text-slate-900">
-          Your account is not in an organization yet
+          {t('organizations.onboarding.title')}
         </h1>
-        <p className="mt-2 text-sm text-slate-600">
-          A platform administrator creates organizations and assigns the first manager. If you were
-          invited, ask them to send the invitation to this email address; it appears in the
-          pending-invitation banner after you sign in.
-        </p>
-        <p className="mt-4 text-sm text-slate-500">
-          MyStock does not send invitation email. The person who invited you will share it with you
-          directly.
-        </p>
+        <p className="mt-2 text-sm text-slate-600">{t('organizations.onboarding.body')}</p>
+        <p className="mt-4 text-sm text-slate-500">{t('organizations.onboarding.note')}</p>
       </div>
     </div>
   );

@@ -1,30 +1,17 @@
 import type { InvitationStatus, MemberRole } from '@mystock/contracts';
 
-export const roleLabels: Record<MemberRole, string> = {
-  owner: 'Owner',
-  admin: 'Admin',
-  manager: 'Manager',
-  viewer: 'Viewer',
+import type { MessageKey } from '@/i18n/messages';
+
+export const roleKeys: Record<MemberRole, MessageKey> = {
+  owner: 'common.role.owner',
+  admin: 'common.role.admin',
+  manager: 'common.role.manager',
+  viewer: 'common.role.viewer',
 };
 
-export const invitationStatusLabels: Record<InvitationStatus, string> = {
-  pending: 'Pending',
-  expired: 'Expired',
-  accepted: 'Accepted',
-  revoked: 'Revoked',
+export const invitationStatusKeys: Record<InvitationStatus, MessageKey> = {
+  pending: 'common.invitationStatus.pending',
+  expired: 'common.invitationStatus.expired',
+  accepted: 'common.invitationStatus.accepted',
+  revoked: 'common.invitationStatus.revoked',
 };
-
-export const dateOnly = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' });
-
-export const dateTime = new Intl.DateTimeFormat('en-GB', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
-
-export function formatDate(value: string): string {
-  return dateOnly.format(new Date(value));
-}
-
-export function formatDateTime(value: string): string {
-  return dateTime.format(new Date(value));
-}

@@ -1,3 +1,5 @@
+import type { MessageKey } from '@/i18n/messages';
+
 import {
   ArrowLeftRight,
   Boxes,
@@ -19,7 +21,7 @@ import {
 
 export interface NavItem {
   to: string;
-  label: string;
+  labelKey: MessageKey;
   icon: LucideIcon;
   end?: boolean;
   platformAdminOnly?: boolean;
@@ -27,23 +29,23 @@ export interface NavItem {
 }
 
 export const navItems: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/products', label: 'Products', icon: Package },
-  { to: '/scan', label: 'Scanning', icon: ScanLine },
-  { to: '/stock', label: 'Stock levels', icon: Boxes, end: true },
-  { to: '/stock/movements', label: 'Movements', icon: ArrowLeftRight },
-  { to: '/stock/reservations', label: 'Reservations', icon: LockKeyhole },
-  { to: '/devices', label: 'Devices', icon: Smartphone },
-  { to: '/suppliers', label: 'Suppliers', icon: Building2 },
-  { to: '/purchasing', label: 'Purchase orders', icon: ClipboardList },
-  { to: '/orders', label: 'Outgoing orders', icon: Send },
-  { to: '/stock/reconciliation', label: 'Reconciliation', icon: Scale },
-  { to: '/warehouses', label: 'Warehouses', icon: Warehouse },
-  { to: '/catalog', label: 'Catalog settings', icon: Tags },
-  { to: '/team', label: 'Team', icon: Users },
+  { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard, end: true },
+  { to: '/products', labelKey: 'nav.products', icon: Package },
+  { to: '/scan', labelKey: 'nav.scanning', icon: ScanLine },
+  { to: '/stock', labelKey: 'nav.stock', icon: Boxes, end: true },
+  { to: '/stock/movements', labelKey: 'nav.movements', icon: ArrowLeftRight },
+  { to: '/stock/reservations', labelKey: 'nav.reservations', icon: LockKeyhole },
+  { to: '/devices', labelKey: 'nav.devices', icon: Smartphone },
+  { to: '/suppliers', labelKey: 'nav.suppliers', icon: Building2 },
+  { to: '/purchasing', labelKey: 'nav.purchasing', icon: ClipboardList },
+  { to: '/orders', labelKey: 'nav.orders', icon: Send },
+  { to: '/stock/reconciliation', labelKey: 'nav.reconciliation', icon: Scale },
+  { to: '/warehouses', labelKey: 'nav.warehouses', icon: Warehouse },
+  { to: '/catalog', labelKey: 'nav.catalog', icon: Tags },
+  { to: '/team', labelKey: 'nav.team', icon: Users },
   {
     to: '/admin',
-    label: 'Administration',
+    labelKey: 'nav.admin',
     icon: ShieldCheck,
     platformAdminOnly: true,
     requiresOrganization: false,

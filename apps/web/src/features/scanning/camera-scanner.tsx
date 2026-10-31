@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { IScannerControls } from '@zxing/browser';
 
+import { useI18n } from '@/i18n/provider';
 import { cn } from '@/lib/cn';
 
 interface BarcodeDetectorLike {
@@ -18,11 +19,6 @@ function nativeDetectorConstructor(): BarcodeDetectorConstructor | null {
   return typeof candidate === 'function' ? candidate : null;
 }
 
-function messageOf(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message;
-  return 'The camera could not be started.';
-}
-
 interface CameraScannerProps {
   active: boolean;
   onDetect: (code: string) => void;
@@ -35,8 +31,10 @@ interface CameraScannerProps {
  * symbology failed to read.
  */
 export function CameraScanner({ active, onDetect }: CameraScannerProps) {
+  const { t, errorMessage } = useI18n();
   const videoRef = useRef<HTMLVideoElement>(null);
   const onDetectRef = useRef(onDetect);
+  const errorMessageRef = useRef(errorMessage);
   const [status, setStatus] = useState<'idle' | 'starting' | 'scanning' | 'error'>('idle');
   const [engine, setEngine] = useState<'native' | 'zxing' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +42,10 @@ export function CameraScanner({ active, onDetect }: CameraScannerProps) {
   useEffect(() => {
     onDetectRef.current = onDetect;
   }, [onDetect]);
+
+  useEffect(() => {
+    errorMessageRef.current = errorMessage;
+  }, [errorMessage]);
 
   useEffect(() => {
     if (!active) {
@@ -93,7 +95,7 @@ export function CameraScanner({ active, onDetect }: CameraScannerProps) {
         } catch (cause) {
           if (!cancelled) {
             setStatus('error');
-            setError(messageOf(cause));
+            setError(errorMessageRef.current(cause, 'scan.camera.error'));
           }
         }
         return;
@@ -142,7 +144,7 @@ export function CameraScanner({ active, onDetect }: CameraScannerProps) {
           await startZxing();
         } catch {
           setStatus('error');
-          setError(messageOf(cause));
+          setError(errorMessageRef.current(cause, 'scan.camera.error'));
         }
       }
     };
@@ -163,19 +165,19 @@ export function CameraScanner({ active, onDetect }: CameraScannerProps) {
         ref={videoRef}
         muted
         playsInline
-        aria-label="Camera preview"
+        aria-label={t('scan.camera.preview')}
         className={cn(
           'w-full rounded-lg bg-slate-900 object-cover',
           active ? 'aspect-video' : 'hidden',
         )}
       />
       <p role="status" className="text-xs text-slate-500">
-        {!active && 'Camera is off. Manual entry and keyboard scanners work without permission.'}
-        {active && status === 'starting' && 'Starting the camera…'}
+        {!active && t('scan.camera.off')}
+        {active && status === 'starting' && t('scan.camera.starting')}
         {active &&
           status === 'scanning' &&
-          `Camera is scanning${engine === 'zxing' ? ' with the ZXing fallback' : ' with the native barcode detector'}.`}
-        {active && status === 'error' && (error ?? 'The camera could not be started.')}
+          t(engine === 'zxing' ? 'scan.camera.scanningZxing' : 'scan.camera.scanningNative')}
+        {active && status === 'error' && (error ?? t('scan.camera.error'))}
       </p>
     </div>
   );

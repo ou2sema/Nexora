@@ -2,7 +2,6 @@ import { PackagePlus, Printer, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import type { ProductStatus, ProductSummary } from '@mystock/contracts';
-import { formatTnd } from '@mystock/domain';
 
 import { Button } from '@/components/ui/button';
 import { useBrands, useCategories, useProducts } from '@/features/catalog/api';
@@ -11,9 +10,11 @@ import { useAssignBarcode } from '@/features/scanning/api';
 import { ProductFormDialog } from '@/features/catalog/product-form-dialog';
 import { ReorderThresholdDialog } from '@/features/catalog/reorder-threshold-dialog';
 import { useOrganization } from '@/features/organizations/organization-provider';
+import { useI18n } from '@/i18n/provider';
 import { cn } from '@/lib/cn';
 
 const PAGE_SIZE = 25;
+const STATUSES = ['active', 'inactive', 'discontinued', 'archived'] as const;
 
 const statusStyles: Record<ProductStatus, string> = {
   active: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
@@ -34,12 +35,20 @@ function useDebouncedValue<T>(value: T, delay = 300): T {
 }
 
 export function ProductsPage() {
+  const { t, plural, errorMessage, formatMoney } = useI18n();
   const { organization } = useOrganization();
   const organizationId = organization?.organizationId ?? null;
   const canWrite =
     organization?.role === 'owner' ||
     organization?.role === 'admin' ||
     organization?.role === 'manager';
+
+  const statusLabels: Record<ProductStatus, string> = {
+    active: t('products.status.active'),
+    inactive: t('products.status.inactive'),
+    discontinued: t('products.status.discontinued'),
+    archived: t('products.status.archived'),
+  };
 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<ProductStatus | ''>('');
@@ -67,20 +76,20 @@ export function ProductsPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Products</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Catalog of electronics, accessories and components for this organization.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            {t('products.title')}
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">{t('products.description')}</p>
         </div>
         <Button disabled={!canWrite} onClick={() => setDialogOpen(true)}>
           <PackagePlus aria-hidden="true" className="size-4" />
-          Add product
+          {t('products.add')}
         </Button>
       </header>
 
       {!canWrite && (
         <p className="rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">
-          Your viewer role is read-only. Owners, admins and managers can add products.
+          {t('products.readOnly')}
         </p>
       )}
 
@@ -88,18 +97,18 @@ export function ProductsPage() {
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <label htmlFor="product-search" className="sr-only">
-              Search products
+              {t('products.searchLabel')}
             </label>
             <Search
               aria-hidden="true"
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
             />
             <input
               id="product-search"
               type="search"
               value={search}
-              placeholder="Search by name, SKU or barcode"
-              className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm text-slate-900 shadow-sm focus:border-indigo-500"
+              placeholder={t('products.searchPlaceholder')}
+              className="w-full rounded-lg border border-slate-300 py-2 ps-9 pe-3 text-sm text-slate-900 shadow-sm focus:border-indigo-500"
               onChange={(event) => {
                 setSearch(event.target.value);
                 setPage(1);
@@ -109,7 +118,7 @@ export function ProductsPage() {
 
           <div>
             <label htmlFor="product-status-filter" className="sr-only">
-              Filter by status
+              {t('products.statusFilterLabel')}
             </label>
             <select
               id="product-status-filter"
@@ -120,11 +129,12 @@ export function ProductsPage() {
                 setPage(1);
               }}
             >
-              <option value="">All statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="discontinued">Discontinued</option>
-              <option value="archived">Archived</option>
+              <option value="">{t('products.allStatuses')}</option>
+              {STATUSES.map((value) => (
+                <option key={value} value={value}>
+                  {statusLabels[value]}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -132,9 +142,7 @@ export function ProductsPage() {
         {products.isError ? (
           <div className="p-6">
             <p role="alert" className="text-sm text-rose-700">
-              {products.error instanceof Error
-                ? products.error.message
-                : 'Products failed to load.'}
+              {errorMessage(products.error, 'products.loadFailed')}
             </p>
             <Button
               variant="secondary"
@@ -142,11 +150,15 @@ export function ProductsPage() {
               className="mt-3"
               onClick={() => void products.refetch()}
             >
-              Try again
+              {t('common.retry')}
             </Button>
           </div>
         ) : products.isPending ? (
-          <div className="divide-y divide-slate-100" aria-label="Loading products" role="status">
+          <div
+            className="divide-y divide-slate-100"
+            aria-label={t('products.loading')}
+            role="status"
+          >
             {Array.from({ length: 5 }).map((_, index) => (
               <div key={index} className="flex animate-pulse items-center gap-4 px-4 py-4">
                 <div className="h-4 w-1/3 rounded bg-slate-200" />
@@ -161,45 +173,45 @@ export function ProductsPage() {
               <PackagePlus aria-hidden="true" className="size-6" />
             </span>
             <h2 className="mt-4 text-base font-semibold text-slate-900">
-              {search || status ? 'No matching products' : 'No products yet'}
+              {search || status ? t('products.emptyMatching') : t('products.empty')}
             </h2>
             <p className="mt-2 max-w-md text-sm text-slate-600">
               {search || status
-                ? 'Adjust the search or status filter to see more results.'
+                ? t('products.emptyMatchingHint')
                 : canWrite
-                  ? 'Add your first product to start building the catalog.'
-                  : 'The catalog is empty. An owner, admin or manager can add products.'}
+                  ? t('products.emptyHintWritable')
+                  : t('products.emptyHintReadOnly')}
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <caption className="sr-only">Products in this organization</caption>
+            <table className="w-full text-start text-sm">
+              <caption className="sr-only">{t('products.caption')}</caption>
               <thead className="text-xs uppercase tracking-wide text-slate-500">
                 <tr className="border-b border-slate-200">
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Product
+                    {t('common.product')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Category
+                    {t('common.category')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Brand
+                    {t('common.brand')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Sale price
+                    {t('products.column.salePrice')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Tracking
+                    {t('products.column.tracking')}
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right font-semibold">
-                    Reorder at
+                  <th scope="col" className="px-4 py-3 text-end font-semibold">
+                    {t('products.column.reorderAt')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Status
+                    {t('common.status')}
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right font-semibold">
-                    Labels
+                  <th scope="col" className="px-4 py-3 text-end font-semibold">
+                    {t('products.column.labels')}
                   </th>
                 </tr>
               </thead>
@@ -208,23 +220,36 @@ export function ProductsPage() {
                   <tr key={product.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3">
                       <p className="font-medium text-slate-900">{product.name}</p>
-                      <p className="mt-0.5 font-mono text-xs text-slate-500">{product.sku}</p>
-                      <p className="mt-0.5 font-mono text-xs text-slate-400">
-                        {product.barcode ?? 'No barcode assigned'}
+                      <p dir="ltr" className="mt-0.5 font-mono text-xs text-slate-500">
+                        {product.sku}
+                      </p>
+                      <p
+                        dir={product.barcode ? 'ltr' : undefined}
+                        className="mt-0.5 font-mono text-xs text-slate-400"
+                      >
+                        {product.barcode ?? t('products.noBarcode')}
                       </p>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{product.categoryName ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-600">{product.brandName ?? '—'}</td>
-                    <td className="px-4 py-3 tabular-nums text-slate-700">
-                      {product.salePriceMinor === null
-                        ? '—'
-                        : formatTnd(product.salePriceMinor, 'en-TN')}
+                    <td className="px-4 py-3 text-slate-600">
+                      {product.categoryName ?? t('common.notAvailable')}
                     </td>
                     <td className="px-4 py-3 text-slate-600">
-                      {product.isSerialized ? 'Serialized' : 'Quantity'}
+                      {product.brandName ?? t('common.notAvailable')}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-700">
-                      {product.reorderThreshold > 0 ? product.reorderThreshold : '—'}
+                    <td className="px-4 py-3 tabular-nums text-slate-700">
+                      {product.salePriceMinor === null
+                        ? t('common.notAvailable')
+                        : formatMoney(product.salePriceMinor)}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {product.isSerialized
+                        ? t('products.trackingSerialized')
+                        : t('common.quantity')}
+                    </td>
+                    <td className="px-4 py-3 text-end tabular-nums text-slate-700">
+                      {product.reorderThreshold > 0
+                        ? product.reorderThreshold
+                        : t('common.notAvailable')}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -233,7 +258,7 @@ export function ProductsPage() {
                           statusStyles[product.status],
                         )}
                       >
-                        {product.status}
+                        {statusLabels[product.status]}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -248,14 +273,12 @@ export function ProductsPage() {
                               assignBarcode.mutate(product.id, {
                                 onError: (error) =>
                                   setBarcodeError(
-                                    error instanceof Error
-                                      ? error.message
-                                      : 'The barcode could not be assigned.',
+                                    errorMessage(error, 'products.assignBarcodeFailed'),
                                   ),
                               });
                             }}
                           >
-                            Assign barcode
+                            {t('products.assignBarcode')}
                           </Button>
                         )}
                         {canWrite && (
@@ -264,7 +287,7 @@ export function ProductsPage() {
                             variant="secondary"
                             onClick={() => setThresholdTarget(product)}
                           >
-                            Threshold
+                            {t('products.threshold')}
                           </Button>
                         )}
                         <Button
@@ -281,7 +304,7 @@ export function ProductsPage() {
                           }
                         >
                           <Printer aria-hidden="true" className="size-4" />
-                          Label
+                          {t('products.label')}
                         </Button>
                       </div>
                     </td>
@@ -304,7 +327,11 @@ export function ProductsPage() {
         {total > 0 && (
           <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm text-slate-600">
             <p>
-              {total} product{total === 1 ? '' : 's'} · page {page} of {pageCount}
+              {t('common.pagination.summary', {
+                items: plural('common.noun.products', total),
+                page,
+                pageCount,
+              })}
             </p>
             <div className="flex gap-2">
               <Button
@@ -313,7 +340,7 @@ export function ProductsPage() {
                 disabled={page <= 1}
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
               >
-                Previous
+                {t('common.previous')}
               </Button>
               <Button
                 variant="secondary"
@@ -321,7 +348,7 @@ export function ProductsPage() {
                 disabled={page >= pageCount}
                 onClick={() => setPage((current) => current + 1)}
               >
-                Next
+                {t('common.next')}
               </Button>
             </div>
           </div>

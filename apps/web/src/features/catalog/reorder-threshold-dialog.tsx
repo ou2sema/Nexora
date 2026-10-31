@@ -11,7 +11,7 @@ import {
   DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ApiError } from '@/lib/api-client';
+import { useI18n } from '@/i18n/provider';
 import { fieldClass } from '@/lib/form-field';
 import { useUpdateProduct } from './api';
 
@@ -39,6 +39,7 @@ export function ReorderThresholdDialog({
   open,
   onOpenChange,
 }: ReorderThresholdDialogProps) {
+  const { t, errorMessage } = useI18n();
   const mutation = useUpdateProduct(organizationId);
   const [value, setValue] = useState('0');
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +58,7 @@ export function ReorderThresholdDialog({
 
     const threshold = parseThreshold(value);
     if (threshold === null) {
-      setError('Use a non-negative quantity with up to 4 decimals.');
+      setError(t('reorder.invalid'));
       return;
     }
 
@@ -65,26 +66,24 @@ export function ReorderThresholdDialog({
       await mutation.mutateAsync({ productId: product.id, input: { reorderThreshold: threshold } });
       onOpenChange(false);
     } catch (failure) {
-      setError(
-        failure instanceof ApiError ? failure.message : 'The reorder threshold could not be saved.',
-      );
+      setError(errorMessage(failure, 'reorder.failed'));
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogTitle>Reorder threshold</DialogTitle>
+        <DialogTitle>{t('reorder.title')}</DialogTitle>
         <DialogDescription>
           {product
-            ? `Low-stock alerts appear when ${product.name} (${product.sku}) has less availability than this quantity. Use 0 to disable alerts.`
-            : 'Low-stock alerts appear when availability falls below this quantity.'}
+            ? t('reorder.descriptionProduct', { name: product.name, sku: product.sku })
+            : t('reorder.description')}
         </DialogDescription>
 
         <form noValidate className="mt-5 space-y-4" onSubmit={submit}>
           <div>
             <label htmlFor="reorder-threshold" className="block text-sm font-medium text-slate-700">
-              Threshold quantity
+              {t('reorder.field')}
             </label>
             <input
               id="reorder-threshold"
@@ -106,11 +105,11 @@ export function ReorderThresholdDialog({
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancel
+                {t('common.cancel')}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={mutation.isPending || !product}>
-              {mutation.isPending ? 'Saving…' : 'Save threshold'}
+              {mutation.isPending ? t('common.saving') : t('reorder.save')}
             </Button>
           </DialogFooter>
         </form>

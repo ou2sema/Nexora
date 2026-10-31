@@ -9,12 +9,13 @@ import { useProducts, useWarehouses } from '@/features/catalog/api';
 import { useDevices } from '@/features/devices/api';
 import { DeviceDetailDialog, RegisterDeviceDialog } from '@/features/devices/device-dialogs';
 import {
-  deviceConditionLabels,
-  deviceStatusLabels,
+  deviceConditionKeys,
+  deviceStatusKeys,
   deviceStatusStyles,
 } from '@/features/devices/labels';
 import { useOrganization } from '@/features/organizations/organization-provider';
 import { LabelDialog, type LabelTarget } from '@/features/scanning/label-dialog';
+import { useI18n } from '@/i18n/provider';
 import { cn } from '@/lib/cn';
 
 const PAGE_SIZE = 25;
@@ -31,6 +32,7 @@ function useDebouncedValue<T>(value: T, delay = 300): T {
 }
 
 export function DevicesPage() {
+  const { t, errorMessage } = useI18n();
   const { organization } = useOrganization();
   const organizationId = organization?.organizationId ?? null;
   const canWrite =
@@ -67,20 +69,20 @@ export function DevicesPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Devices</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Serialized units with unique serial numbers, IMEI checks and an append-only lifecycle.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            {t('devices.title')}
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">{t('devices.subtitle')}</p>
         </div>
         <Button disabled={!canWrite} onClick={() => setRegisterOpen(true)}>
           <Smartphone aria-hidden="true" className="size-4" />
-          Register device
+          {t('devices.register')}
         </Button>
       </header>
 
       {!canWrite && (
         <p className="rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">
-          Your viewer role is read-only. Owners, admins and managers can register and move devices.
+          {t('devices.readOnly')}
         </p>
       )}
 
@@ -88,18 +90,18 @@ export function DevicesPage() {
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <label htmlFor="device-search" className="sr-only">
-              Search devices
+              {t('devices.search')}
             </label>
             <Search
               aria-hidden="true"
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
             />
             <input
               id="device-search"
               type="search"
               value={search}
-              placeholder="Search by serial, IMEI or product"
-              className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm text-slate-900 shadow-sm focus:border-indigo-500"
+              placeholder={t('devices.searchPlaceholder')}
+              className="w-full rounded-lg border border-slate-300 py-2 ps-9 pe-3 text-sm text-slate-900 shadow-sm focus:border-indigo-500"
               onChange={(event) => {
                 setSearch(event.target.value);
                 setPage(1);
@@ -109,7 +111,7 @@ export function DevicesPage() {
 
           <div>
             <label htmlFor="device-status-filter" className="sr-only">
-              Filter by status
+              {t('devices.filterStatus')}
             </label>
             <select
               id="device-status-filter"
@@ -120,10 +122,10 @@ export function DevicesPage() {
                 setPage(1);
               }}
             >
-              <option value="">All statuses</option>
-              {(Object.keys(deviceStatusLabels) as DeviceStatus[]).map((option) => (
+              <option value="">{t('devices.allStatuses')}</option>
+              {(Object.keys(deviceStatusKeys) as DeviceStatus[]).map((option) => (
                 <option key={option} value={option}>
-                  {deviceStatusLabels[option]}
+                  {t(deviceStatusKeys[option])}
                 </option>
               ))}
             </select>
@@ -133,7 +135,7 @@ export function DevicesPage() {
         {devices.isError ? (
           <div className="p-6">
             <p role="alert" className="text-sm text-rose-700">
-              {devices.error instanceof Error ? devices.error.message : 'Devices failed to load.'}
+              {errorMessage(devices.error, 'devices.loadFailed')}
             </p>
             <Button
               variant="secondary"
@@ -141,11 +143,15 @@ export function DevicesPage() {
               className="mt-3"
               onClick={() => void devices.refetch()}
             >
-              Try again
+              {t('common.retry')}
             </Button>
           </div>
         ) : devices.isPending ? (
-          <div className="divide-y divide-slate-100" role="status" aria-label="Loading devices">
+          <div
+            className="divide-y divide-slate-100"
+            role="status"
+            aria-label={t('devices.loading')}
+          >
             {Array.from({ length: 4 }).map((_, index) => (
               <div key={index} className="flex animate-pulse items-center gap-4 px-4 py-4">
                 <div className="h-4 w-1/3 rounded bg-slate-200" />
@@ -160,39 +166,39 @@ export function DevicesPage() {
               <Smartphone aria-hidden="true" className="size-6" />
             </span>
             <h2 className="mt-4 text-base font-semibold text-slate-900">
-              {search || status ? 'No matching devices' : 'No devices registered'}
+              {search || status ? t('devices.noMatches') : t('devices.noDevices')}
             </h2>
             <p className="mt-2 max-w-md text-sm text-slate-600">
               {search || status
-                ? 'Adjust the search or status filter to see more results.'
+                ? t('devices.adjustFilters')
                 : canWrite
-                  ? 'Register the first serialized unit to start a traceable history.'
-                  : 'An owner, admin or manager can register the first device.'}
+                  ? t('devices.registerFirst')
+                  : t('devices.registerFirstHelp')}
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <caption className="sr-only">Registered serialized devices</caption>
+            <table className="w-full text-start text-sm">
+              <caption className="sr-only">{t('devices.registeredCaption')}</caption>
               <thead className="text-xs uppercase tracking-wide text-slate-500">
                 <tr className="border-b border-slate-200">
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Serial
+                    {t('devices.column.serial')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Product
+                    {t('common.product')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Status
+                    {t('common.status')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Condition
+                    {t('devices.column.condition')}
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Location
+                    {t('common.location')}
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right font-semibold">
-                    History
+                  <th scope="col" className="px-4 py-3 text-end font-semibold">
+                    {t('devices.column.history')}
                   </th>
                 </tr>
               </thead>
@@ -200,16 +206,20 @@ export function DevicesPage() {
                 {devices.data.items.map((device) => (
                   <tr key={device.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3">
-                      <p className="font-mono text-sm font-medium text-slate-900">
+                      <p dir="ltr" className="font-mono text-sm font-medium text-slate-900">
                         {device.serialNumber}
                       </p>
                       {device.imei && (
-                        <p className="mt-0.5 font-mono text-xs text-slate-500">{device.imei}</p>
+                        <p dir="ltr" className="mt-0.5 font-mono text-xs text-slate-500">
+                          {device.imei}
+                        </p>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-slate-800">{device.productName}</p>
-                      <p className="mt-0.5 font-mono text-xs text-slate-500">{device.productSku}</p>
+                      <p dir="ltr" className="mt-0.5 font-mono text-xs text-slate-500">
+                        {device.productSku}
+                      </p>
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -218,13 +228,13 @@ export function DevicesPage() {
                           deviceStatusStyles[device.status],
                         )}
                       >
-                        {deviceStatusLabels[device.status]}
+                        {t(deviceStatusKeys[device.status])}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-slate-600">
-                      {deviceConditionLabels[device.condition]}
+                      {t(deviceConditionKeys[device.condition])}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-600">
+                    <td dir="ltr" className="px-4 py-3 font-mono text-xs text-slate-600">
                       {device.warehouseCode} / {device.locationCode}
                     </td>
                     <td className="px-4 py-3">
@@ -243,14 +253,14 @@ export function DevicesPage() {
                           }
                         >
                           <Printer aria-hidden="true" className="size-4" />
-                          Label
+                          {t('devices.label')}
                         </Button>
                         <Button
                           variant="secondary"
                           size="sm"
                           onClick={() => setSelectedDeviceId(device.id)}
                         >
-                          Open
+                          {t('devices.open')}
                         </Button>
                       </div>
                     </td>
@@ -266,7 +276,7 @@ export function DevicesPage() {
             total={total}
             page={page}
             pageCount={pageCount}
-            noun="device"
+            nounKey="common.noun.devices"
             onPrevious={() => setPage((current) => Math.max(1, current - 1))}
             onNext={() => setPage((current) => current + 1)}
           />

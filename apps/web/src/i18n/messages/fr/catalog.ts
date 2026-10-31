@@ -1,0 +1,103 @@
+import type { CatalogMessages } from '../en/catalog';
+
+export const catalog: CatalogMessages = {
+  'products.title': 'Produits',
+  'products.description':
+    'Catalogue d’électronique, d’accessoires et de composants pour cette organisation.',
+  'products.add': 'Ajouter un produit',
+  'products.readOnly':
+    'Votre rôle de lecteur est en lecture seule. Les propriétaires, administrateurs et gestionnaires peuvent ajouter des produits.',
+  'products.searchLabel': 'Rechercher des produits',
+  'products.searchPlaceholder': 'Rechercher par nom, SKU ou code-barres',
+  'products.statusFilterLabel': 'Filtrer par statut',
+  'products.allStatuses': 'Tous les statuts',
+  'products.status.active': 'Actif',
+  'products.status.inactive': 'Inactif',
+  'products.status.discontinued': 'Abandonné',
+  'products.status.archived': 'Archivé',
+  'products.loadFailed': 'Impossible de charger les produits.',
+  'products.loading': 'Chargement des produits',
+  'products.emptyMatching': 'Aucun produit correspondant',
+  'products.empty': 'Aucun produit pour le moment',
+  'products.emptyMatchingHint':
+    'Modifiez la recherche ou le filtre de statut pour afficher davantage de résultats.',
+  'products.emptyHintWritable':
+    'Ajoutez votre premier produit pour commencer à constituer le catalogue.',
+  'products.emptyHintReadOnly':
+    'Le catalogue est vide. Un propriétaire, un administrateur ou un gestionnaire peut ajouter des produits.',
+  'products.caption': 'Produits de cette organisation',
+  'products.noBarcode': 'Aucun code-barres attribué',
+  'products.trackingSerialized': 'Sérialisé',
+  'products.column.salePrice': 'Prix de vente',
+  'products.column.tracking': 'Suivi',
+  'products.column.reorderAt': 'Seuil de réappro.',
+  'products.column.labels': 'Étiquettes',
+  'products.assignBarcode': 'Attribuer un code-barres',
+  'products.assignBarcodeFailed': 'Impossible d’attribuer le code-barres.',
+  'products.threshold': 'Seuil',
+  'products.label': 'Étiquette',
+
+  'productForm.title': 'Ajouter un produit',
+  'productForm.description':
+    'Les prix sont saisis en dinars tunisiens et enregistrés en millimes entiers.',
+  'productForm.sku': 'SKU',
+  'productForm.barcode': 'Code-barres (facultatif)',
+  'productForm.noCategory': 'Aucune catégorie',
+  'productForm.noBrand': 'Aucune marque',
+  'productForm.purchasePrice': 'Prix d’achat (TND)',
+  'productForm.salePrice': 'Prix de vente (TND)',
+  'productForm.reorderThreshold': 'Seuil de réapprovisionnement',
+  'productForm.serialized': 'Suivre les numéros de série individuels',
+  'productForm.serializedHint': 'Les alertes de stock faible utilisent le seuil ; 0 les désactive.',
+  'productForm.failed': 'Impossible de créer le produit.',
+  'productForm.create': 'Créer le produit',
+  'productForm.skuRequired': 'Saisissez un SKU',
+  'productForm.nameRequired': 'Saisissez le nom d’un produit',
+  'productForm.priceInvalid': 'Utilisez un montant positif avec 3 décimales au maximum',
+  'productForm.thresholdInvalid':
+    'Utilisez une quantité positive ou nulle avec 4 décimales au maximum',
+  'productForm.barcodeDigits': 'Utilisez 8, 12, 13 ou 14 chiffres',
+  'productForm.barcodeCheckDigit': 'La clé de contrôle est invalide',
+
+  'catalogSettings.title': 'Paramètres du catalogue',
+  'catalogSettings.description':
+    'Catégories et marques partagées par tous les produits de cette organisation.',
+  'catalogSettings.readOnly':
+    'Votre rôle de lecteur est en lecture seule. Les propriétaires, administrateurs et gestionnaires peuvent modifier ces listes.',
+  'catalogSettings.categories.title': 'Catégories',
+  'catalogSettings.categories.description':
+    'Hiérarchie facultative utilisée pour le filtrage et les rapports.',
+  'catalogSettings.categories.new': 'Nouvelle catégorie',
+  'catalogSettings.categories.namePlaceholder': 'Cameras',
+  'catalogSettings.categories.parent': 'Parent (facultatif)',
+  'catalogSettings.categories.topLevel': 'Niveau supérieur',
+  'catalogSettings.categories.create': 'Ajouter la catégorie',
+  'catalogSettings.adding': 'Ajout…',
+  'catalogSettings.categories.failed': 'Impossible de créer la catégorie.',
+  'catalogSettings.categories.loading': 'Chargement des catégories',
+  'catalogSettings.categories.loadFailed': 'Impossible de charger les catégories.',
+  'catalogSettings.categories.empty': 'Aucune catégorie pour le moment.',
+  'catalogSettings.categories.inside': 'Dans {name}',
+  'catalogSettings.categories.unknown': 'inconnu',
+  'catalogSettings.categories.nameRequired': 'Saisissez le nom d’une catégorie',
+  'catalogSettings.brands.title': 'Marques',
+  'catalogSettings.brands.description': 'Noms de fabricants ou de marques commerciales.',
+  'catalogSettings.brands.new': 'Nouvelle marque',
+  'catalogSettings.brands.namePlaceholder': 'Apple',
+  'catalogSettings.brands.create': 'Ajouter la marque',
+  'catalogSettings.brands.failed': 'Impossible de créer la marque.',
+  'catalogSettings.brands.loading': 'Chargement des marques',
+  'catalogSettings.brands.loadFailed': 'Impossible de charger les marques.',
+  'catalogSettings.brands.empty': 'Aucune marque pour le moment.',
+  'catalogSettings.brands.nameRequired': 'Saisissez le nom d’une marque',
+
+  'reorder.title': 'Seuil de réapprovisionnement',
+  'reorder.descriptionProduct':
+    'Des alertes de stock faible apparaissent lorsque {name} ({sku}) dispose d’une disponibilité inférieure à cette quantité. Utilisez 0 pour désactiver les alertes.',
+  'reorder.description':
+    'Des alertes de stock faible apparaissent lorsque la disponibilité descend sous cette quantité.',
+  'reorder.field': 'Quantité du seuil',
+  'reorder.invalid': 'Utilisez une quantité positive ou nulle avec 4 décimales au maximum.',
+  'reorder.failed': 'Impossible d’enregistrer le seuil de réapprovisionnement.',
+  'reorder.save': 'Enregistrer le seuil',
+};

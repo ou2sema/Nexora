@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -20,7 +20,7 @@ import {
   DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ApiError } from '@/lib/api-client';
+import { useI18n } from '@/i18n/provider';
 import { useCreateProduct } from './api';
 
 const fieldClass =
@@ -40,43 +40,18 @@ function parsePriceInput(value: string): number | null {
   }
 }
 
-const priceField = z
-  .string()
-  .trim()
-  .refine((value) => value === '' || parsePriceInput(value) !== null, {
-    message: 'Use a positive amount with up to 3 decimals',
-  });
-
-const thresholdField = z
-  .string()
-  .trim()
-  .refine(
-    (value) => value === '' || (/^\d+(\.\d{1,4})?$/.test(value) && Number(value) <= 1_000_000_000),
-    { message: 'Use a non-negative quantity with up to 4 decimals' },
-  );
-
-const schema = z.object({
-  sku: z.string().trim().min(1, 'Enter a SKU').max(64),
-  name: z.string().trim().min(1, 'Enter a product name').max(200),
-  categoryId: z.string(),
-  brandId: z.string(),
-  barcode: z
-    .string()
-    .trim()
-    .refine((value) => value === '' || /^[0-9]{8}$|^[0-9]{12,14}$/.test(value), {
-      message: 'Use 8, 12, 13 or 14 digits',
-    })
-    .refine((value) => value === '' || isValidGtinBarcode(value), {
-      message: 'The check digit is invalid',
-    }),
-  purchasePrice: priceField,
-  salePrice: priceField,
-  reorderThreshold: thresholdField,
-  isSerialized: z.boolean(),
-  status: z.enum(['active', 'inactive', 'discontinued']),
-});
-
-type Values = z.infer<typeof schema>;
+type Values = {
+  sku: string;
+  name: string;
+  categoryId: string;
+  brandId: string;
+  barcode: string;
+  purchasePrice: string;
+  salePrice: string;
+  reorderThreshold: string;
+  isSerialized: boolean;
+  status: 'active' | 'inactive' | 'discontinued';
+};
 
 interface ProductFormDialogProps {
   organizationId: string;
@@ -93,7 +68,47 @@ export function ProductFormDialog({
   categories,
   brands,
 }: ProductFormDialogProps) {
+  const { t, errorMessage } = useI18n();
   const mutation = useCreateProduct(organizationId);
+  const schema = useMemo(() => {
+    const priceField = z
+      .string()
+      .trim()
+      .refine((value) => value === '' || parsePriceInput(value) !== null, {
+        message: t('productForm.priceInvalid'),
+      });
+
+    const thresholdField = z
+      .string()
+      .trim()
+      .refine(
+        (value) =>
+          value === '' || (/^\d+(\.\d{1,4})?$/.test(value) && Number(value) <= 1_000_000_000),
+        { message: t('productForm.thresholdInvalid') },
+      );
+
+    return z.object({
+      sku: z.string().trim().min(1, t('productForm.skuRequired')).max(64),
+      name: z.string().trim().min(1, t('productForm.nameRequired')).max(200),
+      categoryId: z.string(),
+      brandId: z.string(),
+      barcode: z
+        .string()
+        .trim()
+        .refine((value) => value === '' || /^[0-9]{8}$|^[0-9]{12,14}$/.test(value), {
+          message: t('productForm.barcodeDigits'),
+        })
+        .refine((value) => value === '' || isValidGtinBarcode(value), {
+          message: t('productForm.barcodeCheckDigit'),
+        }),
+      purchasePrice: priceField,
+      salePrice: priceField,
+      reorderThreshold: thresholdField,
+      isSerialized: z.boolean(),
+      status: z.enum(['active', 'inactive', 'discontinued']),
+    });
+  }, [t]);
+
   const {
     register,
     handleSubmit,
@@ -119,12 +134,7 @@ export function ProductFormDialog({
     if (open) reset();
   }, [open, reset]);
 
-  const errorMessage =
-    mutation.error instanceof ApiError
-      ? mutation.error.message
-      : mutation.error
-        ? 'The product could not be created.'
-        : null;
+  const error = mutation.error ? errorMessage(mutation.error, 'productForm.failed') : null;
 
   const submit = handleSubmit(async (values) => {
     const input: ProductCreateInput = {
@@ -152,20 +162,19 @@ export function ProductFormDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogTitle>Add product</DialogTitle>
-        <DialogDescription>
-          Prices are entered in Tunisian dinars and stored as integer millimes.
-        </DialogDescription>
+        <DialogTitle>{t('productForm.title')}</DialogTitle>
+        <DialogDescription>{t('productForm.description')}</DialogDescription>
 
         <form noValidate className="mt-5 space-y-4" onSubmit={submit}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="product-sku" className="block text-sm font-medium text-slate-700">
-                SKU
+                {t('productForm.sku')}
               </label>
               <input
                 id="product-sku"
                 type="text"
+                dir="ltr"
                 autoComplete="off"
                 className={fieldClass}
                 aria-invalid={Boolean(errors.sku)}
@@ -181,11 +190,12 @@ export function ProductFormDialog({
 
             <div>
               <label htmlFor="product-barcode" className="block text-sm font-medium text-slate-700">
-                Barcode (optional)
+                {t('productForm.barcode')}
               </label>
               <input
                 id="product-barcode"
                 type="text"
+                dir="ltr"
                 inputMode="numeric"
                 autoComplete="off"
                 className={fieldClass}
@@ -203,7 +213,7 @@ export function ProductFormDialog({
 
           <div>
             <label htmlFor="product-name" className="block text-sm font-medium text-slate-700">
-              Name
+              {t('common.name')}
             </label>
             <input
               id="product-name"
@@ -226,10 +236,10 @@ export function ProductFormDialog({
                 htmlFor="product-category"
                 className="block text-sm font-medium text-slate-700"
               >
-                Category
+                {t('common.category')}
               </label>
               <select id="product-category" className={fieldClass} {...register('categoryId')}>
-                <option value="">No category</option>
+                <option value="">{t('productForm.noCategory')}</option>
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.name}
@@ -240,10 +250,10 @@ export function ProductFormDialog({
 
             <div>
               <label htmlFor="product-brand" className="block text-sm font-medium text-slate-700">
-                Brand
+                {t('common.brand')}
               </label>
               <select id="product-brand" className={fieldClass} {...register('brandId')}>
-                <option value="">No brand</option>
+                <option value="">{t('productForm.noBrand')}</option>
                 {brands.map((brand) => (
                   <option key={brand.id} value={brand.id}>
                     {brand.name}
@@ -259,7 +269,7 @@ export function ProductFormDialog({
                 htmlFor="product-purchase-price"
                 className="block text-sm font-medium text-slate-700"
               >
-                Purchase price (TND)
+                {t('productForm.purchasePrice')}
               </label>
               <input
                 id="product-purchase-price"
@@ -283,7 +293,7 @@ export function ProductFormDialog({
                 htmlFor="product-sale-price"
                 className="block text-sm font-medium text-slate-700"
               >
-                Sale price (TND)
+                {t('productForm.salePrice')}
               </label>
               <input
                 id="product-sale-price"
@@ -306,12 +316,12 @@ export function ProductFormDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="product-status" className="block text-sm font-medium text-slate-700">
-                Status
+                {t('common.status')}
               </label>
               <select id="product-status" className={fieldClass} {...register('status')}>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="discontinued">Discontinued</option>
+                <option value="active">{t('products.status.active')}</option>
+                <option value="inactive">{t('products.status.inactive')}</option>
+                <option value="discontinued">{t('products.status.discontinued')}</option>
               </select>
             </div>
 
@@ -320,7 +330,7 @@ export function ProductFormDialog({
                 htmlFor="product-reorder-threshold"
                 className="block text-sm font-medium text-slate-700"
               >
-                Reorder threshold
+                {t('productForm.reorderThreshold')}
               </label>
               <input
                 id="product-reorder-threshold"
@@ -353,27 +363,25 @@ export function ProductFormDialog({
                 className="size-4 rounded border-slate-300 text-indigo-600"
                 {...register('isSerialized')}
               />
-              Track individual serial numbers
+              {t('productForm.serialized')}
             </label>
-            <p className="mt-1 text-xs text-slate-500">
-              Low-stock alerts use the threshold; 0 disables them.
-            </p>
+            <p className="mt-1 text-xs text-slate-500">{t('productForm.serializedHint')}</p>
           </div>
 
-          {errorMessage && (
+          {error && (
             <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
-              {errorMessage}
+              {error}
             </p>
           )}
 
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancel
+                {t('common.cancel')}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Saving…' : 'Create product'}
+              {mutation.isPending ? t('common.saving') : t('productForm.create')}
             </Button>
           </DialogFooter>
         </form>

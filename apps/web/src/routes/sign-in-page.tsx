@@ -1,28 +1,35 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Boxes, Loader2, LockKeyhole, ScrollText } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Navigate, useLocation, useNavigate } from 'react-router';
 import { z } from 'zod';
 
+import { LanguageSwitcher } from '@/components/layout/language-switcher';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/features/auth/auth-provider';
+import { useI18n } from '@/i18n/provider';
 
-const schema = z.object({
-  email: z.email('Enter a valid email address'),
-  password: z.string().min(8, 'Use at least 8 characters'),
-});
-
-type Values = z.infer<typeof schema>;
+type Values = { email: string; password: string };
 type Mode = 'sign-in' | 'sign-up';
 
 export function SignInPage() {
   const { status, signIn, signUp } = useAuth();
+  const { t, errorMessage } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
   const [mode, setMode] = useState<Mode>('sign-in');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [confirmationSentTo, setConfirmationSentTo] = useState<string | null>(null);
+
+  const schema = useMemo(
+    () =>
+      z.object({
+        email: z.email(t('auth.invalidEmail')),
+        password: z.string().min(8, t('auth.passwordTooShort')),
+      }),
+    [t],
+  );
 
   const {
     register,
@@ -58,14 +65,14 @@ export function SignInPage() {
         }
       }
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Authentication failed.');
+      setSubmitError(errorMessage(error, 'auth.failed'));
     }
   });
 
   return (
     <div className="grid min-h-dvh bg-slate-50 lg:grid-cols-2">
       <a href="#sign-in-form" className="skip-link">
-        Skip to sign-in form
+        {t('auth.skipToForm')}
       </a>
 
       <aside className="relative hidden flex-col justify-between overflow-hidden bg-ink-950 p-10 text-slate-300 lg:flex">
@@ -77,45 +84,43 @@ export function SignInPage() {
         </div>
 
         <div className="max-w-md">
-          <h1 className="text-3xl font-semibold tracking-tight text-white">
-            Electronics inventory you can audit.
-          </h1>
-          <p className="mt-4 text-sm leading-6 text-slate-400">
-            Multi-warehouse stock, serialized devices and TND valuation — all derived from an
-            append-only ledger.
-          </p>
+          <h1 className="text-3xl font-semibold tracking-tight text-white">{t('auth.tagline')}</h1>
+          <p className="mt-4 text-sm leading-6 text-slate-400">{t('auth.taglineBody')}</p>
 
           <ul className="mt-8 space-y-4 text-sm">
             <li className="flex items-start gap-3">
               <LockKeyhole aria-hidden="true" className="mt-0.5 size-4 text-indigo-400" />
-              Organization-isolated data enforced in the database, not just the UI.
+              {t('auth.pointTenancy')}
             </li>
             <li className="flex items-start gap-3">
               <ScrollText aria-hidden="true" className="mt-0.5 size-4 text-indigo-400" />
-              Every stock change traceable to an actor, reason and document.
+              {t('auth.pointAudit')}
             </li>
           </ul>
         </div>
 
-        <p className="text-xs text-slate-500">Tunisian dinar · English interface · Phase 2</p>
+        <p className="text-xs text-slate-500">{t('auth.footer')}</p>
       </aside>
 
       <main className="flex items-center justify-center px-4 py-12 sm:px-8">
         <div className="w-full max-w-sm">
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <span className="grid size-10 place-items-center rounded-xl bg-indigo-600 text-white">
-              <Boxes aria-hidden="true" className="size-5" />
-            </span>
-            <span className="text-lg font-semibold tracking-tight text-slate-900">Mystock</span>
+          <div className="mb-8 flex items-center gap-3">
+            <div className="flex items-center gap-3 lg:hidden">
+              <span className="grid size-10 place-items-center rounded-xl bg-indigo-600 text-white">
+                <Boxes aria-hidden="true" className="size-5" />
+              </span>
+              <span className="text-lg font-semibold tracking-tight text-slate-900">Mystock</span>
+            </div>
+            <div className="ms-auto">
+              <LanguageSwitcher />
+            </div>
           </div>
 
           <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
-            {mode === 'sign-in' ? 'Sign in' : 'Create your account'}
+            {mode === 'sign-in' ? t('auth.signInTitle') : t('auth.signUpTitle')}
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            {mode === 'sign-in'
-              ? 'Use the email and password associated with your invitation.'
-              : 'The first account can then create an organization.'}
+            {mode === 'sign-in' ? t('auth.signInSubtitle') : t('auth.signUpSubtitle')}
           </p>
 
           {confirmationSentTo ? (
@@ -124,10 +129,8 @@ export function SignInPage() {
               role="status"
               className="mt-8 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"
             >
-              <p className="font-semibold">Check your inbox</p>
-              <p className="mt-1">
-                We sent a confirmation link to {confirmationSentTo}. Confirm it, then sign in.
-              </p>
+              <p className="font-semibold">{t('auth.checkInbox')}</p>
+              <p className="mt-1">{t('auth.confirmationSent', { email: confirmationSentTo })}</p>
               <Button
                 type="button"
                 variant="secondary"
@@ -137,18 +140,19 @@ export function SignInPage() {
                   setMode('sign-in');
                 }}
               >
-                Back to sign in
+                {t('auth.backToSignIn')}
               </Button>
             </div>
           ) : (
             <form id="sign-in-form" noValidate className="mt-8 space-y-4" onSubmit={submit}>
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-slate-700">
-                  Email
+                  {t('auth.email')}
                 </label>
                 <input
                   id="email"
                   type="email"
+                  dir="ltr"
                   autoComplete="email"
                   aria-invalid={Boolean(errors.email)}
                   aria-describedby={errors.email ? 'email-error' : undefined}
@@ -164,11 +168,12 @@ export function SignInPage() {
 
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-slate-700">
-                  Password
+                  {t('auth.password')}
                 </label>
                 <input
                   id="password"
                   type="password"
+                  dir="ltr"
                   autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
                   aria-invalid={Boolean(errors.password)}
                   aria-describedby={errors.password ? 'password-error' : undefined}
@@ -190,11 +195,11 @@ export function SignInPage() {
 
               <Button type="submit" className="w-full" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
-                {mode === 'sign-in' ? 'Sign in' : 'Create account'}
+                {mode === 'sign-in' ? t('auth.signIn') : t('auth.signUp')}
               </Button>
 
               <p className="text-center text-sm text-slate-600">
-                {mode === 'sign-in' ? 'No account yet?' : 'Already have an account?'}{' '}
+                {mode === 'sign-in' ? t('auth.noAccount') : t('auth.haveAccount')}{' '}
                 <button
                   type="button"
                   className="font-semibold text-indigo-700 hover:text-indigo-800"
@@ -203,7 +208,7 @@ export function SignInPage() {
                     setSubmitError(null);
                   }}
                 >
-                  {mode === 'sign-in' ? 'Create one' : 'Sign in'}
+                  {mode === 'sign-in' ? t('auth.createOne') : t('auth.signIn')}
                 </button>
               </p>
             </form>

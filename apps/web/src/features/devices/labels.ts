@@ -1,13 +1,15 @@
 import type { DeviceCondition, DeviceEventType, DeviceStatus } from '@mystock/contracts';
 
-export const deviceStatusLabels: Record<DeviceStatus, string> = {
-  in_stock: 'In stock',
-  reserved: 'Reserved',
-  sold: 'Sold',
-  returned: 'Returned',
-  in_repair: 'In repair',
-  lost: 'Lost',
-  disposed: 'Disposed',
+import type { MessageKey } from '@/i18n/messages';
+
+export const deviceStatusKeys: Record<DeviceStatus, MessageKey> = {
+  in_stock: 'devices.status.inStock',
+  reserved: 'devices.status.reserved',
+  sold: 'devices.status.sold',
+  returned: 'devices.status.returned',
+  in_repair: 'devices.status.inRepair',
+  lost: 'devices.status.lost',
+  disposed: 'devices.status.disposed',
 };
 
 export const deviceStatusStyles: Record<DeviceStatus, string> = {
@@ -20,24 +22,24 @@ export const deviceStatusStyles: Record<DeviceStatus, string> = {
   disposed: 'bg-slate-200 text-slate-700 ring-slate-300',
 };
 
-export const deviceConditionLabels: Record<DeviceCondition, string> = {
-  new: 'New',
-  used: 'Used',
-  refurbished: 'Refurbished',
-  damaged: 'Damaged',
-  defective: 'Defective',
+export const deviceConditionKeys: Record<DeviceCondition, MessageKey> = {
+  new: 'devices.condition.new',
+  used: 'devices.condition.used',
+  refurbished: 'devices.condition.refurbished',
+  damaged: 'devices.condition.damaged',
+  defective: 'devices.condition.defective',
 };
 
-export const deviceEventLabels: Record<DeviceEventType, string> = {
-  registered: 'Registered',
-  moved: 'Moved',
-  reserved: 'Reserved',
-  released: 'Released',
-  issued: 'Issued',
-  returned: 'Returned',
-  repair_started: 'Repair started',
-  repair_completed: 'Repair completed',
-  marked_lost: 'Marked lost',
-  disposed: 'Disposed',
-  status_changed: 'Status changed',
+export const deviceEventKeys: Record<DeviceEventType, MessageKey> = {
+  registered: 'devices.event.registered',
+  moved: 'devices.event.moved',
+  reserved: 'devices.event.reserved',
+  released: 'devices.event.released',
+  issued: 'devices.event.issued',
+  returned: 'devices.event.returned',
+  repair_started: 'devices.event.repairStarted',
+  repair_completed: 'devices.event.repairCompleted',
+  marked_lost: 'devices.event.markedLost',
+  disposed: 'devices.event.disposed',
+  status_changed: 'devices.event.statusChanged',
 };

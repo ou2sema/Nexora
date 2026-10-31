@@ -1,11 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { z } from 'zod';
 
 import type { ProductSummary, SupplierSummary, WarehouseSummary } from '@mystock/contracts';
-import { formatTnd, toMinorUnits } from '@mystock/domain';
+import { toMinorUnits } from '@mystock/domain';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -17,7 +17,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { WarehouseLocationFields } from '@/components/ui/warehouse-location-fields';
-import { ApiError } from '@/lib/api-client';
+import type { MessageKey, MessageValues } from '@/i18n/messages';
+import { useI18n } from '@/i18n/provider';
 import { cn } from '@/lib/cn';
 import { saveBlob } from '@/lib/download';
 import { fieldClass } from '@/lib/form-field';
@@ -29,13 +30,10 @@ import {
   usePurchaseOrder,
   useReceivePurchaseOrder,
 } from './api';
-import { purchaseOrderStatusLabels, purchaseOrderStatusStyles } from './labels';
+import { purchaseOrderStatusKeys, purchaseOrderStatusStyles } from './labels';
 import { PurchaseReturnsSection } from './return-dialogs';
 
-function dialogError(error: unknown, fallback: string): string | null {
-  if (error instanceof ApiError) return error.message;
-  return error ? fallback : null;
-}
+type Translator = (key: MessageKey, values?: MessageValues) => string;
 
 function parsePriceInput(value: string): number | null {
   const normalized = value.trim().replace(',', '.');
@@ -51,42 +49,44 @@ function parsePriceInput(value: string): number | null {
   }
 }
 
-const priceField = z
-  .string()
-  .trim()
-  .refine((value) => value === '' || parsePriceInput(value) !== null, {
-    message: 'Use a positive amount with up to 3 decimals',
+function buildCreateSchema(t: Translator) {
+  const priceField = z
+    .string()
+    .trim()
+    .refine((value) => value === '' || parsePriceInput(value) !== null, {
+      message: t('purchasing.form.invalidPrice'),
+    });
+
+  const quantityField = z
+    .string()
+    .trim()
+    .refine((value) => /^\d+(\.\d{1,4})?$/.test(value) && Number(value) > 0, {
+      message: t('purchasing.form.invalidQuantity'),
+    });
+
+  const lineSchema = z.object({
+    productId: z.string().min(1, t('purchasing.form.selectProduct')),
+    quantity: quantityField,
+    unitCost: priceField,
   });
 
-const quantityField = z
-  .string()
-  .trim()
-  .refine((value) => /^\d+(\.\d{1,4})?$/.test(value) && Number(value) > 0, {
-    message: 'Enter a quantity greater than zero',
-  });
+  return z
+    .object({
+      supplierId: z.string().min(1, t('purchasing.create.selectSupplier')),
+      warehouseId: z.string().min(1, t('common.selectWarehouse')),
+      locationId: z.string().min(1, t('common.selectLocation')),
+      expectedOn: z.string(),
+      reference: z.string().trim().max(120),
+      notes: z.string().trim().max(2000),
+      lines: z.array(lineSchema).min(1, t('purchasing.form.addLineRequired')).max(100),
+    })
+    .refine(
+      (values) => new Set(values.lines.map((line) => line.productId)).size === values.lines.length,
+      { message: t('purchasing.form.duplicateProduct'), path: ['lines'] },
+    );
+}
 
-const lineSchema = z.object({
-  productId: z.string().min(1, 'Select a product'),
-  quantity: quantityField,
-  unitCost: priceField,
-});
-
-const createSchema = z
-  .object({
-    supplierId: z.string().min(1, 'Select a supplier'),
-    warehouseId: z.string().min(1, 'Select a warehouse'),
-    locationId: z.string().min(1, 'Select a storage location'),
-    expectedOn: z.string(),
-    reference: z.string().trim().max(120),
-    notes: z.string().trim().max(2000),
-    lines: z.array(lineSchema).min(1, 'Add at least one line').max(100),
-  })
-  .refine(
-    (values) => new Set(values.lines.map((line) => line.productId)).size === values.lines.length,
-    { message: 'Each product may appear only once', path: ['lines'] },
-  );
-
-type CreateValues = z.infer<typeof createSchema>;
+type CreateValues = z.infer<ReturnType<typeof buildCreateSchema>>;
 
 const emptyLine = { productId: '', quantity: '', unitCost: '' };
 
@@ -107,7 +107,9 @@ export function CreatePurchaseOrderDialog({
   open,
   onOpenChange,
 }: CreatePurchaseOrderDialogProps) {
+  const { t, errorMessage } = useI18n();
   const mutation = useCreatePurchaseOrder(organizationId);
+  const createSchema = useMemo(() => buildCreateSchema(t), [t]);
   const {
     register,
     control,
@@ -146,7 +148,9 @@ export function CreatePurchaseOrderDialog({
   }, [open, reset]);
 
   const activeSuppliers = suppliers.filter((supplier) => supplier.isActive);
-  const errorMessage = dialogError(mutation.error, 'The purchase order could not be created.');
+  const createError = mutation.error
+    ? errorMessage(mutation.error, 'purchasing.create.failed')
+    : null;
 
   const submit = handleSubmit(async (values) => {
     try {
@@ -173,18 +177,16 @@ export function CreatePurchaseOrderDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
-        <DialogTitle>New purchase order</DialogTitle>
-        <DialogDescription>
-          Drafts can be cancelled. Ordered quantities enter stock only when received.
-        </DialogDescription>
+        <DialogTitle>{t('purchasing.newOrder')}</DialogTitle>
+        <DialogDescription>{t('purchasing.create.description')}</DialogDescription>
 
         <form noValidate className="mt-5 space-y-4" onSubmit={submit}>
           <div>
             <label htmlFor="po-supplier" className="block text-sm font-medium text-slate-700">
-              Supplier
+              {t('common.supplier')}
             </label>
             <select id="po-supplier" className={fieldClass} {...register('supplierId')}>
-              <option value="">Select a supplier</option>
+              <option value="">{t('purchasing.create.selectSupplier')}</option>
               {activeSuppliers.map((supplier) => (
                 <option key={supplier.id} value={supplier.id}>
                   {supplier.name}
@@ -197,9 +199,7 @@ export function CreatePurchaseOrderDialog({
               </p>
             )}
             {activeSuppliers.length === 0 && (
-              <p className="mt-1 text-xs text-amber-700">
-                Create an active supplier before raising a purchase order.
-              </p>
+              <p className="mt-1 text-xs text-amber-700">{t('purchasing.create.noSuppliers')}</p>
             )}
           </div>
 
@@ -214,7 +214,7 @@ export function CreatePurchaseOrderDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="po-expected" className="block text-sm font-medium text-slate-700">
-                Expected date (optional)
+                {t('purchasing.form.expectedDateOptional')}
               </label>
               <input
                 id="po-expected"
@@ -225,11 +225,12 @@ export function CreatePurchaseOrderDialog({
             </div>
             <div>
               <label htmlFor="po-reference" className="block text-sm font-medium text-slate-700">
-                Supplier reference (optional)
+                {t('purchasing.form.supplierReferenceOptional')}
               </label>
               <input
                 id="po-reference"
                 type="text"
+                dir="ltr"
                 className={fieldClass}
                 {...register('reference')}
               />
@@ -239,11 +240,11 @@ export function CreatePurchaseOrderDialog({
           <section aria-labelledby="po-lines-heading">
             <div className="flex items-center justify-between">
               <h3 id="po-lines-heading" className="text-sm font-semibold text-slate-900">
-                Lines
+                {t('purchasing.form.lines')}
               </h3>
               <Button type="button" variant="secondary" size="sm" onClick={() => append(emptyLine)}>
                 <Plus aria-hidden="true" className="size-4" />
-                Add line
+                {t('purchasing.form.addLine')}
               </Button>
             </div>
 
@@ -258,14 +259,14 @@ export function CreatePurchaseOrderDialog({
                       htmlFor={`po-line-product-${index}`}
                       className="block text-xs font-medium text-slate-600"
                     >
-                      Product
+                      {t('common.product')}
                     </label>
                     <select
                       id={`po-line-product-${index}`}
                       className={fieldClass}
                       {...register(`lines.${index}.productId`)}
                     >
-                      <option value="">Select a product</option>
+                      <option value="">{t('purchasing.form.selectProduct')}</option>
                       {products.map((product) => (
                         <option key={product.id} value={product.id}>
                           {product.sku} · {product.name}
@@ -278,7 +279,7 @@ export function CreatePurchaseOrderDialog({
                       htmlFor={`po-line-quantity-${index}`}
                       className="block text-xs font-medium text-slate-600"
                     >
-                      Quantity
+                      {t('common.quantity')}
                     </label>
                     <input
                       id={`po-line-quantity-${index}`}
@@ -293,7 +294,7 @@ export function CreatePurchaseOrderDialog({
                       htmlFor={`po-line-cost-${index}`}
                       className="block text-xs font-medium text-slate-600"
                     >
-                      Unit cost (TND)
+                      {t('purchasing.form.unitCost')}
                     </label>
                     <input
                       id={`po-line-cost-${index}`}
@@ -309,7 +310,7 @@ export function CreatePurchaseOrderDialog({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      aria-label={`Remove line ${index + 1}`}
+                      aria-label={t('purchasing.form.removeLine', { index: index + 1 })}
                       disabled={fields.length === 1}
                       onClick={() => remove(index)}
                     >
@@ -343,25 +344,25 @@ export function CreatePurchaseOrderDialog({
 
           <div>
             <label htmlFor="po-notes" className="block text-sm font-medium text-slate-700">
-              Notes (optional)
+              {t('purchasing.form.notesOptional')}
             </label>
             <textarea id="po-notes" rows={2} className={fieldClass} {...register('notes')} />
           </div>
 
-          {errorMessage && (
+          {createError && (
             <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
-              {errorMessage}
+              {createError}
             </p>
           )}
 
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancel
+                {t('common.cancel')}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Creating…' : 'Create purchase order'}
+              {mutation.isPending ? t('purchasing.create.creating') : t('purchasing.create.submit')}
             </Button>
           </DialogFooter>
         </form>
@@ -399,6 +400,7 @@ export function PurchaseOrderDetailDialog({
   canWrite,
   onOpenChange,
 }: PurchaseOrderDetailDialogProps) {
+  const { t, plural, errorMessage, formatQuantity, formatMoney } = useI18n();
   const order = usePurchaseOrder(organizationId, purchaseOrderId);
   const orderMutation = useOrderPurchaseOrder(organizationId);
   const receiveMutation = useReceivePurchaseOrder(organizationId);
@@ -424,9 +426,15 @@ export function PurchaseOrderDetailDialog({
   const openLines =
     data?.lines.filter((line) => line.quantityOrdered - line.quantityReceived > 0) ?? [];
 
-  const receiveError = dialogError(receiveMutation.error, 'The receipt could not be posted.');
-  const cancelError = dialogError(cancelMutation.error, 'The order could not be cancelled.');
-  const orderError = dialogError(orderMutation.error, 'The order could not be advanced.');
+  const receiveError = receiveMutation.error
+    ? errorMessage(receiveMutation.error, 'purchasing.receipt.failed')
+    : null;
+  const cancelError = cancelMutation.error
+    ? errorMessage(cancelMutation.error, 'purchasing.cancel.failed')
+    : null;
+  const orderError = orderMutation.error
+    ? errorMessage(orderMutation.error, 'purchasing.order.failed')
+    : null;
 
   const downloadOrderPdf = async (orderId: string) => {
     setPdfError(null);
@@ -434,9 +442,9 @@ export function PurchaseOrderDetailDialog({
     try {
       const file = await downloadPdf(orderId);
       saveBlob(file.blob, file.filename);
-      setNotice(`Downloaded ${file.filename}`);
+      setNotice(t('purchasing.detail.downloaded', { filename: file.filename }));
     } catch (error) {
-      setPdfError(error instanceof ApiError ? error.message : 'The PDF could not be generated.');
+      setPdfError(errorMessage(error, 'purchasing.detail.pdfFailed'));
     } finally {
       setPdfPending(false);
     }
@@ -459,7 +467,7 @@ export function PurchaseOrderDetailDialog({
     });
 
     if (lines.length === 0) {
-      setNotice('Enter a quantity or at least one serial number to receive.');
+      setNotice(t('purchasing.receipt.empty'));
       return;
     }
 
@@ -469,7 +477,9 @@ export function PurchaseOrderDetailDialog({
         input: { lines },
       });
       setNotice(
-        `Received ${result.receivedQuantity} unit${result.receivedQuantity === 1 ? '' : 's'} · ${purchaseOrderStatusLabels[result.status]}`,
+        plural('purchasing.receipt.posted', result.receivedQuantity, {
+          status: t(purchaseOrderStatusKeys[result.status]),
+        }),
       );
       setReceipt({});
     } catch {
@@ -481,17 +491,27 @@ export function PurchaseOrderDetailDialog({
     <Dialog open={Boolean(purchaseOrderId)} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogTitle>
-          {data ? `${data.number} · ${data.supplierName}` : 'Purchase order'}
+          {data ? (
+            <>
+              <span dir="ltr">{data.number}</span> · {data.supplierName}
+            </>
+          ) : (
+            t('purchasing.detail.title')
+          )}
         </DialogTitle>
         <DialogDescription>
           {data
-            ? `${purchaseOrderStatusLabels[data.status]} · ${data.warehouseCode} / ${data.locationCode}`
-            : 'Loading purchase order…'}
+            ? t('purchasing.detail.subtitle', {
+                status: t(purchaseOrderStatusKeys[data.status]),
+                warehouse: data.warehouseCode,
+                location: data.locationCode,
+              })
+            : t('purchasing.detail.loading')}
         </DialogDescription>
 
         {order.isError ? (
           <p role="alert" className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
-            {order.error instanceof Error ? order.error.message : 'The order failed to load.'}
+            {errorMessage(order.error, 'purchasing.detail.loadFailed')}
           </p>
         ) : data ? (
           <div className="mt-5 space-y-6">
@@ -502,7 +522,9 @@ export function PurchaseOrderDetailDialog({
                 disabled={pdfPending}
                 onClick={() => void downloadOrderPdf(data.id)}
               >
-                {pdfPending ? 'Preparing PDF…' : 'Download purchase order PDF'}
+                {pdfPending
+                  ? t('purchasing.detail.preparingPdf')
+                  : t('purchasing.detail.downloadPdf')}
               </Button>
             </div>
 
@@ -515,7 +537,7 @@ export function PurchaseOrderDetailDialog({
             <dl className="grid gap-3 rounded-lg bg-slate-50 p-4 text-sm sm:grid-cols-3">
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Status
+                  {t('common.status')}
                 </dt>
                 <dd className="mt-1">
                   <span
@@ -524,42 +546,46 @@ export function PurchaseOrderDetailDialog({
                       purchaseOrderStatusStyles[data.status],
                     )}
                   >
-                    {purchaseOrderStatusLabels[data.status]}
+                    {t(purchaseOrderStatusKeys[data.status])}
                   </span>
                 </dd>
               </div>
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Expected
+                  {t('purchasing.columns.expected')}
                 </dt>
-                <dd className="mt-1 text-slate-800">{data.expectedOn ?? '—'}</dd>
+                <dd className="mt-1 text-slate-800">
+                  {data.expectedOn ?? t('common.notAvailable')}
+                </dd>
               </div>
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Reference
+                  {t('common.reference')}
                 </dt>
-                <dd className="mt-1 text-slate-800">{data.reference ?? '—'}</dd>
+                <dd className="mt-1 text-slate-800">
+                  {data.reference ?? t('common.notAvailable')}
+                </dd>
               </div>
             </dl>
 
             <div className="overflow-x-auto rounded-lg border border-slate-200">
-              <table className="w-full text-left text-sm">
+              <table className="w-full text-start text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
                     <th scope="col" className="px-3 py-2 font-semibold">
-                      Product
+                      {t('common.product')}
                     </th>
-                    <th scope="col" className="px-3 py-2 text-right font-semibold">
-                      Ordered
+                    <th scope="col" className="px-3 py-2 text-end font-semibold">
+                      {t('purchasing.detail.ordered')}
                     </th>
-                    <th scope="col" className="px-3 py-2 text-right font-semibold">
-                      Received
+                    <th scope="col" className="px-3 py-2 text-end font-semibold">
+                      {t('purchasing.detail.received')}
                     </th>
-                    <th scope="col" className="px-3 py-2 text-right font-semibold">
-                      Returned
+                    <th scope="col" className="px-3 py-2 text-end font-semibold">
+                      {t('purchasing.detail.returned')}
                     </th>
-                    <th scope="col" className="px-3 py-2 text-right font-semibold">
-                      Unit cost
+                    <th scope="col" className="px-3 py-2 text-end font-semibold">
+                      {t('purchasing.detail.unitCost')}
                     </th>
                   </tr>
                 </thead>
@@ -568,19 +594,23 @@ export function PurchaseOrderDetailDialog({
                     <tr key={line.id}>
                       <td className="px-3 py-2">
                         <p className="text-slate-800">{line.productName}</p>
-                        <p className="font-mono text-xs text-slate-500">{line.productSku}</p>
+                        <p dir="ltr" className="font-mono text-xs text-slate-500">
+                          {line.productSku}
+                        </p>
                       </td>
-                      <td className="px-3 py-2 text-right text-slate-700">
-                        {line.quantityOrdered}
+                      <td className="px-3 py-2 text-end text-slate-700">
+                        {formatQuantity(line.quantityOrdered)}
                       </td>
-                      <td className="px-3 py-2 text-right text-slate-700">
-                        {line.quantityReceived}
+                      <td className="px-3 py-2 text-end text-slate-700">
+                        {formatQuantity(line.quantityReceived)}
                       </td>
-                      <td className="px-3 py-2 text-right text-slate-700">
-                        {line.quantityReturned}
+                      <td className="px-3 py-2 text-end text-slate-700">
+                        {formatQuantity(line.quantityReturned)}
                       </td>
-                      <td className="px-3 py-2 text-right text-slate-700">
-                        {line.unitCostMinor === null ? '—' : formatTnd(line.unitCostMinor)}
+                      <td className="px-3 py-2 text-end text-slate-700">
+                        {line.unitCostMinor === null
+                          ? t('common.notAvailable')
+                          : formatMoney(line.unitCostMinor)}
                       </td>
                     </tr>
                   ))}
@@ -603,12 +633,9 @@ export function PurchaseOrderDetailDialog({
                 className="rounded-lg border border-slate-200 p-4"
               >
                 <h3 id="po-receipt-heading" className="text-sm font-semibold text-slate-900">
-                  Receive stock
+                  {t('purchasing.receipt.heading')}
                 </h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Serialized products register one device per serial number. Use serial|IMEI per
-                  line.
-                </p>
+                <p className="mt-1 text-xs text-slate-500">{t('purchasing.receipt.help')}</p>
                 <div className="mt-3 space-y-3">
                   {openLines.map((line) => {
                     const state = receipt[line.id] ?? { quantity: '', serials: '' };
@@ -618,12 +645,16 @@ export function PurchaseOrderDetailDialog({
                         <div>
                           <p className="text-sm font-medium text-slate-800">{line.productName}</p>
                           <p className="text-xs text-slate-500">
-                            Remaining {line.quantityOrdered - line.quantityReceived}
+                            {t('purchasing.receipt.remaining', {
+                              count: formatQuantity(line.quantityOrdered - line.quantityReceived),
+                            })}
                           </p>
                         </div>
                         {line.isSerialized ? (
                           <textarea
-                            aria-label={`Serial numbers for ${line.productSku}`}
+                            aria-label={t('purchasing.receipt.serialsLabel', {
+                              sku: line.productSku,
+                            })}
                             rows={2}
                             placeholder="SN-0001|356789012345671"
                             className={fieldClass}
@@ -637,7 +668,9 @@ export function PurchaseOrderDetailDialog({
                           />
                         ) : (
                           <input
-                            aria-label={`Quantity to receive for ${line.productSku}`}
+                            aria-label={t('purchasing.receipt.quantityLabel', {
+                              sku: line.productSku,
+                            })}
                             type="text"
                             inputMode="decimal"
                             placeholder="0"
@@ -666,7 +699,9 @@ export function PurchaseOrderDetailDialog({
                   disabled={receiveMutation.isPending}
                   onClick={() => void submitReceipt()}
                 >
-                  {receiveMutation.isPending ? 'Receiving…' : 'Post receipt'}
+                  {receiveMutation.isPending
+                    ? t('purchasing.receipt.receiving')
+                    : t('purchasing.receipt.submit')}
                 </Button>
               </section>
             )}
@@ -682,11 +717,9 @@ export function PurchaseOrderDetailDialog({
             {canWrite && data.status === 'draft' && (
               <section aria-labelledby="po-order-heading">
                 <h3 id="po-order-heading" className="text-sm font-semibold text-slate-900">
-                  Send to supplier
+                  {t('purchasing.order.heading')}
                 </h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Marking the order as ordered makes it receivable.
-                </p>
+                <p className="mt-1 text-xs text-slate-500">{t('purchasing.order.help')}</p>
                 {orderError && (
                   <p role="alert" className="mt-2 text-xs text-rose-700">
                     {orderError}
@@ -700,14 +733,19 @@ export function PurchaseOrderDetailDialog({
                     try {
                       const result = await orderMutation.mutateAsync(data.id);
                       setNotice(
-                        `Purchase order ${result.number} is now ${purchaseOrderStatusLabels[result.status].toLowerCase()}.`,
+                        t('purchasing.detail.nowStatus', {
+                          number: result.number,
+                          status: t(purchaseOrderStatusKeys[result.status]).toLowerCase(),
+                        }),
                       );
                     } catch {
                       // mutation.error renders above.
                     }
                   }}
                 >
-                  {orderMutation.isPending ? 'Updating…' : 'Mark as ordered'}
+                  {orderMutation.isPending
+                    ? t('purchasing.order.updating')
+                    : t('purchasing.order.submit')}
                 </Button>
               </section>
             )}
@@ -718,16 +756,14 @@ export function PurchaseOrderDetailDialog({
                 className="rounded-lg border border-rose-100 bg-rose-50/50 p-4"
               >
                 <h3 id="po-cancel-heading" className="text-sm font-semibold text-slate-900">
-                  Cancel order
+                  {t('purchasing.cancel.heading')}
                 </h3>
-                <p className="mt-1 text-xs text-slate-600">
-                  Cancelling is only possible before any stock is received.
-                </p>
+                <p className="mt-1 text-xs text-slate-600">{t('purchasing.cancel.help')}</p>
                 <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                   <input
-                    aria-label="Cancellation reason"
+                    aria-label={t('purchasing.cancel.reasonLabel')}
                     type="text"
-                    placeholder="Reason (optional)"
+                    placeholder={t('purchasing.cancel.reasonPlaceholder')}
                     className={fieldClass}
                     value={reason}
                     onChange={(event) => setReason(event.target.value)}
@@ -743,14 +779,16 @@ export function PurchaseOrderDetailDialog({
                           purchaseOrderId: data.id,
                           input: { reason: reason || null },
                         });
-                        setNotice(`Purchase order ${result.number} was cancelled.`);
+                        setNotice(t('purchasing.detail.cancelled', { number: result.number }));
                         setReason('');
                       } catch {
                         // mutation.error renders below.
                       }
                     }}
                   >
-                    {cancelMutation.isPending ? 'Cancelling…' : 'Cancel order'}
+                    {cancelMutation.isPending
+                      ? t('purchasing.cancel.cancelling')
+                      : t('purchasing.cancel.submit')}
                   </Button>
                 </div>
                 {cancelError && (
@@ -763,7 +801,7 @@ export function PurchaseOrderDetailDialog({
           </div>
         ) : (
           <p className="mt-4 text-sm text-slate-500" role="status">
-            Loading order…
+            {t('purchasing.detail.loadingOrder')}
           </p>
         )}
       </DialogContent>

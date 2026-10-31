@@ -2,9 +2,11 @@ import { Bell } from 'lucide-react';
 import { Link } from 'react-router';
 
 import { useOrganization } from '@/features/organizations/organization-provider';
+import { useI18n } from '@/i18n/provider';
 import { useLowStock } from './api';
 
 export function LowStockBell() {
+  const { t, plural } = useI18n();
   const { organization } = useOrganization();
   const organizationId = organization?.organizationId ?? null;
   const lowStock = useLowStock(organizationId, {
@@ -16,8 +18,8 @@ export function LowStockBell() {
   const count = lowStock.data?.total ?? 0;
   const label =
     count === 0
-      ? 'Low stock alerts: none'
-      : `Low stock alerts: ${count} product${count === 1 ? '' : 's'}`;
+      ? t('lowStock.bell.none')
+      : t('lowStock.bell.count', { products: plural('common.noun.products', count) });
 
   return (
     <Link
@@ -28,7 +30,7 @@ export function LowStockBell() {
     >
       <Bell aria-hidden="true" className="size-5" />
       {count > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 grid min-w-5 place-items-center rounded-full bg-rose-600 px-1 text-[0.65rem] font-semibold leading-5 text-white">
+        <span className="absolute -end-0.5 -top-0.5 grid min-w-5 place-items-center rounded-full bg-rose-600 px-1 text-[0.65rem] font-semibold leading-5 text-white">
           {count > 99 ? '99+' : count}
         </span>
       )}

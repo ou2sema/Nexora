@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -14,25 +14,12 @@ import {
   DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { roleLabels } from '@/features/team/labels';
-import { ApiError } from '@/lib/api-client';
+import { roleKeys } from '@/features/team/labels';
+import { useI18n } from '@/i18n/provider';
 import { fieldClass } from '@/lib/form-field';
 import { useAdminInviteMember } from './api';
 
-const schema = z.object({
-  organizationId: z.string().min(1, 'Choose an organization'),
-  email: z
-    .string()
-    .trim()
-    .min(1, 'Enter an email address')
-    .max(254)
-    .refine((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), {
-      message: 'Enter a valid email address',
-    }),
-  role: z.enum(['admin', 'manager', 'viewer']),
-});
-
-type Values = z.infer<typeof schema>;
+type Values = { organizationId: string; email: string; role: InvitationRole };
 
 interface AdminInviteDialogProps {
   organizations: AdminOrganizationSummary[];
@@ -47,8 +34,27 @@ export function AdminInviteDialog({
   open,
   onOpenChange,
 }: AdminInviteDialogProps) {
+  const { t, errorMessage } = useI18n();
   const mutation = useAdminInviteMember();
   const defaultOrganizationId = initialOrganizationId || organizations[0]?.id || '';
+
+  const schema = useMemo(
+    () =>
+      z.object({
+        organizationId: z.string().min(1, t('adminInvite.organizationRequired')),
+        email: z
+          .string()
+          .trim()
+          .min(1, t('adminInvite.emailRequired'))
+          .max(254)
+          .refine((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), {
+            message: t('adminInvite.emailInvalid'),
+          }),
+        role: z.enum(['admin', 'manager', 'viewer']),
+      }),
+    [t],
+  );
+
   const {
     register,
     handleSubmit,
@@ -65,12 +71,7 @@ export function AdminInviteDialog({
     }
   }, [open, reset, defaultOrganizationId]);
 
-  const errorMessage =
-    mutation.error instanceof ApiError
-      ? mutation.error.message
-      : mutation.error
-        ? 'The invitation could not be created.'
-        : null;
+  const error = mutation.error ? errorMessage(mutation.error, 'adminInvite.createFailed') : null;
 
   const submit = handleSubmit(async (values) => {
     try {
@@ -88,11 +89,8 @@ export function AdminInviteDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogTitle>Invite a member</DialogTitle>
-        <DialogDescription>
-          Choose the organization and role. MyStock does not send email, so share the pending
-          invitation with the person; it appears after they sign in with this address.
-        </DialogDescription>
+        <DialogTitle>{t('adminInvite.title')}</DialogTitle>
+        <DialogDescription>{t('adminInvite.description')}</DialogDescription>
 
         <form noValidate className="mt-5 space-y-4" onSubmit={submit}>
           <div>
@@ -100,7 +98,7 @@ export function AdminInviteDialog({
               htmlFor="admin-invite-organization"
               className="block text-sm font-medium text-slate-700"
             >
-              Organization
+              {t('common.organization')}
             </label>
             <select
               id="admin-invite-organization"
@@ -126,11 +124,12 @@ export function AdminInviteDialog({
               htmlFor="admin-invite-email"
               className="block text-sm font-medium text-slate-700"
             >
-              Email
+              {t('common.email')}
             </label>
             <input
               id="admin-invite-email"
               type="email"
+              dir="ltr"
               autoComplete="off"
               className={fieldClass}
               aria-invalid={Boolean(errors.email)}
@@ -145,32 +144,30 @@ export function AdminInviteDialog({
 
           <div>
             <label htmlFor="admin-invite-role" className="block text-sm font-medium text-slate-700">
-              Role
+              {t('adminInvite.roleLabel')}
             </label>
             <select id="admin-invite-role" className={fieldClass} {...register('role')}>
-              <option value="manager">{roleLabels.manager}</option>
-              <option value="admin">{roleLabels.admin}</option>
-              <option value="viewer">{roleLabels.viewer}</option>
+              <option value="manager">{t(roleKeys.manager)}</option>
+              <option value="admin">{t(roleKeys.admin)}</option>
+              <option value="viewer">{t(roleKeys.viewer)}</option>
             </select>
-            <p className="mt-1 text-xs text-slate-500">
-              Ownership is transferred by changing an existing member, not by invitation.
-            </p>
+            <p className="mt-1 text-xs text-slate-500">{t('adminInvite.ownershipNote')}</p>
           </div>
 
-          {errorMessage && (
+          {error && (
             <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
-              {errorMessage}
+              {error}
             </p>
           )}
 
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancel
+                {t('common.cancel')}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={mutation.isPending || organizations.length === 0}>
-              {mutation.isPending ? 'Sending…' : 'Send invitation'}
+              {mutation.isPending ? t('adminInvite.sending') : t('adminInvite.send')}
             </Button>
           </DialogFooter>
         </form>

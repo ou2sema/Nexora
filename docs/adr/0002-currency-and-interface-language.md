@@ -1,6 +1,6 @@
 # ADR-0002 — Currency and interface language
 
-- **Status:** accepted
+- **Status:** accepted; decision 4 superseded by [ADR-0014](0014-interface-localization.md)
 - **Date:** 2026-10-29
 - **Deciders:** product owner, engineering
 - **Supersedes:** the Phase 0 defaults proposing FR/EN UI and per-organization EUR + MAD
@@ -40,12 +40,16 @@ corrupts TND totals.
 Reports, exports, and receipts use the same helper so a total rendered in two places can
 never disagree.
 
-### 4. The interface is single-language
+### 4. The interface is single-language — superseded
 
 The FR/EN toggle is dropped. UI copy is English and lives in components; no i18n framework,
 message catalogs, or locale negotiation is introduced for Phase 1–7. This is a reversible
 decision: if French becomes required, strings move into a catalog and the routing gains a
 locale segment — no data-model change.
+
+> Superseded on 2026-10-31 by [ADR-0014](0014-interface-localization.md). The string
+> catalog arrived as predicted, with a device-local preference instead of a locale URL
+> segment. The currency decisions above stand unchanged.
 
 ## Consequences
 

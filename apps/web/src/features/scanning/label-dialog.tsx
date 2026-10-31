@@ -12,8 +12,8 @@ import {
   DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useI18n } from '@/i18n/provider';
 import { fieldClass } from '@/lib/form-field';
-import { ApiError } from '@/lib/api-client';
 import { useDownloadLabels } from './api';
 
 export interface LabelTarget {
@@ -43,6 +43,7 @@ function saveBlob(blob: Blob, filename: string): void {
  * internal code otherwise; device labels always encode the serial number.
  */
 export function LabelDialog({ organizationId, targets, open, onOpenChange }: LabelDialogProps) {
+  const { t, plural, errorMessage } = useI18n();
   const mutation = useDownloadLabels(organizationId);
   const [copies, setCopies] = useState('1');
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +61,7 @@ export function LabelDialog({ organizationId, targets, open, onOpenChange }: Lab
 
   const generate = () => {
     if (!validCopies) {
-      setError('Choose between 1 and 20 copies.');
+      setError(t('scanLabels.copiesError'));
       return;
     }
 
@@ -79,9 +80,7 @@ export function LabelDialog({ organizationId, targets, open, onOpenChange }: Lab
           onOpenChange(false);
         },
         onError: (cause) => {
-          setError(
-            cause instanceof ApiError ? cause.message : 'The label sheet could not be generated.',
-          );
+          setError(errorMessage(cause, 'scanLabels.failed'));
         },
       },
     );
@@ -90,10 +89,11 @@ export function LabelDialog({ organizationId, targets, open, onOpenChange }: Lab
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogTitle>Print labels</DialogTitle>
+        <DialogTitle>{t('scanLabels.title')}</DialogTitle>
         <DialogDescription>
-          Generate an A4 PDF with {targets.length} label{targets.length === 1 ? '' : 's'} per copy.
-          Print at 100% scale so barcodes stay scannable.
+          {t('scanLabels.description', {
+            labels: plural('scanLabels.labels', targets.length),
+          })}
         </DialogDescription>
 
         <ul className="mt-4 space-y-1 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
@@ -101,14 +101,16 @@ export function LabelDialog({ organizationId, targets, open, onOpenChange }: Lab
             <li key={`${target.kind}-${target.id}`} className="flex justify-between gap-3">
               <span className="truncate">{target.title}</span>
               <span className="shrink-0 text-xs uppercase tracking-wide text-slate-500">
-                {target.kind}
+                {t(
+                  target.kind === 'product' ? 'scanLabels.kind.product' : 'scanLabels.kind.device',
+                )}
               </span>
             </li>
           ))}
         </ul>
 
         <label htmlFor="label-copies" className="mt-4 block text-sm font-medium text-slate-700">
-          Copies per label
+          {t('scanLabels.copies')}
           <input
             id="label-copies"
             type="number"
@@ -128,11 +130,11 @@ export function LabelDialog({ organizationId, targets, open, onOpenChange }: Lab
 
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="secondary">Cancel</Button>
+            <Button variant="secondary">{t('common.cancel')}</Button>
           </DialogClose>
           <Button disabled={mutation.isPending || !validCopies} onClick={generate}>
             <Printer aria-hidden="true" className="size-4" />
-            {mutation.isPending ? 'Generating…' : 'Download PDF'}
+            {mutation.isPending ? t('scanLabels.generating') : t('scanLabels.download')}
           </Button>
         </DialogFooter>
       </DialogContent>

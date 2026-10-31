@@ -13,8 +13,6 @@ import {
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 
-import { formatTnd } from '@mystock/domain';
-
 import { Button } from '@/components/ui/button';
 import { useCategories, useWarehouses } from '@/features/catalog/api';
 import { useOrganization } from '@/features/organizations/organization-provider';
@@ -27,19 +25,15 @@ import {
 } from '@/features/reports/api';
 import { useStockRealtime } from '@/features/reports/use-stock-realtime';
 import { useApiHealth } from '@/features/system/use-api-health';
-import { ApiError } from '@/lib/api-client';
+import { useI18n } from '@/i18n/provider';
 import { cn } from '@/lib/cn';
 
 const LOW_STOCK_PAGE_SIZE = 8;
 const RANGES = [
-  { days: 7, label: 'Last 7 days' },
-  { days: 30, label: 'Last 30 days' },
-  { days: 90, label: 'Last 90 days' },
+  { days: 7, label: 'dashboard.range.last7' },
+  { days: 30, label: 'dashboard.range.last30' },
+  { days: 90, label: 'dashboard.range.last90' },
 ] as const;
-
-function formatQuantity(value: number): string {
-  return new Intl.NumberFormat('en-TN', { maximumFractionDigits: 4 }).format(value);
-}
 
 function formatRate(rate: number | null): string {
   return rate === null ? '—' : `${Math.round(rate * 100)}%`;
@@ -55,6 +49,16 @@ function saveBlob(blob: Blob, filename: string): void {
 }
 
 export function DashboardPage() {
+  const {
+    t,
+    plural,
+    errorMessage,
+    formatNumber,
+    formatQuantity,
+    formatMoney,
+    formatDate,
+    formatDateTime,
+  } = useI18n();
   const health = useApiHealth();
   const queryClient = useQueryClient();
   const { organization } = useOrganization();
@@ -100,56 +104,62 @@ export function DashboardPage() {
   );
 
   const apiStatus = health.isPending
-    ? { tone: 'pending', label: 'Checking API…' }
+    ? { tone: 'pending', label: t('dashboard.health.checking') }
     : health.isError
-      ? { tone: 'error', label: 'API unreachable' }
-      : { tone: 'ok', label: 'API online' };
+      ? { tone: 'error', label: t('dashboard.health.unreachable') }
+      : { tone: 'ok', label: t('dashboard.health.online') };
 
   const realtimeStatus = {
-    live: { tone: 'ok', label: 'Realtime connected' },
-    connecting: { tone: 'pending', label: 'Connecting…' },
-    offline: { tone: 'error', label: 'Polling fallback' },
+    live: { tone: 'ok', label: t('dashboard.realtime.connected') },
+    connecting: { tone: 'pending', label: t('dashboard.realtime.connecting') },
+    offline: { tone: 'error', label: t('dashboard.realtime.polling') },
   }[realtime];
 
   const metrics = [
     {
-      label: 'Units on hand',
+      label: t('dashboard.metric.onHand'),
       icon: Boxes,
       value: data ? formatQuantity(data.totals.onHand) : '—',
-      hint: data ? `${data.totals.locationCount} stock lines` : 'Ledger quantities',
+      hint: data
+        ? plural('common.noun.stockLines', data.totals.locationCount)
+        : t('dashboard.metric.onHand.hint'),
     },
     {
-      label: 'Available',
+      label: t('dashboard.metric.available'),
       icon: ArrowUpFromLine,
       value: data ? formatQuantity(data.totals.available) : '—',
-      hint: data ? `${formatQuantity(data.totals.reserved)} reserved` : 'On hand minus holds',
+      hint: data
+        ? t('dashboard.metric.available.reserved', {
+            quantity: formatQuantity(data.totals.reserved),
+          })
+        : t('dashboard.metric.available.hint'),
     },
     {
-      label: 'Reserved',
+      label: t('dashboard.metric.reserved'),
       icon: LockKeyhole,
       value: data ? formatQuantity(data.totals.reserved) : '—',
-      hint: 'Active reservations',
+      hint: t('dashboard.metric.reserved.hint'),
     },
     {
-      label: 'Serialized in stock',
+      label: t('dashboard.metric.serialized'),
       icon: Smartphone,
       value: data ? formatQuantity(data.totals.serializedInStock) : '—',
-      hint: 'Devices with status in stock',
+      hint: t('dashboard.metric.serialized.hint'),
     },
     {
-      label: 'Stock value at cost',
+      label: t('dashboard.metric.costValue'),
       icon: Wallet,
-      value: data ? formatTnd(data.valuation.purchaseValueMinor, 'en-TN') : '—',
+      value: data ? formatMoney(data.valuation.purchaseValueMinor) : '—',
       hint:
         data && data.valuation.unpricedProductCount > 0
-          ? `${data.valuation.unpricedProductCount} priced incompletely`
-          : 'Purchase prices, TND',
+          ? plural('dashboard.metric.unpriced', data.valuation.unpricedProductCount)
+          : t('dashboard.metric.costValue.hint'),
     },
     {
-      label: 'Stock value at retail',
+      label: t('dashboard.metric.retailValue'),
       icon: Tag,
-      value: data ? formatTnd(data.valuation.saleValueMinor, 'en-TN') : '—',
-      hint: 'Sale prices, TND',
+      value: data ? formatMoney(data.valuation.saleValueMinor) : '—',
+      hint: t('dashboard.metric.retailValue.hint'),
     },
   ];
 
@@ -162,14 +172,14 @@ export function DashboardPage() {
           ? await exportLevels({ warehouseId, categoryId })
           : await exportMovements({ warehouseId, categoryId, days });
       saveBlob(file.blob, file.filename);
-      setNotice({ tone: 'ok', text: `Downloaded ${file.filename}` });
+      setNotice({
+        tone: 'ok',
+        text: t('dashboard.export.downloaded', { filename: file.filename }),
+      });
     } catch (error) {
       setNotice({
         tone: 'error',
-        text:
-          error instanceof ApiError
-            ? error.message
-            : 'The export could not be generated. Try again.',
+        text: errorMessage(error, 'dashboard.export.error'),
       });
     } finally {
       setExporting(null);
@@ -180,10 +190,10 @@ export function DashboardPage() {
     <div className="space-y-8">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Dashboard</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Inventory totals computed from the stock ledger, reservations and serialized devices.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            {t('nav.dashboard')}
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">{t('dashboard.subtitle')}</p>
           <div className="mt-3 flex flex-wrap items-center gap-4 text-xs font-medium text-slate-600">
             <span className="inline-flex items-center gap-1.5">
               <span
@@ -220,7 +230,9 @@ export function DashboardPage() {
             onClick={() => void runExport('levels')}
           >
             <Download aria-hidden="true" className="size-4" />
-            {exporting === 'levels' ? 'Exporting…' : 'Stock levels CSV'}
+            {exporting === 'levels'
+              ? t('dashboard.export.exporting')
+              : t('dashboard.export.stockLevels')}
           </Button>
           <Button
             variant="secondary"
@@ -229,7 +241,9 @@ export function DashboardPage() {
             onClick={() => void runExport('movements')}
           >
             <Download aria-hidden="true" className="size-4" />
-            {exporting === 'movements' ? 'Exporting…' : 'Movements CSV'}
+            {exporting === 'movements'
+              ? t('dashboard.export.exporting')
+              : t('dashboard.export.movements')}
           </Button>
           <Button
             variant="secondary"
@@ -240,7 +254,7 @@ export function DashboardPage() {
             }}
           >
             <RefreshCw aria-hidden="true" className="size-4" />
-            Refresh
+            {t('common.refresh')}
           </Button>
         </div>
       </header>
@@ -258,12 +272,12 @@ export function DashboardPage() {
       )}
 
       <section
-        aria-label="Report filters"
+        aria-label={t('dashboard.filters.ariaLabel')}
         className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:flex-wrap sm:items-center"
       >
         <div className="flex-1 sm:max-w-xs">
           <label htmlFor="report-warehouse" className="sr-only">
-            Filter by warehouse
+            {t('dashboard.filters.warehouse')}
           </label>
           <select
             id="report-warehouse"
@@ -271,7 +285,7 @@ export function DashboardPage() {
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-indigo-500"
             onChange={(event) => setWarehouseId(event.target.value)}
           >
-            <option value="">All warehouses</option>
+            <option value="">{t('dashboard.filters.allWarehouses')}</option>
             {(warehouses.data ?? []).map((warehouse) => (
               <option key={warehouse.id} value={warehouse.id}>
                 {warehouse.code} · {warehouse.name}
@@ -282,7 +296,7 @@ export function DashboardPage() {
 
         <div className="flex-1 sm:max-w-xs">
           <label htmlFor="report-category" className="sr-only">
-            Filter by category
+            {t('dashboard.filters.category')}
           </label>
           <select
             id="report-category"
@@ -290,7 +304,7 @@ export function DashboardPage() {
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-indigo-500"
             onChange={(event) => setCategoryId(event.target.value)}
           >
-            <option value="">All categories</option>
+            <option value="">{t('dashboard.filters.allCategories')}</option>
             {(categories.data ?? []).map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
@@ -301,7 +315,7 @@ export function DashboardPage() {
 
         <div>
           <label htmlFor="report-range" className="sr-only">
-            Movement window
+            {t('dashboard.filters.window')}
           </label>
           <select
             id="report-range"
@@ -311,29 +325,27 @@ export function DashboardPage() {
           >
             {RANGES.map((range) => (
               <option key={range.days} value={range.days}>
-                {range.label}
+                {t(range.label)}
               </option>
             ))}
           </select>
         </div>
 
-        <p className="text-xs text-slate-500 sm:ml-auto">
+        <p className="text-xs text-slate-500 sm:ms-auto">
           {data
-            ? `Window ${new Date(data.window.from).toLocaleDateString('en-TN')} – ${new Date(
-                data.window.to,
-              ).toLocaleDateString('en-TN')} · generated ${new Date(
-                data.generatedAt,
-              ).toLocaleTimeString('en-TN')}`
-            : 'Loading report window…'}
+            ? t('dashboard.filters.windowSummary', {
+                from: formatDate(data.window.from),
+                to: formatDate(data.window.to),
+                generatedAt: formatDateTime(data.generatedAt),
+              })
+            : t('dashboard.filters.windowLoading')}
         </p>
       </section>
 
       {overview.isError && (
         <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
           <p role="alert" className="text-sm text-rose-800">
-            {overview.error instanceof Error
-              ? overview.error.message
-              : 'The inventory report failed to load.'}
+            {errorMessage(overview.error, 'dashboard.overview.error')}
           </p>
           <Button
             variant="secondary"
@@ -341,14 +353,14 @@ export function DashboardPage() {
             className="mt-3"
             onClick={() => void overview.refetch()}
           >
-            Try again
+            {t('common.retry')}
           </Button>
         </div>
       )}
 
       <section aria-labelledby="metrics-heading">
         <h2 id="metrics-heading" className="sr-only">
-          Inventory metrics
+          {t('dashboard.metrics.ariaLabel')}
         </h2>
         <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
           {metrics.map((metric) => (
@@ -379,29 +391,31 @@ export function DashboardPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 id="movement-heading" className="text-sm font-semibold text-slate-900">
-                Ledger activity
+                {t('dashboard.ledger.title')}
               </h2>
               <p className="mt-1 text-xs text-slate-500">
                 {data
-                  ? `${data.movements.count} movements in the window`
-                  : 'Movements in the selected window'}
+                  ? t('dashboard.ledger.summary', {
+                      movements: plural('common.noun.movements', data.movements.count),
+                    })
+                  : t('dashboard.ledger.placeholder')}
               </p>
             </div>
-            <dl className="flex gap-6 text-right text-xs text-slate-500">
+            <dl className="flex gap-6 text-end text-xs text-slate-500">
               <div>
-                <dt>Received</dt>
+                <dt>{t('dashboard.ledger.received')}</dt>
                 <dd className="text-base font-semibold tabular-nums text-emerald-700">
                   {data ? formatQuantity(data.movements.receivedQuantity) : '—'}
                 </dd>
               </div>
               <div>
-                <dt>Issued</dt>
+                <dt>{t('dashboard.ledger.issued')}</dt>
                 <dd className="text-base font-semibold tabular-nums text-rose-700">
                   {data ? formatQuantity(data.movements.issuedQuantity) : '—'}
                 </dd>
               </div>
               <div>
-                <dt>Net</dt>
+                <dt>{t('dashboard.ledger.net')}</dt>
                 <dd className="text-base font-semibold tabular-nums text-slate-900">
                   {data ? formatQuantity(data.movements.netQuantity) : '—'}
                 </dd>
@@ -410,23 +424,26 @@ export function DashboardPage() {
           </div>
 
           {series.length === 0 ? (
-            <p className="mt-6 text-sm text-slate-500">No movement history for this window.</p>
+            <p className="mt-6 text-sm text-slate-500">{t('dashboard.ledger.empty')}</p>
           ) : (
             <>
               <div
                 className="mt-6 flex h-32 items-end gap-1 overflow-x-auto"
                 role="img"
-                aria-label={`Daily received and issued quantities from ${series[0]?.date} to ${
-                  series[series.length - 1]?.date
-                }`}
+                aria-label={t('dashboard.ledger.chartAria', {
+                  from: series[0]?.date ?? '',
+                  to: series[series.length - 1]?.date ?? '',
+                })}
               >
                 {series.map((point) => (
                   <div
                     key={point.date}
                     className="flex h-full min-w-2 flex-1 flex-col justify-end gap-0.5"
-                    title={`${point.date}: received ${formatQuantity(
-                      point.receivedQuantity,
-                    )}, issued ${formatQuantity(point.issuedQuantity)}`}
+                    title={t('dashboard.ledger.pointTitle', {
+                      date: point.date,
+                      received: formatQuantity(point.receivedQuantity),
+                      issued: formatQuantity(point.issuedQuantity),
+                    })}
                   >
                     <div
                       className="w-full rounded-t bg-emerald-500"
@@ -440,18 +457,18 @@ export function DashboardPage() {
                 ))}
               </div>
               <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-                <span>{series[0]?.date}</span>
+                <span dir="ltr">{series[0]?.date}</span>
                 <span className="flex gap-4">
                   <span className="inline-flex items-center gap-1">
                     <span aria-hidden="true" className="size-2 rounded-sm bg-emerald-500" />
-                    Received
+                    {t('dashboard.ledger.received')}
                   </span>
                   <span className="inline-flex items-center gap-1">
                     <span aria-hidden="true" className="size-2 rounded-sm bg-rose-400" />
-                    Issued
+                    {t('dashboard.ledger.issued')}
                   </span>
                 </span>
-                <span>{series[series.length - 1]?.date}</span>
+                <span dir="ltr">{series[series.length - 1]?.date}</span>
               </div>
             </>
           )}
@@ -469,24 +486,24 @@ export function DashboardPage() {
                 className="flex items-center gap-2 text-sm font-semibold text-slate-900"
               >
                 <BellRing aria-hidden="true" className="size-4 text-amber-500" />
-                Low stock
+                {t('dashboard.lowStock.title')}
               </h2>
               <p className="mt-1 text-xs text-slate-500">
                 {lowStockTotal === 0
-                  ? 'Nothing below its reorder threshold'
-                  : `${lowStockTotal} product${lowStockTotal === 1 ? '' : 's'} at or below their threshold`}
+                  ? t('dashboard.lowStock.none')
+                  : t('dashboard.lowStock.summary', {
+                      products: plural('common.noun.products', lowStockTotal),
+                    })}
               </p>
             </div>
           </div>
 
           {lowStock.isError ? (
             <p role="alert" className="mt-4 text-sm text-rose-700">
-              Low stock alerts failed to load.
+              {errorMessage(lowStock.error, 'dashboard.lowStock.error')}
             </p>
           ) : lowStockTotal === 0 ? (
-            <p className="mt-6 text-sm text-slate-500">
-              Set reorder thresholds on products to receive alerts here and in the top bar.
-            </p>
+            <p className="mt-6 text-sm text-slate-500">{t('dashboard.lowStock.empty')}</p>
           ) : (
             <ul className="mt-4 divide-y divide-slate-100">
               {lowStockItems.map((item) => (
@@ -497,16 +514,21 @@ export function DashboardPage() {
                         {item.productName}
                       </p>
                       <p className="mt-0.5 text-xs text-slate-500">
-                        {item.sku}
+                        <span dir="ltr">{item.sku}</span>
                         {item.categoryName ? ` · ${item.categoryName}` : ''}
-                        {item.isSerialized ? ' · serialized' : ''}
+                        {item.isSerialized ? ` · ${t('dashboard.lowStock.serialized')}` : ''}
                       </p>
                     </div>
-                    <p className="shrink-0 text-right text-xs text-slate-600">
-                      <span className="block text-sm font-semibold tabular-nums text-rose-700">
+                    <p className="shrink-0 text-end text-xs text-slate-600">
+                      <span
+                        dir="ltr"
+                        className="block text-sm font-semibold tabular-nums text-rose-700"
+                      >
                         {formatQuantity(item.available)} / {formatQuantity(item.reorderThreshold)}
                       </span>
-                      short {formatQuantity(item.shortfall)}
+                      {t('dashboard.lowStock.short', {
+                        quantity: formatQuantity(item.shortfall),
+                      })}
                     </p>
                   </div>
                 </li>
@@ -523,15 +545,15 @@ export function DashboardPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-5">
           <div>
             <h2 id="supplier-performance-heading" className="text-sm font-semibold text-slate-900">
-              Supplier performance
+              {t('dashboard.supplierPerformance.title')}
             </h2>
             <p className="mt-1 text-xs text-slate-500">
-              On-time delivery, lead time and return rate from purchase orders and posted returns.
+              {t('dashboard.supplierPerformance.description')}
             </p>
           </div>
           <div className="flex items-center gap-3">
             <label htmlFor="supplier-window" className="sr-only">
-              Supplier performance window
+              {t('dashboard.supplierPerformance.windowLabel')}
             </label>
             <select
               id="supplier-window"
@@ -539,15 +561,18 @@ export function DashboardPage() {
               className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-indigo-500"
               onChange={(event) => setSupplierDays(Number(event.target.value))}
             >
-              <option value={30}>Last 30 days</option>
-              <option value={90}>Last 90 days</option>
-              <option value={180}>Last 180 days</option>
+              <option value={30}>{t('dashboard.range.last30')}</option>
+              <option value={90}>{t('dashboard.range.last90')}</option>
+              <option value={180}>{t('dashboard.range.last180')}</option>
             </select>
             <Link
               to="/suppliers"
               className="text-sm font-medium text-indigo-700 hover:text-indigo-900"
             >
-              Suppliers →
+              {t('nav.suppliers')}{' '}
+              <span aria-hidden="true" className="inline-block rtl:-scale-x-100">
+                →
+              </span>
             </Link>
           </div>
         </div>
@@ -555,9 +580,7 @@ export function DashboardPage() {
         {supplierPerformance.isError ? (
           <div className="p-5">
             <p role="alert" className="text-sm text-rose-700">
-              {supplierPerformance.error instanceof Error
-                ? supplierPerformance.error.message
-                : 'Supplier performance failed to load.'}
+              {errorMessage(supplierPerformance.error, 'dashboard.supplierPerformance.error')}
             </p>
             <Button
               variant="secondary"
@@ -565,38 +588,38 @@ export function DashboardPage() {
               className="mt-3"
               onClick={() => void supplierPerformance.refetch()}
             >
-              Try again
+              {t('common.retry')}
             </Button>
           </div>
         ) : (supplierPerformance.data?.suppliers ?? []).length === 0 ? (
           <p className="p-5 text-sm text-slate-500">
             {supplierPerformance.isPending
-              ? 'Loading supplier metrics…'
-              : 'No supplier orders in the selected window.'}
+              ? t('dashboard.supplierPerformance.loading')
+              : t('dashboard.supplierPerformance.empty')}
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <caption className="sr-only">Supplier performance metrics</caption>
+            <table className="w-full text-start text-sm">
+              <caption className="sr-only">{t('dashboard.supplierPerformance.caption')}</caption>
               <thead className="text-xs uppercase tracking-wide text-slate-500">
                 <tr className="border-b border-slate-200">
                   <th scope="col" className="px-5 py-3 font-semibold">
-                    Supplier
+                    {t('common.supplier')}
                   </th>
-                  <th scope="col" className="px-5 py-3 text-right font-semibold">
-                    Orders
+                  <th scope="col" className="px-5 py-3 text-end font-semibold">
+                    {t('dashboard.supplierPerformance.orders')}
                   </th>
-                  <th scope="col" className="px-5 py-3 text-right font-semibold">
-                    On time
+                  <th scope="col" className="px-5 py-3 text-end font-semibold">
+                    {t('dashboard.supplierPerformance.onTime')}
                   </th>
-                  <th scope="col" className="px-5 py-3 text-right font-semibold">
-                    Lead time
+                  <th scope="col" className="px-5 py-3 text-end font-semibold">
+                    {t('dashboard.supplierPerformance.leadTime')}
                   </th>
-                  <th scope="col" className="px-5 py-3 text-right font-semibold">
-                    Received value
+                  <th scope="col" className="px-5 py-3 text-end font-semibold">
+                    {t('dashboard.supplierPerformance.receivedValue')}
                   </th>
-                  <th scope="col" className="px-5 py-3 text-right font-semibold">
-                    Return rate
+                  <th scope="col" className="px-5 py-3 text-end font-semibold">
+                    {t('dashboard.supplierPerformance.returnRate')}
                   </th>
                 </tr>
               </thead>
@@ -606,13 +629,15 @@ export function DashboardPage() {
                     <th scope="row" className="px-5 py-3 font-medium text-slate-900">
                       {row.supplierName}
                     </th>
-                    <td className="px-5 py-3 text-right tabular-nums text-slate-700">
-                      {row.ordersCreated}
-                      <span className="ml-1 text-xs text-slate-500">
-                        ({row.ordersReceived} received)
+                    <td className="px-5 py-3 text-end tabular-nums text-slate-700">
+                      {formatNumber(row.ordersCreated)}
+                      <span className="ms-1 text-xs text-slate-500">
+                        {t('dashboard.supplierPerformance.received', {
+                          count: formatNumber(row.ordersReceived),
+                        })}
                       </span>
                     </td>
-                    <td className="px-5 py-3 text-right tabular-nums">
+                    <td className="px-5 py-3 text-end tabular-nums">
                       <span
                         className={cn(
                           row.onTimeRate === null ? 'text-slate-400' : 'text-slate-900',
@@ -621,18 +646,26 @@ export function DashboardPage() {
                         {formatRate(row.onTimeRate)}
                       </span>
                       <span className="block text-xs text-slate-500">
-                        {row.onTimeOrders} on time · {row.lateOrders} late
+                        {t('dashboard.supplierPerformance.onTimeLate', {
+                          onTime: formatNumber(row.onTimeOrders),
+                          late: formatNumber(row.lateOrders),
+                        })}
                       </span>
                     </td>
-                    <td className="px-5 py-3 text-right tabular-nums text-slate-700">
+                    <td className="px-5 py-3 text-end tabular-nums text-slate-700">
                       {row.averageLeadTimeDays === null
                         ? '—'
-                        : `${row.averageLeadTimeDays.toFixed(1)} d`}
+                        : t('dashboard.supplierPerformance.leadTimeDays', {
+                            days: formatNumber(row.averageLeadTimeDays, {
+                              minimumFractionDigits: 1,
+                              maximumFractionDigits: 1,
+                            }),
+                          })}
                     </td>
-                    <td className="px-5 py-3 text-right tabular-nums text-slate-700">
-                      {formatTnd(row.receivedValueMinor, 'en-TN')}
+                    <td className="px-5 py-3 text-end tabular-nums text-slate-700">
+                      {formatMoney(row.receivedValueMinor)}
                     </td>
-                    <td className="px-5 py-3 text-right tabular-nums">
+                    <td className="px-5 py-3 text-end tabular-nums">
                       <span
                         className={cn(
                           row.returnRate !== null && row.returnRate > 0
@@ -643,7 +676,9 @@ export function DashboardPage() {
                         {formatRate(row.returnRate)}
                       </span>
                       <span className="block text-xs text-slate-500">
-                        {formatQuantity(row.returnedQuantity)} returned
+                        {t('dashboard.supplierPerformance.returned', {
+                          count: formatQuantity(row.returnedQuantity),
+                        })}
                       </span>
                     </td>
                   </tr>
@@ -661,43 +696,44 @@ export function DashboardPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 p-5">
           <div>
             <h2 id="warehouse-breakdown-heading" className="text-sm font-semibold text-slate-900">
-              Warehouse breakdown
+              {t('dashboard.warehouses.title')}
             </h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Ledger quantities, serialized units and valuation per warehouse.
-            </p>
+            <p className="mt-1 text-xs text-slate-500">{t('dashboard.warehouses.description')}</p>
           </div>
           <Link to="/stock" className="text-sm font-medium text-indigo-700 hover:text-indigo-900">
-            Open stock levels →
+            {t('dashboard.warehouses.openStock')}{' '}
+            <span aria-hidden="true" className="inline-block rtl:-scale-x-100">
+              →
+            </span>
           </Link>
         </div>
 
         {data && data.warehouses.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <caption className="sr-only">Stock totals by warehouse</caption>
+            <table className="w-full text-start text-sm">
+              <caption className="sr-only">{t('dashboard.warehouses.caption')}</caption>
               <thead className="text-xs uppercase tracking-wide text-slate-500">
                 <tr className="border-b border-slate-200">
                   <th scope="col" className="px-5 py-3 font-semibold">
-                    Warehouse
+                    {t('common.warehouse')}
                   </th>
-                  <th scope="col" className="px-5 py-3 text-right font-semibold">
-                    On hand
+                  <th scope="col" className="px-5 py-3 text-end font-semibold">
+                    {t('dashboard.warehouses.onHand')}
                   </th>
-                  <th scope="col" className="px-5 py-3 text-right font-semibold">
-                    Reserved
+                  <th scope="col" className="px-5 py-3 text-end font-semibold">
+                    {t('dashboard.warehouses.reserved')}
                   </th>
-                  <th scope="col" className="px-5 py-3 text-right font-semibold">
-                    Available
+                  <th scope="col" className="px-5 py-3 text-end font-semibold">
+                    {t('dashboard.warehouses.available')}
                   </th>
-                  <th scope="col" className="px-5 py-3 text-right font-semibold">
-                    Serialized
+                  <th scope="col" className="px-5 py-3 text-end font-semibold">
+                    {t('dashboard.warehouses.serialized')}
                   </th>
-                  <th scope="col" className="px-5 py-3 text-right font-semibold">
-                    Cost value
+                  <th scope="col" className="px-5 py-3 text-end font-semibold">
+                    {t('dashboard.warehouses.costValue')}
                   </th>
-                  <th scope="col" className="px-5 py-3 text-right font-semibold">
-                    Retail value
+                  <th scope="col" className="px-5 py-3 text-end font-semibold">
+                    {t('dashboard.warehouses.retailValue')}
                   </th>
                 </tr>
               </thead>
@@ -705,25 +741,25 @@ export function DashboardPage() {
                 {data.warehouses.map((warehouse) => (
                   <tr key={warehouse.warehouseId}>
                     <th scope="row" className="px-5 py-3 font-medium text-slate-900">
-                      {warehouse.code} · {warehouse.name}
+                      <span dir="ltr">{warehouse.code}</span> · {warehouse.name}
                     </th>
-                    <td className="px-5 py-3 text-right tabular-nums">
+                    <td className="px-5 py-3 text-end tabular-nums">
                       {formatQuantity(warehouse.onHand)}
                     </td>
-                    <td className="px-5 py-3 text-right tabular-nums">
+                    <td className="px-5 py-3 text-end tabular-nums">
                       {formatQuantity(warehouse.reserved)}
                     </td>
-                    <td className="px-5 py-3 text-right tabular-nums">
+                    <td className="px-5 py-3 text-end tabular-nums">
                       {formatQuantity(warehouse.available)}
                     </td>
-                    <td className="px-5 py-3 text-right tabular-nums">
+                    <td className="px-5 py-3 text-end tabular-nums">
                       {formatQuantity(warehouse.serializedInStock)}
                     </td>
-                    <td className="px-5 py-3 text-right tabular-nums">
-                      {formatTnd(warehouse.purchaseValueMinor, 'en-TN')}
+                    <td className="px-5 py-3 text-end tabular-nums">
+                      {formatMoney(warehouse.purchaseValueMinor)}
                     </td>
-                    <td className="px-5 py-3 text-right tabular-nums">
-                      {formatTnd(warehouse.saleValueMinor, 'en-TN')}
+                    <td className="px-5 py-3 text-end tabular-nums">
+                      {formatMoney(warehouse.saleValueMinor)}
                     </td>
                   </tr>
                 ))}
@@ -733,28 +769,33 @@ export function DashboardPage() {
         ) : (
           <p className="p-5 text-sm text-slate-500">
             {overview.isPending
-              ? 'Loading warehouse totals…'
-              : 'No warehouse totals for the current filters.'}
+              ? t('dashboard.warehouses.loading')
+              : t('dashboard.warehouses.empty')}
           </p>
         )}
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-6">
-        <h2 className="text-sm font-semibold text-slate-900">Stock ledger is live</h2>
-        <p className="mt-2 max-w-2xl text-sm text-slate-600">
-          Reports read the same immutable ledger and balance projection as the rest of the app.
-          Realtime updates refresh these numbers after a committed change; when the socket is
-          unavailable the dashboard polls instead.
-        </p>
+        <h2 className="text-sm font-semibold text-slate-900">{t('dashboard.live.title')}</h2>
+        <p className="mt-2 max-w-2xl text-sm text-slate-600">{t('dashboard.live.body')}</p>
         <div className="mt-4 flex flex-wrap gap-3 text-sm font-medium">
           <Link to="/stock/movements" className="text-indigo-700 hover:text-indigo-900">
-            View movements →
+            {t('dashboard.live.openMovements')}{' '}
+            <span aria-hidden="true" className="inline-block rtl:-scale-x-100">
+              →
+            </span>
           </Link>
           <Link to="/stock/reconciliation" className="text-indigo-700 hover:text-indigo-900">
-            Reconciliation →
+            {t('nav.reconciliation')}{' '}
+            <span aria-hidden="true" className="inline-block rtl:-scale-x-100">
+              →
+            </span>
           </Link>
           <Link to="/devices" className="text-indigo-700 hover:text-indigo-900">
-            Devices →
+            {t('nav.devices')}{' '}
+            <span aria-hidden="true" className="inline-block rtl:-scale-x-100">
+              →
+            </span>
           </Link>
         </div>
       </section>

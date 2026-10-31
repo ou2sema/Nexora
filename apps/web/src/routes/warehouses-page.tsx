@@ -7,9 +7,11 @@ import { Button } from '@/components/ui/button';
 import { useWarehouses } from '@/features/catalog/api';
 import { LocationFormDialog, WarehouseFormDialog } from '@/features/catalog/warehouse-forms';
 import { useOrganization } from '@/features/organizations/organization-provider';
+import { useI18n } from '@/i18n/provider';
 
 export function WarehousesPage() {
   const { organization } = useOrganization();
+  const { t, errorMessage } = useI18n();
   const organizationId = organization?.organizationId ?? null;
   const canWrite =
     organization?.role === 'owner' ||
@@ -24,29 +26,27 @@ export function WarehousesPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Warehouses</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Physical sites and the storage locations stock will be counted against.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            {t('warehouses.title')}
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">{t('warehouses.description')}</p>
         </div>
         <Button disabled={!canWrite} onClick={() => setWarehouseDialogOpen(true)}>
           <Plus aria-hidden="true" className="size-4" />
-          Add warehouse
+          {t('warehouses.addWarehouse')}
         </Button>
       </header>
 
       {!canWrite && (
         <p className="rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">
-          Your viewer role is read-only. Owners, admins and managers can change warehouses.
+          {t('warehouses.viewerReadOnly')}
         </p>
       )}
 
       {warehouses.isError ? (
         <section className="rounded-xl border border-rose-200 bg-white p-6">
           <p role="alert" className="text-sm text-rose-700">
-            {warehouses.error instanceof Error
-              ? warehouses.error.message
-              : 'Warehouses failed to load.'}
+            {errorMessage(warehouses.error, 'warehouses.loadFailed')}
           </p>
           <Button
             variant="secondary"
@@ -54,11 +54,15 @@ export function WarehousesPage() {
             className="mt-3"
             onClick={() => void warehouses.refetch()}
           >
-            Try again
+            {t('common.retry')}
           </Button>
         </section>
       ) : warehouses.isPending ? (
-        <div className="grid gap-4 lg:grid-cols-2" role="status" aria-label="Loading warehouses">
+        <div
+          className="grid gap-4 lg:grid-cols-2"
+          role="status"
+          aria-label={t('warehouses.loading')}
+        >
           {Array.from({ length: 2 }).map((_, index) => (
             <div
               key={index}
@@ -74,11 +78,13 @@ export function WarehousesPage() {
           <span className="grid size-12 place-items-center rounded-full bg-slate-100 text-slate-500">
             <Warehouse aria-hidden="true" className="size-6" />
           </span>
-          <h2 className="mt-4 text-base font-semibold text-slate-900">No warehouses yet</h2>
+          <h2 className="mt-4 text-base font-semibold text-slate-900">
+            {t('warehouses.emptyTitle')}
+          </h2>
           <p className="mt-2 max-w-md text-sm text-slate-600">
             {canWrite
-              ? 'Create the first physical site, then add its aisles or shelves as storage locations.'
-              : 'An owner, admin or manager can create the first warehouse.'}
+              ? t('warehouses.emptyCreateDescription')
+              : t('warehouses.emptyViewerDescription')}
           </p>
         </section>
       ) : (
@@ -98,19 +104,31 @@ export function WarehousesPage() {
                     >
                       {warehouse.name}
                     </h2>
-                    <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs font-semibold text-slate-700">
+                    <span
+                      dir="ltr"
+                      className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs font-semibold text-slate-700"
+                    >
                       {warehouse.code}
                     </span>
                     {!warehouse.isActive && (
                       <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
-                        Inactive
+                        {t('warehouses.inactive')}
                       </span>
                     )}
                   </div>
                   <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
                     <MapPin aria-hidden="true" className="size-4" />
-                    {[warehouse.city, warehouse.countryCode].filter(Boolean).join(', ') ||
-                      'No address recorded'}
+                    {warehouse.city || warehouse.countryCode ? (
+                      <>
+                        {warehouse.city}
+                        {warehouse.city && warehouse.countryCode ? ', ' : ''}
+                        {warehouse.countryCode ? (
+                          <span dir="ltr">{warehouse.countryCode}</span>
+                        ) : null}
+                      </>
+                    ) : (
+                      t('warehouses.noAddress')
+                    )}
                   </p>
                 </div>
                 <Button
@@ -120,18 +138,16 @@ export function WarehousesPage() {
                   onClick={() => setLocationWarehouse(warehouse)}
                 >
                   <Plus aria-hidden="true" className="size-4" />
-                  Location
+                  {t('common.location')}
                 </Button>
               </div>
 
               <div className="p-5">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Storage locations
+                  {t('warehouses.storageLocations')}
                 </h3>
                 {warehouse.locations.length === 0 ? (
-                  <p className="mt-2 text-sm text-slate-600">
-                    No storage locations yet. Stock will need one when receiving.
-                  </p>
+                  <p className="mt-2 text-sm text-slate-600">{t('warehouses.noLocationsYet')}</p>
                 ) : (
                   <ul className="mt-2 divide-y divide-slate-100">
                     {warehouse.locations.map((location) => (
@@ -140,7 +156,7 @@ export function WarehousesPage() {
                         className="flex items-center justify-between py-2 text-sm"
                       >
                         <span className="text-slate-700">{location.name}</span>
-                        <span className="font-mono text-xs font-semibold text-slate-500">
+                        <span dir="ltr" className="font-mono text-xs font-semibold text-slate-500">
                           {location.code}
                         </span>
                       </li>

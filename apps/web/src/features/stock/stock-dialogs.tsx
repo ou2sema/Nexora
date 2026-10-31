@@ -21,7 +21,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { WarehouseLocationFields } from '@/components/ui/warehouse-location-fields';
-import { ApiError } from '@/lib/api-client';
+import type { MessageKey } from '@/i18n/messages';
+import { useI18n } from '@/i18n/provider';
 import { fieldClass } from '@/lib/form-field';
 import {
   usePostStockMovement,
@@ -32,22 +33,27 @@ import {
 
 type PostingMode = 'receipt' | 'issue' | 'adjustment';
 
-const modeCopy: Record<PostingMode, { title: string; description: string; submit: string }> = {
+interface ModeCopy {
+  titleKey: MessageKey;
+  descriptionKey: MessageKey;
+  submitKey: MessageKey;
+}
+
+const modeCopy: Record<PostingMode, ModeCopy> = {
   receipt: {
-    title: 'Receive stock',
-    description: 'Increase the on-hand quantity for a product at one storage location.',
-    submit: 'Post receipt',
+    titleKey: 'stockDialog.mode.receipt.title',
+    descriptionKey: 'stockDialog.mode.receipt.description',
+    submitKey: 'stockDialog.mode.receipt.submit',
   },
   issue: {
-    title: 'Issue stock',
-    description:
-      'Decrease on-hand stock. Issue the reservation quantity to fulfil a reservation atomically.',
-    submit: 'Post issue',
+    titleKey: 'stockDialog.mode.issue.title',
+    descriptionKey: 'stockDialog.mode.issue.description',
+    submitKey: 'stockDialog.mode.issue.submit',
   },
   adjustment: {
-    title: 'Adjust stock',
-    description: 'Correct the ledger with a signed delta. Adjustments require a documented reason.',
-    submit: 'Post adjustment',
+    titleKey: 'stockDialog.mode.adjustment.title',
+    descriptionKey: 'stockDialog.mode.adjustment.description',
+    submitKey: 'stockDialog.mode.adjustment.submit',
   },
 };
 
@@ -59,27 +65,29 @@ function parseQuantity(value: string): number | null {
   return Number.isFinite(quantity) ? quantity : null;
 }
 
-function quantityIssue(value: string, mode: PostingMode): string | null {
+function quantityIssue(
+  value: string,
+  mode: PostingMode,
+  t: (key: MessageKey) => string,
+): string | null {
   const quantity = parseQuantity(value);
-  if (quantity === null) return 'Enter a number';
+  if (quantity === null) return t('stockDialog.quantityNumber');
   if (Math.abs(quantity * 10_000 - Math.round(quantity * 10_000)) > 1e-6) {
-    return 'Use at most four decimal places';
+    return t('stockDialog.quantityDecimals');
   }
-  if (mode === 'adjustment' && quantity === 0) return 'Adjustment quantity must not be zero';
-  if (mode !== 'adjustment' && quantity <= 0) return 'Quantity must be greater than zero';
+  if (mode === 'adjustment' && quantity === 0) return t('stockDialog.quantityZero');
+  if (mode !== 'adjustment' && quantity <= 0) return t('stockDialog.quantityPositive');
   return null;
 }
 
-const postingBaseSchema = z.object({
-  productId: z.string().min(1, 'Select a product'),
-  warehouseId: z.string().min(1, 'Select a warehouse'),
-  locationId: z.string().min(1, 'Select a storage location'),
-  quantity: z.string().trim().min(1, 'Enter a quantity'),
-  reason: z.string().trim().max(500),
-  reservationId: z.string(),
-});
-
-type PostingValues = z.infer<typeof postingBaseSchema>;
+interface PostingValues {
+  productId: string;
+  warehouseId: string;
+  locationId: string;
+  quantity: string;
+  reason: string;
+  reservationId: string;
+}
 
 interface StockDialogProps {
   organizationId: string;
@@ -95,11 +103,6 @@ function activeProducts(products: ProductSummary[], serialized: boolean) {
   );
 }
 
-function dialogError(error: unknown, fallback: string): string | null {
-  if (error instanceof ApiError) return error.message;
-  return error ? fallback : null;
-}
-
 export function StockPostingDialog({
   organizationId,
   warehouses,
@@ -108,23 +111,33 @@ export function StockPostingDialog({
   open,
   onOpenChange,
 }: StockDialogProps & { mode: PostingMode }) {
+  const { t, formatQuantity, errorMessage } = useI18n();
   const mutation = usePostStockMovement(organizationId);
   const copy = modeCopy[mode];
 
   const schema = useMemo(
     () =>
-      postingBaseSchema.superRefine((values, context) => {
-        const message = quantityIssue(values.quantity, mode);
-        if (message) context.addIssue({ code: 'custom', path: ['quantity'], message });
-        if (mode === 'adjustment' && values.reason.length < 3) {
-          context.addIssue({
-            code: 'custom',
-            path: ['reason'],
-            message: 'Adjustments require a reason of at least 3 characters',
-          });
-        }
-      }),
-    [mode],
+      z
+        .object({
+          productId: z.string().min(1, t('stockDialog.selectProduct')),
+          warehouseId: z.string().min(1, t('common.selectWarehouse')),
+          locationId: z.string().min(1, t('stockDialog.selectLocation')),
+          quantity: z.string().trim().min(1, t('stockDialog.enterQuantity')),
+          reason: z.string().trim().max(500),
+          reservationId: z.string(),
+        })
+        .superRefine((values, context) => {
+          const message = quantityIssue(values.quantity, mode, t);
+          if (message) context.addIssue({ code: 'custom', path: ['quantity'], message });
+          if (mode === 'adjustment' && values.reason.length < 3) {
+            context.addIssue({
+              code: 'custom',
+              path: ['reason'],
+              message: t('stockDialog.adjustmentReasonShort'),
+            });
+          }
+        }),
+    [mode, t],
   );
 
   const {
@@ -172,7 +185,7 @@ export function StockPostingDialog({
     setValue('reservationId', '');
   }, [productId, warehouseId, setValue]);
 
-  const errorMessage = dialogError(mutation.error, 'The movement could not be posted.');
+  const formError = mutation.error ? errorMessage(mutation.error, 'stockDialog.postError') : null;
 
   const submit = handleSubmit(async (values) => {
     const quantity = parseQuantity(values.quantity);
@@ -201,16 +214,16 @@ export function StockPostingDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
-        <DialogTitle>{copy.title}</DialogTitle>
-        <DialogDescription>{copy.description}</DialogDescription>
+        <DialogTitle>{t(copy.titleKey)}</DialogTitle>
+        <DialogDescription>{t(copy.descriptionKey)}</DialogDescription>
 
         <form noValidate className="mt-5 space-y-4" onSubmit={submit}>
           <div>
             <label htmlFor="posting-product" className="block text-sm font-medium text-slate-700">
-              Product
+              {t('common.product')}
             </label>
             <select id="posting-product" className={fieldClass} {...register('productId')}>
-              <option value="">Select a product</option>
+              <option value="">{t('stockDialog.selectProduct')}</option>
               {activeProducts(products, false).map((product) => (
                 <option key={product.id} value={product.id}>
                   {product.sku} · {product.name}
@@ -238,11 +251,12 @@ export function StockPostingDialog({
                 htmlFor="posting-quantity"
                 className="block text-sm font-medium text-slate-700"
               >
-                Quantity
+                {t('common.quantity')}
               </label>
               <input
                 id="posting-quantity"
                 type="text"
+                dir="ltr"
                 inputMode="decimal"
                 className={fieldClass}
                 disabled={Boolean(reservationId)}
@@ -257,8 +271,8 @@ export function StockPostingDialog({
               ) : (
                 <p className="mt-1 text-xs text-slate-500">
                   {mode === 'adjustment'
-                    ? 'Use a negative value to decrease stock.'
-                    : 'Up to four decimal places.'}
+                    ? t('stockDialog.form.quantityNegativeHint')
+                    : t('stockDialog.form.quantityHint')}
                 </p>
               )}
             </div>
@@ -269,7 +283,7 @@ export function StockPostingDialog({
                   htmlFor="posting-reservation"
                   className="block text-sm font-medium text-slate-700"
                 >
-                  Fulfil reservation (optional)
+                  {t('stockDialog.form.fulfilReservation')}
                 </label>
                 <select
                   id="posting-reservation"
@@ -285,12 +299,15 @@ export function StockPostingDialog({
                 >
                   <option value="">
                     {matchingReservations.length === 0
-                      ? 'No active reservation for this line'
-                      : 'No reservation'}
+                      ? t('stockDialog.form.noActiveReservation')
+                      : t('stockDialog.form.noReservation')}
                   </option>
                   {matchingReservations.map((reservation) => (
                     <option key={reservation.id} value={reservation.id}>
-                      {reservation.quantity} reserved · {reservation.productSku}
+                      {t('stockDialog.reservationOption', {
+                        quantity: formatQuantity(reservation.quantity),
+                        sku: reservation.productSku,
+                      })}
                     </option>
                   ))}
                 </select>
@@ -300,7 +317,9 @@ export function StockPostingDialog({
 
           <div>
             <label htmlFor="posting-reason" className="block text-sm font-medium text-slate-700">
-              Reason {mode === 'adjustment' ? '' : '(optional)'}
+              {mode === 'adjustment'
+                ? t('stockDialog.form.reason')
+                : t('stockDialog.form.reasonOptional')}
             </label>
             <input
               id="posting-reason"
@@ -317,20 +336,20 @@ export function StockPostingDialog({
             )}
           </div>
 
-          {errorMessage && (
+          {formError && (
             <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
-              {errorMessage}
+              {formError}
             </p>
           )}
 
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancel
+                {t('common.cancel')}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Posting…' : copy.submit}
+              {mutation.isPending ? t('stockDialog.posting') : t(copy.submitKey)}
             </Button>
           </DialogFooter>
         </form>
@@ -339,32 +358,15 @@ export function StockPostingDialog({
   );
 }
 
-const transferSchema = z
-  .object({
-    productId: z.string().min(1, 'Select a product'),
-    sourceWarehouseId: z.string().min(1, 'Select the source warehouse'),
-    sourceLocationId: z.string().min(1, 'Select the source location'),
-    targetWarehouseId: z.string().min(1, 'Select the target warehouse'),
-    targetLocationId: z.string().min(1, 'Select the target location'),
-    quantity: z.string().trim().min(1, 'Enter a quantity'),
-    reason: z.string().trim().max(500),
-  })
-  .superRefine((values, context) => {
-    const message = quantityIssue(values.quantity, 'receipt');
-    if (message) context.addIssue({ code: 'custom', path: ['quantity'], message });
-    if (
-      values.sourceWarehouseId === values.targetWarehouseId &&
-      values.sourceLocationId === values.targetLocationId
-    ) {
-      context.addIssue({
-        code: 'custom',
-        path: ['targetLocationId'],
-        message: 'Choose two different locations',
-      });
-    }
-  });
-
-type TransferValues = z.infer<typeof transferSchema>;
+interface TransferValues {
+  productId: string;
+  sourceWarehouseId: string;
+  sourceLocationId: string;
+  targetWarehouseId: string;
+  targetLocationId: string;
+  quantity: string;
+  reason: string;
+}
 
 export function StockTransferDialog({
   organizationId,
@@ -373,7 +375,38 @@ export function StockTransferDialog({
   open,
   onOpenChange,
 }: StockDialogProps) {
+  const { t, errorMessage } = useI18n();
   const mutation = useStockTransfer(organizationId);
+
+  const schema = useMemo(
+    () =>
+      z
+        .object({
+          productId: z.string().min(1, t('stockDialog.selectProduct')),
+          sourceWarehouseId: z.string().min(1, t('stockDialog.selectSourceWarehouse')),
+          sourceLocationId: z.string().min(1, t('stockDialog.selectSourceLocation')),
+          targetWarehouseId: z.string().min(1, t('stockDialog.selectTargetWarehouse')),
+          targetLocationId: z.string().min(1, t('stockDialog.selectTargetLocation')),
+          quantity: z.string().trim().min(1, t('stockDialog.enterQuantity')),
+          reason: z.string().trim().max(500),
+        })
+        .superRefine((values, context) => {
+          const message = quantityIssue(values.quantity, 'receipt', t);
+          if (message) context.addIssue({ code: 'custom', path: ['quantity'], message });
+          if (
+            values.sourceWarehouseId === values.targetWarehouseId &&
+            values.sourceLocationId === values.targetLocationId
+          ) {
+            context.addIssue({
+              code: 'custom',
+              path: ['targetLocationId'],
+              message: t('stockDialog.differentLocations'),
+            });
+          }
+        }),
+    [t],
+  );
+
   const {
     register,
     handleSubmit,
@@ -382,7 +415,7 @@ export function StockTransferDialog({
     watch,
     formState: { errors },
   } = useForm<TransferValues>({
-    resolver: zodResolver(transferSchema),
+    resolver: zodResolver(schema),
     defaultValues: {
       productId: '',
       sourceWarehouseId: '',
@@ -409,7 +442,9 @@ export function StockTransferDialog({
     setValue('targetLocationId', '');
   }, [targetWarehouseId, setValue]);
 
-  const errorMessage = dialogError(mutation.error, 'The transfer could not be posted.');
+  const formError = mutation.error
+    ? errorMessage(mutation.error, 'stockDialog.transferError')
+    : null;
 
   const submit = handleSubmit(async (values) => {
     const quantity = parseQuantity(values.quantity);
@@ -437,18 +472,16 @@ export function StockTransferDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
-        <DialogTitle>Transfer stock</DialogTitle>
-        <DialogDescription>
-          Move quantity between two storage locations in one atomic operation.
-        </DialogDescription>
+        <DialogTitle>{t('stockDialog.transfer.title')}</DialogTitle>
+        <DialogDescription>{t('stockDialog.transfer.description')}</DialogDescription>
 
         <form noValidate className="mt-5 space-y-4" onSubmit={submit}>
           <div>
             <label htmlFor="transfer-product" className="block text-sm font-medium text-slate-700">
-              Product
+              {t('common.product')}
             </label>
             <select id="transfer-product" className={fieldClass} {...register('productId')}>
-              <option value="">Select a product</option>
+              <option value="">{t('stockDialog.selectProduct')}</option>
               {activeProducts(products, false).map((product) => (
                 <option key={product.id} value={product.id}>
                   {product.sku} · {product.name}
@@ -468,8 +501,8 @@ export function StockTransferDialog({
             warehouseField={register('sourceWarehouseId')}
             locationField={register('sourceLocationId')}
             selectedWarehouseId={sourceWarehouseId}
-            warehouseLabel="Source warehouse"
-            locationLabel="Source location"
+            warehouseLabel={t('stockDialog.sourceWarehouse')}
+            locationLabel={t('stockDialog.sourceLocation')}
           />
 
           <WarehouseLocationFields
@@ -478,8 +511,8 @@ export function StockTransferDialog({
             warehouseField={register('targetWarehouseId')}
             locationField={register('targetLocationId')}
             selectedWarehouseId={targetWarehouseId}
-            warehouseLabel="Target warehouse"
-            locationLabel="Target location"
+            warehouseLabel={t('stockDialog.targetWarehouse')}
+            locationLabel={t('stockDialog.targetLocation')}
           />
           {errors.targetLocationId && (
             <p role="alert" className="text-xs text-rose-700">
@@ -493,11 +526,12 @@ export function StockTransferDialog({
                 htmlFor="transfer-quantity"
                 className="block text-sm font-medium text-slate-700"
               >
-                Quantity
+                {t('common.quantity')}
               </label>
               <input
                 id="transfer-quantity"
                 type="text"
+                dir="ltr"
                 inputMode="decimal"
                 className={fieldClass}
                 aria-invalid={Boolean(errors.quantity)}
@@ -512,7 +546,7 @@ export function StockTransferDialog({
 
             <div>
               <label htmlFor="transfer-reason" className="block text-sm font-medium text-slate-700">
-                Reason (optional)
+                {t('stockDialog.form.reasonOptional')}
               </label>
               <input
                 id="transfer-reason"
@@ -523,20 +557,22 @@ export function StockTransferDialog({
             </div>
           </div>
 
-          {errorMessage && (
+          {formError && (
             <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
-              {errorMessage}
+              {formError}
             </p>
           )}
 
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancel
+                {t('common.cancel')}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Transferring…' : 'Post transfer'}
+              {mutation.isPending
+                ? t('stockDialog.transferring')
+                : t('stockDialog.transfer.submit')}
             </Button>
           </DialogFooter>
         </form>
@@ -545,16 +581,14 @@ export function StockTransferDialog({
   );
 }
 
-const reservationSchema = z.object({
-  productId: z.string().min(1, 'Select a product'),
-  warehouseId: z.string().min(1, 'Select a warehouse'),
-  locationId: z.string().min(1, 'Select a storage location'),
-  quantity: z.string().trim().min(1, 'Enter a quantity'),
-  expiresAt: z.string(),
-  note: z.string().trim().max(500),
-});
-
-type ReservationValues = z.infer<typeof reservationSchema>;
+interface ReservationValues {
+  productId: string;
+  warehouseId: string;
+  locationId: string;
+  quantity: string;
+  expiresAt: string;
+  note: string;
+}
 
 export function ReservationDialog({
   organizationId,
@@ -563,7 +597,22 @@ export function ReservationDialog({
   open,
   onOpenChange,
 }: StockDialogProps) {
+  const { t, errorMessage } = useI18n();
   const mutation = useReserveStock(organizationId);
+
+  const schema = useMemo(
+    () =>
+      z.object({
+        productId: z.string().min(1, t('stockDialog.selectProduct')),
+        warehouseId: z.string().min(1, t('common.selectWarehouse')),
+        locationId: z.string().min(1, t('stockDialog.selectLocation')),
+        quantity: z.string().trim().min(1, t('stockDialog.enterQuantity')),
+        expiresAt: z.string(),
+        note: z.string().trim().max(500),
+      }),
+    [t],
+  );
+
   const {
     register,
     handleSubmit,
@@ -572,7 +621,7 @@ export function ReservationDialog({
     watch,
     formState: { errors },
   } = useForm<ReservationValues>({
-    resolver: zodResolver(reservationSchema),
+    resolver: zodResolver(schema),
     defaultValues: {
       productId: '',
       warehouseId: '',
@@ -594,7 +643,9 @@ export function ReservationDialog({
     setValue('locationId', '');
   }, [productId, warehouseId, setValue]);
 
-  const errorMessage = dialogError(mutation.error, 'The reservation could not be created.');
+  const formError = mutation.error
+    ? errorMessage(mutation.error, 'stockDialog.reservationError')
+    : null;
 
   const submit = handleSubmit(async (values) => {
     const quantity = parseQuantity(values.quantity);
@@ -621,10 +672,8 @@ export function ReservationDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
-        <DialogTitle>Reserve stock</DialogTitle>
-        <DialogDescription>
-          Reservations hold availability without changing physical on-hand stock.
-        </DialogDescription>
+        <DialogTitle>{t('stockDialog.reservation.title')}</DialogTitle>
+        <DialogDescription>{t('stockDialog.reservation.description')}</DialogDescription>
 
         <form noValidate className="mt-5 space-y-4" onSubmit={submit}>
           <div>
@@ -632,10 +681,10 @@ export function ReservationDialog({
               htmlFor="reservation-product"
               className="block text-sm font-medium text-slate-700"
             >
-              Product
+              {t('common.product')}
             </label>
             <select id="reservation-product" className={fieldClass} {...register('productId')}>
-              <option value="">Select a product</option>
+              <option value="">{t('stockDialog.selectProduct')}</option>
               {activeProducts(products, false).map((product) => (
                 <option key={product.id} value={product.id}>
                   {product.sku} · {product.name}
@@ -663,11 +712,12 @@ export function ReservationDialog({
                 htmlFor="reservation-quantity"
                 className="block text-sm font-medium text-slate-700"
               >
-                Quantity
+                {t('common.quantity')}
               </label>
               <input
                 id="reservation-quantity"
                 type="text"
+                dir="ltr"
                 inputMode="decimal"
                 className={fieldClass}
                 aria-invalid={Boolean(errors.quantity)}
@@ -685,7 +735,7 @@ export function ReservationDialog({
                 htmlFor="reservation-expires"
                 className="block text-sm font-medium text-slate-700"
               >
-                Expires (optional)
+                {t('stockDialog.reservation.expires')}
               </label>
               <input
                 id="reservation-expires"
@@ -698,25 +748,27 @@ export function ReservationDialog({
 
           <div>
             <label htmlFor="reservation-note" className="block text-sm font-medium text-slate-700">
-              Note (optional)
+              {t('stockDialog.reservation.note')}
             </label>
             <input id="reservation-note" type="text" className={fieldClass} {...register('note')} />
           </div>
 
-          {errorMessage && (
+          {formError && (
             <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
-              {errorMessage}
+              {formError}
             </p>
           )}
 
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancel
+                {t('common.cancel')}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Reserving…' : 'Create reservation'}
+              {mutation.isPending
+                ? t('stockDialog.reserving')
+                : t('stockDialog.reservation.submit')}
             </Button>
           </DialogFooter>
         </form>

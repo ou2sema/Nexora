@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -14,36 +14,23 @@ import {
   DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ApiError } from '@/lib/api-client';
+import { useI18n } from '@/i18n/provider';
 import { fieldClass } from '@/lib/form-field';
 import { useCreateSupplier, useUpdateSupplier } from './api';
 
 const optionalText = (max: number) => z.string().trim().max(max);
 
-const schema = z.object({
-  name: z.string().trim().min(1, 'Enter the supplier name').max(160),
-  contactName: optionalText(160),
-  email: z
-    .string()
-    .trim()
-    .max(254)
-    .refine((value) => value === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), {
-      message: 'Enter a valid email address',
-    }),
-  phone: optionalText(40),
-  addressLine: optionalText(200),
-  city: optionalText(120),
-  countryCode: z
-    .string()
-    .trim()
-    .refine((value) => value === '' || /^[A-Za-z]{2}$/.test(value), {
-      message: 'Use a two-letter country code',
-    }),
-  taxId: optionalText(60),
-  notes: optionalText(2000),
-});
-
-type Values = z.infer<typeof schema>;
+type Values = {
+  name: string;
+  contactName: string;
+  email: string;
+  phone: string;
+  addressLine: string;
+  city: string;
+  countryCode: string;
+  taxId: string;
+  notes: string;
+};
 
 interface SupplierDialogProps {
   organizationId: string;
@@ -86,9 +73,37 @@ export function SupplierDialog({
   open,
   onOpenChange,
 }: SupplierDialogProps) {
+  const { t, errorMessage } = useI18n();
   const createMutation = useCreateSupplier(organizationId);
   const updateMutation = useUpdateSupplier(organizationId);
   const mutation = supplier ? updateMutation : createMutation;
+
+  const schema = useMemo(
+    () =>
+      z.object({
+        name: z.string().trim().min(1, t('supplierDialog.nameRequired')).max(160),
+        contactName: optionalText(160),
+        email: z
+          .string()
+          .trim()
+          .max(254)
+          .refine((value) => value === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), {
+            message: t('supplierDialog.invalidEmail'),
+          }),
+        phone: optionalText(40),
+        addressLine: optionalText(200),
+        city: optionalText(120),
+        countryCode: z
+          .string()
+          .trim()
+          .refine((value) => value === '' || /^[A-Za-z]{2}$/.test(value), {
+            message: t('supplierDialog.countryCodeInvalid'),
+          }),
+        taxId: optionalText(60),
+        notes: optionalText(2000),
+      }),
+    [t],
+  );
 
   const {
     register,
@@ -101,12 +116,9 @@ export function SupplierDialog({
     if (open) reset(valuesOf(supplier));
   }, [open, supplier, reset]);
 
-  const errorMessage =
-    mutation.error instanceof ApiError
-      ? mutation.error.message
-      : mutation.error
-        ? 'The supplier could not be saved.'
-        : null;
+  const saveError = mutation.error
+    ? errorMessage(mutation.error, 'supplierDialog.saveFailed')
+    : null;
 
   const submit = handleSubmit(async (values) => {
     const details = {
@@ -137,16 +149,16 @@ export function SupplierDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
-        <DialogTitle>{supplier ? 'Edit supplier' : 'New supplier'}</DialogTitle>
-        <DialogDescription>
-          Suppliers are shared by every purchase order in this organization.
-        </DialogDescription>
+        <DialogTitle>
+          {supplier ? t('supplierDialog.editTitle') : t('supplierDialog.newTitle')}
+        </DialogTitle>
+        <DialogDescription>{t('supplierDialog.description')}</DialogDescription>
 
         <form noValidate className="mt-5 space-y-4" onSubmit={submit}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="supplier-name" className="block text-sm font-medium text-slate-700">
-                Name
+                {t('common.name')}
               </label>
               <input
                 id="supplier-name"
@@ -167,7 +179,7 @@ export function SupplierDialog({
                 htmlFor="supplier-contact"
                 className="block text-sm font-medium text-slate-700"
               >
-                Contact name (optional)
+                {t('supplierDialog.contactName')}
               </label>
               <input
                 id="supplier-contact"
@@ -181,11 +193,12 @@ export function SupplierDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="supplier-email" className="block text-sm font-medium text-slate-700">
-                Email (optional)
+                {t('supplierDialog.email')}
               </label>
               <input
                 id="supplier-email"
                 type="email"
+                dir="ltr"
                 className={fieldClass}
                 aria-invalid={Boolean(errors.email)}
                 {...register('email')}
@@ -199,15 +212,21 @@ export function SupplierDialog({
 
             <div>
               <label htmlFor="supplier-phone" className="block text-sm font-medium text-slate-700">
-                Phone (optional)
+                {t('supplierDialog.phone')}
               </label>
-              <input id="supplier-phone" type="tel" className={fieldClass} {...register('phone')} />
+              <input
+                id="supplier-phone"
+                type="tel"
+                dir="ltr"
+                className={fieldClass}
+                {...register('phone')}
+              />
             </div>
           </div>
 
           <div>
             <label htmlFor="supplier-address" className="block text-sm font-medium text-slate-700">
-              Address (optional)
+              {t('supplierDialog.address')}
             </label>
             <input
               id="supplier-address"
@@ -220,7 +239,7 @@ export function SupplierDialog({
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <label htmlFor="supplier-city" className="block text-sm font-medium text-slate-700">
-                City (optional)
+                {t('supplierDialog.city')}
               </label>
               <input id="supplier-city" type="text" className={fieldClass} {...register('city')} />
             </div>
@@ -230,11 +249,12 @@ export function SupplierDialog({
                 htmlFor="supplier-country"
                 className="block text-sm font-medium text-slate-700"
               >
-                Country code (optional)
+                {t('supplierDialog.countryCode')}
               </label>
               <input
                 id="supplier-country"
                 type="text"
+                dir="ltr"
                 maxLength={2}
                 placeholder="TN"
                 className={fieldClass}
@@ -250,11 +270,12 @@ export function SupplierDialog({
 
             <div>
               <label htmlFor="supplier-tax-id" className="block text-sm font-medium text-slate-700">
-                Tax ID (optional)
+                {t('supplierDialog.taxId')}
               </label>
               <input
                 id="supplier-tax-id"
                 type="text"
+                dir="ltr"
                 className={fieldClass}
                 {...register('taxId')}
               />
@@ -263,25 +284,29 @@ export function SupplierDialog({
 
           <div>
             <label htmlFor="supplier-notes" className="block text-sm font-medium text-slate-700">
-              Notes (optional)
+              {t('supplierDialog.notes')}
             </label>
             <textarea id="supplier-notes" rows={3} className={fieldClass} {...register('notes')} />
           </div>
 
-          {errorMessage && (
+          {saveError && (
             <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
-              {errorMessage}
+              {saveError}
             </p>
           )}
 
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancel
+                {t('common.cancel')}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Saving…' : supplier ? 'Save supplier' : 'Create supplier'}
+              {mutation.isPending
+                ? t('common.saving')
+                : supplier
+                  ? t('supplierDialog.save')
+                  : t('supplierDialog.create')}
             </Button>
           </DialogFooter>
         </form>

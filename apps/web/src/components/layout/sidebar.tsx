@@ -3,6 +3,7 @@ import { NavLink } from 'react-router';
 
 import { navItems } from '@/components/layout/nav-items';
 import { useOrganization } from '@/features/organizations/organization-provider';
+import { useI18n } from '@/i18n/provider';
 import { cn } from '@/lib/cn';
 
 interface SidebarProps {
@@ -12,6 +13,7 @@ interface SidebarProps {
 
 export function Sidebar({ className, onNavigate }: SidebarProps) {
   const { memberships, platformAdmin } = useOrganization();
+  const { t } = useI18n();
   const hasOrganization = memberships.length > 0;
   const items = navItems.filter(
     (item) =>
@@ -28,7 +30,7 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
         <span className="text-base font-semibold tracking-tight text-white">Mystock</span>
       </div>
 
-      <nav aria-label="Main navigation" className="flex-1 px-3 py-4">
+      <nav aria-label={t('nav.main')} className="flex-1 px-3 py-4">
         <ul className="space-y-1">
           {items.map((item) => (
             <li key={item.to}>
@@ -46,7 +48,7 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
                 }
               >
                 <item.icon aria-hidden="true" className="size-4" />
-                {item.label}
+                {t(item.labelKey)}
               </NavLink>
             </li>
           ))}
@@ -54,7 +56,7 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
       </nav>
 
       <div className="border-t border-white/10 px-5 py-4 text-xs text-slate-500">
-        Stock ledger, devices &amp; team access · Phase 10
+        {t('layout.footer')}
       </div>
     </div>
   );

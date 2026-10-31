@@ -586,6 +586,51 @@ locally running API on `:4100` was left on the previous build, so the app stayed
 The restore drill in [`runbooks/restore-drill.md`](runbooks/restore-drill.md) is documented but
 has not been executed.
 
+## Interface localization verification
+
+Phase 12 changes no schema and no API contract. The existing suites remain the regression
+check, and a dedicated spec covers the new behavior:
+
+```powershell
+cd apps/web
+npx playwright test --config playwright.local-stack.config.ts --headed
+```
+
+Expected: 36 checks (18 tests × desktop/mobile). The four `e2e-local/i18n.spec.ts` tests
+cover:
+
+- French pre-auth copy, the sign-in form, dashboard copy, `fr-TN` money and date output,
+  and persistence across a reload;
+- a localized authentication error (`Identifiants de connexion invalides`) instead of the
+  Supabase English message;
+- Arabic copy, `lang="ar"`/`dir="rtl"`, the sidebar mirrored to the right on desktop,
+  Latin digits with no Arabic-Indic digits, and persistence;
+- live switching in the sign-in page and top bar (`en` → `fr` → `ar` → `en`) with the
+  stored `mystock.locale` value checked at each step.
+
+The English assertions in `admin`, `dashboard`, `operations`, and `team` were not edited
+and still pass, confirming the conversion produced byte-identical English copy.
+
+A catalog audit bundled the message modules and compared all locales: 1,285 flat keys per
+locale with no missing or extra keys in French or Arabic, no placeholder mismatch in
+French, and all six CLDR categories present for each of the 24 plural nouns in every
+locale. Arabic deliberately omits `{count}` in the 12 zero/one/two forms where the word
+itself carries the number (for example “تم استلام وحدة واحدة” for one unit); the few, many,
+and other forms carry it.
+
+Full gates on 2026-10-31 for Phase 12: `format:check`, `lint`, `typecheck`, and `build`
+clean; `npm test` still runs 277 Vitest tests across the workspaces; the headed local-stack
+run passed 36/36 in 4.6 minutes with Allure served at http://127.0.0.1:5058.
+
+The French timestamp uses a 24-hour clock: CLDR's `fr-TN` default is a 12-hour clock with
+an English “PM”, so the provider forces `hourCycle: 'h23'` for French. Money keeps three
+decimals in every locale (`0,000 DT`, `TND 0.000`, `0,000 د.ت.`).
+
+No hosted change is involved: the locale is a browser preference, there is no migration,
+and PDFs, CSV exports, labels, and invitation emails remain English. If a local database
+already holds the stack's default PostgreSQL port, set `E2E_PG_PORT` to a free port before
+the run.
+
 ## Operator tasks
 
 ### Integrity sweep
@@ -762,7 +807,7 @@ npm run test --workspace @mystock/api -- test/db
 | `npm run test:e2e`                                              | Playwright against the API and dev server (16 checks: 8 tests × desktop/mobile)                                                                                                                                                                             |
 | `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                            |
 | `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                 |
-| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–11 flows on the self-contained stack (28 checks: 14 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                                                                         |
+| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–12 flows on the self-contained stack (36 checks: 18 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                                                                         |
 | `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                           |
 
 The API suites (`apps/api/test/api`) run the real migrations on PGlite, sign JWTs with
@@ -810,7 +855,7 @@ and every pull request:
 The `e2e` job writes placeholder `VITE_` values (no real project, no real secrets) and
 uploads `test-results/` plus `allure-results/` only when the run fails. The `e2e-local` job
 boots embedded PostgreSQL, the fake auth/JWKS server, the built API, and Vite, so it needs
-no Supabase project; it runs the same 28 checks as the headed local run. The `e2e-local` job
+no Supabase project; it runs the same 36 checks as the headed local run. The `e2e-local` job
 has not yet run on GitHub Actions; it was validated by running the same command locally.
 
 To reproduce the `quality` job locally, run the gates above in the same order after a

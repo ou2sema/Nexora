@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -14,24 +14,12 @@ import {
   DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ApiError } from '@/lib/api-client';
+import { roleKeys } from '@/features/team/labels';
+import { useI18n } from '@/i18n/provider';
 import { fieldClass } from '@/lib/form-field';
 import { useCreateInvitation } from './api';
-import { roleLabels } from './labels';
 
-const schema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, 'Enter an email address')
-    .max(254)
-    .refine((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), {
-      message: 'Enter a valid email address',
-    }),
-  role: z.enum(['admin', 'manager', 'viewer']),
-});
-
-type Values = z.infer<typeof schema>;
+type Values = { email: string; role: InvitationRole };
 
 interface InviteDialogProps {
   organizationId: string;
@@ -46,9 +34,27 @@ export function InviteDialog({
   onOpenChange,
   allowedRoles = ['viewer', 'manager', 'admin'],
 }: InviteDialogProps) {
+  const { t, errorMessage } = useI18n();
   const mutation = useCreateInvitation(organizationId);
   const defaultRole = allowedRoles[0] ?? 'viewer';
   const emptyValues: Values = { email: '', role: defaultRole };
+
+  const schema = useMemo(
+    () =>
+      z.object({
+        email: z
+          .string()
+          .trim()
+          .min(1, t('invite.emailRequired'))
+          .max(254)
+          .refine((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), {
+            message: t('invite.emailInvalid'),
+          }),
+        role: z.enum(['admin', 'manager', 'viewer']),
+      }),
+    [t],
+  );
+
   const {
     register,
     handleSubmit,
@@ -60,12 +66,7 @@ export function InviteDialog({
     if (open) reset({ email: '', role: defaultRole });
   }, [open, reset, defaultRole]);
 
-  const errorMessage =
-    mutation.error instanceof ApiError
-      ? mutation.error.message
-      : mutation.error
-        ? 'The invitation could not be created.'
-        : null;
+  const error = mutation.error ? errorMessage(mutation.error, 'invite.createFailed') : null;
 
   const submit = handleSubmit(async (values) => {
     try {
@@ -79,20 +80,18 @@ export function InviteDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogTitle>Invite a team member</DialogTitle>
-        <DialogDescription>
-          The invitation appears for this email after they sign in. MyStock does not send email, so
-          tell them to look for the pending invitation.
-        </DialogDescription>
+        <DialogTitle>{t('invite.title')}</DialogTitle>
+        <DialogDescription>{t('invite.description')}</DialogDescription>
 
         <form noValidate className="mt-5 space-y-4" onSubmit={submit}>
           <div>
             <label htmlFor="invite-email" className="block text-sm font-medium text-slate-700">
-              Email
+              {t('common.email')}
             </label>
             <input
               id="invite-email"
               type="email"
+              dir="ltr"
               autoComplete="off"
               className={fieldClass}
               aria-invalid={Boolean(errors.email)}
@@ -107,42 +106,42 @@ export function InviteDialog({
 
           <div>
             <label htmlFor="invite-role" className="block text-sm font-medium text-slate-700">
-              Role
+              {t('team.roleLabel')}
             </label>
             {allowedRoles.length > 1 ? (
               <select id="invite-role" className={fieldClass} {...register('role')}>
                 {allowedRoles.map((role) => (
                   <option key={role} value={role}>
-                    {roleLabels[role]}
+                    {t(roleKeys[role])}
                   </option>
                 ))}
               </select>
             ) : (
               <p className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-                {roleLabels[defaultRole]}
+                {t(roleKeys[defaultRole])}
               </p>
             )}
             <p className="mt-1 text-xs text-slate-500">
               {allowedRoles.length === 1
-                ? 'Managers can invite viewers only.'
-                : 'Ownership is transferred by changing an existing member, not by invitation.'}
+                ? t('invite.managersViewersOnly')
+                : t('invite.ownershipNote')}
             </p>
           </div>
 
-          {errorMessage && (
+          {error && (
             <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
-              {errorMessage}
+              {error}
             </p>
           )}
 
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancel
+                {t('common.cancel')}
               </Button>
             </DialogClose>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Sending…' : 'Send invitation'}
+              {mutation.isPending ? t('invite.sending') : t('invite.send')}
             </Button>
           </DialogFooter>
         </form>

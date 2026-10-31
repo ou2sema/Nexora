@@ -18,7 +18,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useDevices } from '@/features/devices/api';
-import { ApiError } from '@/lib/api-client';
+import type { MessageKey } from '@/i18n/messages';
+import { useI18n } from '@/i18n/provider';
 import { cn } from '@/lib/cn';
 import { saveBlob } from '@/lib/download';
 import { fieldClass } from '@/lib/form-field';
@@ -34,10 +35,10 @@ import {
   useSalesReturns,
 } from './api';
 
-export const returnStatusLabels: Record<ReturnStatus, string> = {
-  draft: 'Draft',
-  posted: 'Posted',
-  cancelled: 'Cancelled',
+export const returnStatusKeys: Record<ReturnStatus, MessageKey> = {
+  draft: 'returns.status.draft',
+  posted: 'returns.status.posted',
+  cancelled: 'returns.status.cancelled',
 };
 
 export const returnStatusStyles: Record<ReturnStatus, string> = {
@@ -46,12 +47,9 @@ export const returnStatusStyles: Record<ReturnStatus, string> = {
   cancelled: 'bg-rose-50 text-rose-800 ring-rose-200',
 };
 
-function errorMessage(error: unknown, fallback: string): string | null {
-  if (error instanceof ApiError) return error.message;
-  return error ? fallback : null;
-}
-
 function ReturnStatusBadge({ status }: { status: ReturnStatus }) {
+  const { t } = useI18n();
+
   return (
     <span
       className={cn(
@@ -59,7 +57,7 @@ function ReturnStatusBadge({ status }: { status: ReturnStatus }) {
         returnStatusStyles[status],
       )}
     >
-      {returnStatusLabels[status]}
+      {t(returnStatusKeys[status])}
     </span>
   );
 }
@@ -84,6 +82,7 @@ function SerializedDevicePicker({
   selected,
   onChange,
 }: SerializedDevicePickerProps) {
+  const { t } = useI18n();
   const devices = useDevices(organizationId, {
     search: '',
     status: 'in_stock',
@@ -97,21 +96,23 @@ function SerializedDevicePicker({
   return (
     <div>
       <p className="text-xs font-medium text-slate-600">
-        In-stock units of {productName} ({selected.length} selected)
+        {t('returns.devicePicker.summary', { product: productName, selected: selected.length })}
       </p>
       {devices.isPending ? (
         <p className="mt-1 text-xs text-slate-500" role="status">
-          Loading devices…
+          {t('returns.devicePicker.loading')}
         </p>
       ) : items.length === 0 ? (
-        <p className="mt-1 text-xs text-amber-700">No in-stock device can be returned.</p>
+        <p className="mt-1 text-xs text-amber-700">{t('returns.devicePicker.empty')}</p>
       ) : (
         <div className="mt-1 max-h-32 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2">
           {items.map((device) => (
             <label key={device.id} className="flex items-center gap-2 text-xs text-slate-700">
               <input
                 type="checkbox"
-                aria-label={`Return device ${device.serialNumber}`}
+                aria-label={t('returns.devicePicker.deviceLabel', {
+                  serial: device.serialNumber,
+                })}
                 checked={selected.includes(device.id)}
                 onChange={(event) =>
                   onChange(
@@ -121,7 +122,9 @@ function SerializedDevicePicker({
                   )
                 }
               />
-              <span className="font-mono">{device.serialNumber}</span>
+              <span dir="ltr" className="font-mono">
+                {device.serialNumber}
+              </span>
             </label>
           ))}
         </div>
@@ -145,6 +148,7 @@ function PurchaseReturnDialog({
   onOpenChange,
   onCreated,
 }: PurchaseReturnDialogProps) {
+  const { t, errorMessage, formatQuantity } = useI18n();
   const mutation = useCreatePurchaseReturn(organizationId);
   const [reason, setReason] = useState('');
   const [reference, setReference] = useState('');
@@ -166,7 +170,7 @@ function PurchaseReturnDialog({
 
   const submit = async () => {
     if (reason.trim().length < 3) {
-      setLocalError('Explain why the goods are going back (at least 3 characters).');
+      setLocalError(t('returns.purchase.reasonTooShort'));
       return;
     }
 
@@ -183,7 +187,7 @@ function PurchaseReturnDialog({
     });
 
     if (lines.length === 0) {
-      setLocalError('Enter a quantity or select at least one device to return.');
+      setLocalError(t('returns.purchase.emptySelection'));
       return;
     }
 
@@ -192,7 +196,7 @@ function PurchaseReturnDialog({
         purchaseOrderId: order.id,
         input: { reason: reason.trim(), reference: reference.trim() || null, lines },
       });
-      onCreated(`Purchase return ${result.number} created as a draft.`);
+      onCreated(t('returns.purchase.created', { number: result.number }));
       reset();
       onOpenChange(false);
     } catch {
@@ -200,7 +204,7 @@ function PurchaseReturnDialog({
     }
   };
 
-  const submitError = errorMessage(mutation.error, 'The return could not be created.');
+  const submitError = mutation.error ? errorMessage(mutation.error, 'returns.createFailed') : null;
 
   return (
     <Dialog
@@ -211,11 +215,8 @@ function PurchaseReturnDialog({
       }}
     >
       <DialogContent className="max-w-2xl">
-        <DialogTitle>Return goods to supplier</DialogTitle>
-        <DialogDescription>
-          A draft return does not move stock. Posting it issues the quantity or disposes the chosen
-          devices.
-        </DialogDescription>
+        <DialogTitle>{t('returns.purchase.dialogTitle')}</DialogTitle>
+        <DialogDescription>{t('returns.purchase.dialogDescription')}</DialogDescription>
 
         <div className="mt-5 space-y-4">
           <div>
@@ -223,7 +224,7 @@ function PurchaseReturnDialog({
               htmlFor="purchase-return-reason"
               className="block text-sm font-medium text-slate-700"
             >
-              Reason
+              {t('common.reason')}
             </label>
             <input
               id="purchase-return-reason"
@@ -238,11 +239,12 @@ function PurchaseReturnDialog({
               htmlFor="purchase-return-reference"
               className="block text-sm font-medium text-slate-700"
             >
-              Reference (optional)
+              {t('returns.form.referenceOptional')}
             </label>
             <input
               id="purchase-return-reference"
               type="text"
+              dir="ltr"
               className={fieldClass}
               value={reference}
               onChange={(event) => setReference(event.target.value)}
@@ -254,11 +256,15 @@ function PurchaseReturnDialog({
               <div key={line.id} className="rounded-lg border border-slate-200 p-3">
                 <p className="text-sm font-medium text-slate-800">
                   {line.productName}{' '}
-                  <span className="font-mono text-xs text-slate-500">{line.productSku}</span>
+                  <span dir="ltr" className="font-mono text-xs text-slate-500">
+                    {line.productSku}
+                  </span>
                 </p>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Returnable {line.quantityReceived - line.quantityReturned} of{' '}
-                  {line.quantityReceived} received
+                  {t('returns.purchase.returnable', {
+                    returnable: formatQuantity(line.quantityReceived - line.quantityReturned),
+                    received: formatQuantity(line.quantityReceived),
+                  })}
                 </p>
                 <div className="mt-2">
                   {line.isSerialized ? (
@@ -273,7 +279,7 @@ function PurchaseReturnDialog({
                     />
                   ) : (
                     <input
-                      aria-label={`Return quantity for ${line.productSku}`}
+                      aria-label={t('returns.form.quantityLabel', { sku: line.productSku })}
                       type="text"
                       inputMode="decimal"
                       placeholder="0"
@@ -288,7 +294,7 @@ function PurchaseReturnDialog({
               </div>
             ))}
             {returnableLines.length === 0 && (
-              <p className="text-sm text-slate-500">Every received line has been returned.</p>
+              <p className="text-sm text-slate-500">{t('returns.purchase.allReturned')}</p>
             )}
           </div>
 
@@ -301,7 +307,7 @@ function PurchaseReturnDialog({
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancel
+                {t('common.cancel')}
               </Button>
             </DialogClose>
             <Button
@@ -309,7 +315,7 @@ function PurchaseReturnDialog({
               disabled={mutation.isPending || returnableLines.length === 0}
               onClick={() => void submit()}
             >
-              {mutation.isPending ? 'Creating…' : 'Create return'}
+              {mutation.isPending ? t('returns.form.creating') : t('returns.form.submit')}
             </Button>
           </DialogFooter>
         </div>
@@ -329,6 +335,7 @@ export function PurchaseReturnsSection({
   order,
   canWrite,
 }: PurchaseReturnsSectionProps) {
+  const { t, errorMessage, formatQuantity } = useI18n();
   const returns = usePurchaseReturns(organizationId, order.id);
   const postMutation = usePostPurchaseReturn(organizationId);
   const cancelMutation = useCancelPurchaseReturn(organizationId);
@@ -345,9 +352,9 @@ export function PurchaseReturnsSection({
     setActionError(null);
     try {
       const result = await postMutation.mutateAsync({ purchaseOrderId: order.id, returnId });
-      setNotice(`Return ${result.number} posted. Stock and devices are updated.`);
+      setNotice(t('returns.purchase.posted', { number: result.number }));
     } catch (error) {
-      setActionError(errorMessage(error, 'The return could not be posted.'));
+      setActionError(errorMessage(error, 'returns.postFailed'));
     }
   };
 
@@ -359,9 +366,9 @@ export function PurchaseReturnsSection({
         returnId,
         input: {},
       });
-      setNotice(`Return ${result.number} cancelled.`);
+      setNotice(t('returns.cancelled', { number: result.number }));
     } catch (error) {
-      setActionError(errorMessage(error, 'The return could not be cancelled.'));
+      setActionError(errorMessage(error, 'returns.cancelFailed'));
     }
   };
 
@@ -371,9 +378,9 @@ export function PurchaseReturnsSection({
     try {
       const file = await downloadPdf(order.id, item.id);
       saveBlob(file.blob, file.filename);
-      setNotice(`Downloaded ${file.filename}`);
+      setNotice(t('returns.downloaded', { filename: file.filename }));
     } catch (error) {
-      setActionError(errorMessage(error, 'The return note could not be generated.'));
+      setActionError(errorMessage(error, 'returns.downloadFailed'));
     } finally {
       setPdfPendingId(null);
     }
@@ -384,11 +391,9 @@ export function PurchaseReturnsSection({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 id="purchase-returns-heading" className="text-sm font-semibold text-slate-900">
-            Returns to supplier
+            {t('returns.purchase.heading')}
           </h3>
-          <p className="mt-1 text-xs text-slate-500">
-            Returns post as stock issues; serialized units are disposed with full device history.
-          </p>
+          <p className="mt-1 text-xs text-slate-500">{t('returns.purchase.help')}</p>
         </div>
         {canWrite && (
           <Button
@@ -397,49 +402,53 @@ export function PurchaseReturnsSection({
             disabled={!returnable}
             onClick={() => setCreateOpen(true)}
           >
-            New purchase return
+            {t('returns.purchase.new')}
           </Button>
         )}
       </div>
 
       {returns.isError ? (
         <p role="alert" className="text-xs text-rose-700">
-          {returns.error instanceof Error ? returns.error.message : 'Returns failed to load.'}
+          {errorMessage(returns.error, 'returns.loadFailed')}
         </p>
       ) : items.length === 0 ? (
         <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-          No returns recorded for this order.
+          {t('returns.empty')}
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-slate-200">
-          <table className="w-full text-left text-sm">
+          <table className="w-full text-start text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th scope="col" className="px-3 py-2 font-semibold">
-                  Number
+                  {t('returns.columns.number')}
                 </th>
                 <th scope="col" className="px-3 py-2 font-semibold">
-                  Status
+                  {t('common.status')}
                 </th>
-                <th scope="col" className="px-3 py-2 text-right font-semibold">
-                  Quantity
+                <th scope="col" className="px-3 py-2 text-end font-semibold">
+                  {t('common.quantity')}
                 </th>
                 <th scope="col" className="px-3 py-2 font-semibold">
-                  Reason
+                  {t('common.reason')}
                 </th>
-                <th scope="col" className="px-3 py-2 text-right font-semibold">
-                  Actions
+                <th scope="col" className="px-3 py-2 text-end font-semibold">
+                  {t('common.actions')}
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {items.map((item) => (
                 <tr key={item.id}>
-                  <td className="px-3 py-2 font-mono text-xs text-slate-800">{item.number}</td>
+                  <td dir="ltr" className="px-3 py-2 font-mono text-xs text-slate-800">
+                    {item.number}
+                  </td>
                   <td className="px-3 py-2">
                     <ReturnStatusBadge status={item.status} />
                   </td>
-                  <td className="px-3 py-2 text-right text-slate-700">{item.totalQuantity}</td>
+                  <td className="px-3 py-2 text-end text-slate-700">
+                    {formatQuantity(item.totalQuantity)}
+                  </td>
                   <td className="px-3 py-2 text-slate-600">{item.reason}</td>
                   <td className="px-3 py-2">
                     <div className="flex justify-end gap-2">
@@ -450,7 +459,7 @@ export function PurchaseReturnsSection({
                             disabled={postMutation.isPending}
                             onClick={() => void post(item.id)}
                           >
-                            Post return
+                            {t('returns.postAction')}
                           </Button>
                           <Button
                             size="sm"
@@ -458,7 +467,7 @@ export function PurchaseReturnsSection({
                             disabled={cancelMutation.isPending}
                             onClick={() => void cancel(item.id)}
                           >
-                            Cancel return
+                            {t('returns.cancelAction')}
                           </Button>
                         </>
                       )}
@@ -468,7 +477,9 @@ export function PurchaseReturnsSection({
                         disabled={pdfPendingId === item.id}
                         onClick={() => void download(item)}
                       >
-                        {pdfPendingId === item.id ? 'Preparing…' : 'Download PDF'}
+                        {pdfPendingId === item.id
+                          ? t('returns.preparing')
+                          : t('returns.downloadPdf')}
                       </Button>
                     </div>
                   </td>
@@ -518,6 +529,7 @@ function SalesReturnDialog({
   onOpenChange,
   onCreated,
 }: SalesReturnDialogProps) {
+  const { t, errorMessage, formatQuantity } = useI18n();
   const mutation = useCreateSalesReturn(organizationId);
   const [reason, setReason] = useState('');
   const [reference, setReference] = useState('');
@@ -535,7 +547,7 @@ function SalesReturnDialog({
 
   const submit = async () => {
     if (reason.trim().length < 3) {
-      setLocalError('Explain why the goods are coming back (at least 3 characters).');
+      setLocalError(t('returns.sales.reasonTooShort'));
       return;
     }
 
@@ -545,7 +557,7 @@ function SalesReturnDialog({
     });
 
     if (lines.length === 0) {
-      setLocalError('Enter a quantity to restock.');
+      setLocalError(t('returns.sales.emptySelection'));
       return;
     }
 
@@ -554,7 +566,7 @@ function SalesReturnDialog({
         salesOrderId: order.id,
         input: { reason: reason.trim(), reference: reference.trim() || null, lines },
       });
-      onCreated(`Sales return ${result.number} created as a draft.`);
+      onCreated(t('returns.sales.created', { number: result.number }));
       reset();
       onOpenChange(false);
     } catch {
@@ -562,7 +574,7 @@ function SalesReturnDialog({
     }
   };
 
-  const submitError = errorMessage(mutation.error, 'The return could not be created.');
+  const submitError = mutation.error ? errorMessage(mutation.error, 'returns.createFailed') : null;
 
   return (
     <Dialog
@@ -573,10 +585,8 @@ function SalesReturnDialog({
       }}
     >
       <DialogContent className="max-w-2xl">
-        <DialogTitle>Restock a customer return</DialogTitle>
-        <DialogDescription>
-          Posting the draft receipts the quantity back into the order&apos;s warehouse location.
-        </DialogDescription>
+        <DialogTitle>{t('returns.sales.dialogTitle')}</DialogTitle>
+        <DialogDescription>{t('returns.sales.dialogDescription')}</DialogDescription>
 
         <div className="mt-5 space-y-4">
           <div>
@@ -584,7 +594,7 @@ function SalesReturnDialog({
               htmlFor="sales-return-reason"
               className="block text-sm font-medium text-slate-700"
             >
-              Reason
+              {t('common.reason')}
             </label>
             <input
               id="sales-return-reason"
@@ -599,11 +609,12 @@ function SalesReturnDialog({
               htmlFor="sales-return-reference"
               className="block text-sm font-medium text-slate-700"
             >
-              Reference (optional)
+              {t('returns.form.referenceOptional')}
             </label>
             <input
               id="sales-return-reference"
               type="text"
+              dir="ltr"
               className={fieldClass}
               value={reference}
               onChange={(event) => setReference(event.target.value)}
@@ -615,13 +626,18 @@ function SalesReturnDialog({
               <div key={line.id} className="rounded-lg border border-slate-200 p-3">
                 <p className="text-sm font-medium text-slate-800">
                   {line.productName}{' '}
-                  <span className="font-mono text-xs text-slate-500">{line.productSku}</span>
+                  <span dir="ltr" className="font-mono text-xs text-slate-500">
+                    {line.productSku}
+                  </span>
                 </p>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Returnable {line.quantity - line.quantityReturned} of {line.quantity} fulfilled
+                  {t('returns.sales.returnable', {
+                    returnable: formatQuantity(line.quantity - line.quantityReturned),
+                    fulfilled: formatQuantity(line.quantity),
+                  })}
                 </p>
                 <input
-                  aria-label={`Return quantity for ${line.productSku}`}
+                  aria-label={t('returns.form.quantityLabel', { sku: line.productSku })}
                   type="text"
                   inputMode="decimal"
                   placeholder="0"
@@ -634,7 +650,7 @@ function SalesReturnDialog({
               </div>
             ))}
             {returnableLines.length === 0 && (
-              <p className="text-sm text-slate-500">Every fulfilled line has been returned.</p>
+              <p className="text-sm text-slate-500">{t('returns.sales.allReturned')}</p>
             )}
           </div>
 
@@ -647,7 +663,7 @@ function SalesReturnDialog({
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="secondary">
-                Cancel
+                {t('common.cancel')}
               </Button>
             </DialogClose>
             <Button
@@ -655,7 +671,7 @@ function SalesReturnDialog({
               disabled={mutation.isPending || returnableLines.length === 0}
               onClick={() => void submit()}
             >
-              {mutation.isPending ? 'Creating…' : 'Create return'}
+              {mutation.isPending ? t('returns.form.creating') : t('returns.form.submit')}
             </Button>
           </DialogFooter>
         </div>
@@ -671,6 +687,7 @@ interface SalesReturnsSectionProps {
 }
 
 export function SalesReturnsSection({ organizationId, order, canWrite }: SalesReturnsSectionProps) {
+  const { t, errorMessage, formatQuantity } = useI18n();
   const returns = useSalesReturns(organizationId, order.id);
   const postMutation = usePostSalesReturn(organizationId);
   const cancelMutation = useCancelSalesReturn(organizationId);
@@ -685,9 +702,9 @@ export function SalesReturnsSection({ organizationId, order, canWrite }: SalesRe
     setActionError(null);
     try {
       const result = await postMutation.mutateAsync({ salesOrderId: order.id, returnId });
-      setNotice(`Return ${result.number} posted. Stock is restocked.`);
+      setNotice(t('returns.sales.posted', { number: result.number }));
     } catch (error) {
-      setActionError(errorMessage(error, 'The return could not be posted.'));
+      setActionError(errorMessage(error, 'returns.postFailed'));
     }
   };
 
@@ -699,9 +716,9 @@ export function SalesReturnsSection({ organizationId, order, canWrite }: SalesRe
         returnId,
         input: {},
       });
-      setNotice(`Return ${result.number} cancelled.`);
+      setNotice(t('returns.cancelled', { number: result.number }));
     } catch (error) {
-      setActionError(errorMessage(error, 'The return could not be cancelled.'));
+      setActionError(errorMessage(error, 'returns.cancelFailed'));
     }
   };
 
@@ -710,11 +727,9 @@ export function SalesReturnsSection({ organizationId, order, canWrite }: SalesRe
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 id="sales-returns-heading" className="text-sm font-semibold text-slate-900">
-            Returns from customer
+            {t('returns.sales.heading')}
           </h3>
-          <p className="mt-1 text-xs text-slate-500">
-            Posting a sales return receipts the quantity back into the order location.
-          </p>
+          <p className="mt-1 text-xs text-slate-500">{t('returns.sales.help')}</p>
         </div>
         {canWrite && (
           <Button
@@ -723,49 +738,53 @@ export function SalesReturnsSection({ organizationId, order, canWrite }: SalesRe
             disabled={!returnable}
             onClick={() => setCreateOpen(true)}
           >
-            New sales return
+            {t('returns.sales.new')}
           </Button>
         )}
       </div>
 
       {returns.isError ? (
         <p role="alert" className="text-xs text-rose-700">
-          {returns.error instanceof Error ? returns.error.message : 'Returns failed to load.'}
+          {errorMessage(returns.error, 'returns.loadFailed')}
         </p>
       ) : items.length === 0 ? (
         <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-          No returns recorded for this order.
+          {t('returns.empty')}
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-slate-200">
-          <table className="w-full text-left text-sm">
+          <table className="w-full text-start text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th scope="col" className="px-3 py-2 font-semibold">
-                  Number
+                  {t('returns.columns.number')}
                 </th>
                 <th scope="col" className="px-3 py-2 font-semibold">
-                  Status
+                  {t('common.status')}
                 </th>
-                <th scope="col" className="px-3 py-2 text-right font-semibold">
-                  Quantity
+                <th scope="col" className="px-3 py-2 text-end font-semibold">
+                  {t('common.quantity')}
                 </th>
                 <th scope="col" className="px-3 py-2 font-semibold">
-                  Reason
+                  {t('common.reason')}
                 </th>
-                <th scope="col" className="px-3 py-2 text-right font-semibold">
-                  Actions
+                <th scope="col" className="px-3 py-2 text-end font-semibold">
+                  {t('common.actions')}
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {items.map((item) => (
                 <tr key={item.id}>
-                  <td className="px-3 py-2 font-mono text-xs text-slate-800">{item.number}</td>
+                  <td dir="ltr" className="px-3 py-2 font-mono text-xs text-slate-800">
+                    {item.number}
+                  </td>
                   <td className="px-3 py-2">
                     <ReturnStatusBadge status={item.status} />
                   </td>
-                  <td className="px-3 py-2 text-right text-slate-700">{item.totalQuantity}</td>
+                  <td className="px-3 py-2 text-end text-slate-700">
+                    {formatQuantity(item.totalQuantity)}
+                  </td>
                   <td className="px-3 py-2 text-slate-600">{item.reason}</td>
                   <td className="px-3 py-2">
                     {canWrite && item.status === 'draft' ? (
@@ -775,7 +794,7 @@ export function SalesReturnsSection({ organizationId, order, canWrite }: SalesRe
                           disabled={postMutation.isPending}
                           onClick={() => void post(item.id)}
                         >
-                          Post return
+                          {t('returns.postAction')}
                         </Button>
                         <Button
                           size="sm"
@@ -783,11 +802,13 @@ export function SalesReturnsSection({ organizationId, order, canWrite }: SalesRe
                           disabled={cancelMutation.isPending}
                           onClick={() => void cancel(item.id)}
                         >
-                          Cancel return
+                          {t('returns.cancelAction')}
                         </Button>
                       </div>
                     ) : (
-                      <span className="block text-right text-xs text-slate-400">—</span>
+                      <span className="block text-end text-xs text-slate-400">
+                        {t('common.notAvailable')}
+                      </span>
                     )}
                   </td>
                 </tr>
