@@ -32,7 +32,8 @@ test.describe('platform administration', () => {
     await createDialog.getByRole('button', { name: 'Create organization' }).click();
     await expect(createDialog).toBeHidden();
 
-    const organizationRow = page.locator('tbody tr').filter({ hasText: organizationName });
+    const organizations = page.getByRole('region', { name: 'Organizations' });
+    const organizationRow = organizations.locator('tbody tr').filter({ hasText: organizationName });
     await expect(organizationRow).toBeVisible();
     await expect(organizationRow.getByRole('cell').nth(2)).toHaveText('1');
 
@@ -67,6 +68,13 @@ test.describe('platform administration', () => {
 
     await page.locator('#main-content').getByRole('link', { name: 'Administration' }).click();
     await expect(page).toHaveURL(/\/admin$/);
+
+    const activity = page.getByRole('region', { name: 'Operator activity' });
+    await expect(activity).toContainText('Created organization');
+    await expect(activity).toContainText('Invited member');
+    await expect(activity).toContainText(organizationName);
+    await expect(activity).toContainText(invitedManager);
+    await expect(activity).toContainText('pat@example.com');
   });
 
   test('manager invites viewers only and cannot manage members', async ({ page }) => {

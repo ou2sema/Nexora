@@ -16,6 +16,15 @@ export const invitationStatusLabels: Record<InvitationStatus, string> = {
 
 export const dateOnly = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' });
 
+export const dateTime = new Intl.DateTimeFormat('en-GB', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+});
+
 export function formatDate(value: string): string {
   return dateOnly.format(new Date(value));
+}
+
+export function formatDateTime(value: string): string {
+  return dateTime.format(new Date(value));
 }

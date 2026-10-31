@@ -45,7 +45,7 @@ export default defineConfig({
       command: 'node scripts/local-e2e-stack.mjs',
       cwd: '../api',
       url: `${API_ORIGIN}/health`,
-      reuseExistingServer: true,
+      reuseExistingServer: !process.env.CI,
       timeout: 180_000,
       stdout: 'pipe',
       stderr: 'pipe',
@@ -53,7 +53,7 @@ export default defineConfig({
     {
       command: 'npx vite --port 5174 --strictPort',
       url: WEB_ORIGIN,
-      reuseExistingServer: true,
+      reuseExistingServer: !process.env.CI,
       timeout: 120_000,
       env: {
         VITE_SUPABASE_URL: 'http://localhost:4200',

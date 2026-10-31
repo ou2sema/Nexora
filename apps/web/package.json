@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:e2e": "node -e \"require('node:fs').rmSync('allure-results',{recursive:true,force:true})\" && playwright test",
+    "test:e2e:local": "node -e \"require('node:fs').rmSync('allure-results',{recursive:true,force:true})\" && playwright test -c playwright.local-stack.config.ts",
     "test:e2e:headed": "playwright test --headed",
     "allure:serve": "allure serve allure-results"
   },

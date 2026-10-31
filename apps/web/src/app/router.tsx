@@ -1,48 +1,100 @@
 import { createBrowserRouter } from 'react-router';
 
 import { AppShell } from '@/components/layout/app-shell';
-import { AdminPage } from '@/routes/admin-page';
-import { AdminTeamPage } from '@/routes/admin-team-page';
-import { CatalogSettingsPage } from '@/routes/catalog-settings-page';
-import { DashboardPage } from '@/routes/dashboard-page';
-import { DevicesPage } from '@/routes/devices-page';
-import { NotFoundPage } from '@/routes/not-found-page';
-import { ProductsPage } from '@/routes/products-page';
-import { PurchaseOrdersPage } from '@/routes/purchase-orders-page';
-import { ReconciliationPage } from '@/routes/reconciliation-page';
-import { ReservationsPage } from '@/routes/reservations-page';
-import { SalesOrdersPage } from '@/routes/sales-orders-page';
-import { ScanningPage } from '@/routes/scanning-page';
-import { SignInPage } from '@/routes/sign-in-page';
-import { StockLevelsPage } from '@/routes/stock-levels-page';
-import { StockMovementsPage } from '@/routes/stock-movements-page';
-import { SuppliersPage } from '@/routes/suppliers-page';
-import { TeamPage } from '@/routes/team-page';
-import { WarehousesPage } from '@/routes/warehouses-page';
 
 export const router = createBrowserRouter([
-  { path: '/sign-in', element: <SignInPage /> },
+  {
+    path: '/sign-in',
+    lazy: async () => ({ Component: (await import('@/routes/sign-in-page')).SignInPage }),
+  },
   {
     path: '/',
     element: <AppShell />,
     children: [
-      { index: true, element: <DashboardPage /> },
-      { path: 'products', element: <ProductsPage /> },
-      { path: 'scan', element: <ScanningPage /> },
-      { path: 'stock', element: <StockLevelsPage /> },
-      { path: 'stock/movements', element: <StockMovementsPage /> },
-      { path: 'stock/reservations', element: <ReservationsPage /> },
-      { path: 'stock/reconciliation', element: <ReconciliationPage /> },
-      { path: 'devices', element: <DevicesPage /> },
-      { path: 'suppliers', element: <SuppliersPage /> },
-      { path: 'purchasing', element: <PurchaseOrdersPage /> },
-      { path: 'orders', element: <SalesOrdersPage /> },
-      { path: 'warehouses', element: <WarehousesPage /> },
-      { path: 'catalog', element: <CatalogSettingsPage /> },
-      { path: 'team', element: <TeamPage /> },
-      { path: 'admin', element: <AdminPage /> },
-      { path: 'admin/organizations/:organizationId/team', element: <AdminTeamPage /> },
-      { path: '*', element: <NotFoundPage /> },
+      {
+        index: true,
+        lazy: async () => ({ Component: (await import('@/routes/dashboard-page')).DashboardPage }),
+      },
+      {
+        path: 'products',
+        lazy: async () => ({ Component: (await import('@/routes/products-page')).ProductsPage }),
+      },
+      {
+        path: 'scan',
+        lazy: async () => ({ Component: (await import('@/routes/scanning-page')).ScanningPage }),
+      },
+      {
+        path: 'stock',
+        lazy: async () => ({
+          Component: (await import('@/routes/stock-levels-page')).StockLevelsPage,
+        }),
+      },
+      {
+        path: 'stock/movements',
+        lazy: async () => ({
+          Component: (await import('@/routes/stock-movements-page')).StockMovementsPage,
+        }),
+      },
+      {
+        path: 'stock/reservations',
+        lazy: async () => ({
+          Component: (await import('@/routes/reservations-page')).ReservationsPage,
+        }),
+      },
+      {
+        path: 'stock/reconciliation',
+        lazy: async () => ({
+          Component: (await import('@/routes/reconciliation-page')).ReconciliationPage,
+        }),
+      },
+      {
+        path: 'devices',
+        lazy: async () => ({ Component: (await import('@/routes/devices-page')).DevicesPage }),
+      },
+      {
+        path: 'suppliers',
+        lazy: async () => ({ Component: (await import('@/routes/suppliers-page')).SuppliersPage }),
+      },
+      {
+        path: 'purchasing',
+        lazy: async () => ({
+          Component: (await import('@/routes/purchase-orders-page')).PurchaseOrdersPage,
+        }),
+      },
+      {
+        path: 'orders',
+        lazy: async () => ({
+          Component: (await import('@/routes/sales-orders-page')).SalesOrdersPage,
+        }),
+      },
+      {
+        path: 'warehouses',
+        lazy: async () => ({
+          Component: (await import('@/routes/warehouses-page')).WarehousesPage,
+        }),
+      },
+      {
+        path: 'catalog',
+        lazy: async () => ({
+          Component: (await import('@/routes/catalog-settings-page')).CatalogSettingsPage,
+        }),
+      },
+      {
+        path: 'team',
+        lazy: async () => ({ Component: (await import('@/routes/team-page')).TeamPage }),
+      },
+      {
+        path: 'admin',
+        lazy: async () => ({ Component: (await import('@/routes/admin-page')).AdminPage }),
+      },
+      {
+        path: 'admin/organizations/:organizationId/team',
+        lazy: async () => ({ Component: (await import('@/routes/admin-team-page')).AdminTeamPage }),
+      },
+      {
+        path: '*',
+        lazy: async () => ({ Component: (await import('@/routes/not-found-page')).NotFoundPage }),
+      },
     ],
   },
 ]);

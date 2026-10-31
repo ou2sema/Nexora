@@ -13,6 +13,12 @@ export {
   organizationSchema,
 } from './account';
 export {
+  type AdminAuditEvent,
+  adminAuditEventSchema,
+  type AdminAuditQuery,
+  adminAuditQuerySchema,
+  type AdminAuditResponse,
+  adminAuditResponseSchema,
   type AdminOrganizationSummary,
   type AdminOrganizationsResponse,
   adminOrganizationSchema,

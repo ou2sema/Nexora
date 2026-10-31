@@ -38,7 +38,13 @@ and organization-scoped reporting.
 > invite viewers only. Platform administration covers identity rows, not business data, so stock,
 > catalog, devices, and orders still require membership. It is verified locally, and its
 > migration was applied to the hosted project on 2026-10-31 with the bootstrap flag verified
-> for the operator account. Nothing is production-ready yet.
+> for the operator account. Phase 11 adds operational hardening: a platform-admin audit trail
+> (`/admin` shows recent operator activity), a schema capability probe that stops the API from
+> booting against an out-of-date database, a read-only integrity CLI
+> (`npm run check:integrity`), an idempotent operator script for granting the platform flag, the
+> full local-stack Playwright suite in CI, and route-level code splitting. It is verified
+> locally; its migration has not yet been applied to the hosted project, and the documented
+> restore drill has not been executed. Nothing is production-ready yet.
 
 ## Stack
 
@@ -70,6 +76,9 @@ supplier performance are specified in
 specified in [ADR-0010](docs/adr/0010-purchasing-documents.md). Team roles and invitations are
 specified in [ADR-0011](docs/adr/0011-team-access.md). Platform administration and the
 operator flag are specified in [ADR-0012](docs/adr/0012-platform-administration.md).
+The Phase 11 hardening measures — audit trail, boot-time schema probe, integrity CLI, CI
+coverage, and route splitting — are specified in
+[ADR-0013](docs/adr/0013-operational-hardening.md).
 
 ## Layout
 
@@ -95,6 +104,7 @@ query inside a transaction that holds the caller's identity, so RLS applies.
 | ------ | ------------------------------------------------------------------------ | --------------------------------------------------- |
 | GET    | `/api/v1/me`                                                             | any authenticated user                              |
 | GET    | `/api/v1/admin/organizations`                                            | platform admin                                      |
+| GET    | `/api/v1/admin/audit`                                                    | platform admin                                      |
 | POST   | `/api/v1/organizations`                                                  | platform admin                                      |
 | GET    | `/api/v1/organizations/:id/products`                                     | any member                                          |
 | POST   | `/api/v1/organizations/:id/products`                                     | owner, admin, manager                               |
@@ -280,6 +290,25 @@ and invite viewers only; owners and admins continue to manage roles, removals, a
 and the last-owner trigger applies to every caller, platform admins included. See
 [ADR-0012](docs/adr/0012-platform-administration.md).
 
+Platform-admin actions are audited. Every organization created, invitation created or
+revoked, role changed, and member removed by a platform admin writes a row in
+`public.admin_audit_events` with the actor, organization, target, and before/after detail.
+Organization owners, admins, and managers keep their own powers and are not logged, so the
+trail covers cross-tenant operator activity; `/admin` shows the latest entries in an
+Operator activity table, and `GET /api/v1/admin/audit` serves the same rows to platform
+admins only. The table is RLS-protected and has no client write grant. Granting the
+platform flag is still a database operation, now available as an idempotent operator
+script that records its own audit row.
+
+The API probes the schema at boot (`to_regclass`/`to_regprocedure`) and refuses to start
+when a reachable database is missing objects it needs, naming them; an unreachable database
+only logs a warning so health checks and the shell test suite still run. `npm run
+check:integrity` sweeps every organization, calls `app.stock_reconciliation` under an
+owner/admin's claims, and exits non-zero on any drift, so it can run unattended. See
+[ADR-0013](docs/adr/0013-operational-hardening.md) and
+[`docs/runbooks/restore-drill.md`](docs/runbooks/restore-drill.md) for the operator
+procedures.
+
 ## Prerequisites
 
 - Node.js >= 22.12 (developed on 26.13.0) and npm >= 10
@@ -300,13 +329,14 @@ npm run build
 
 ## Scripts
 
-| Script                  | Purpose                                       |
-| ----------------------- | --------------------------------------------- |
-| `npm run lint`          | ESLint across the workspace                   |
-| `npm run format`        | Prettier write                                |
-| `npm run format:check`  | Prettier check without writing                |
-| `npm run typecheck`     | TypeScript project checks per workspace       |
-| `npm run test`          | Unit/integration tests per workspace          |
-| `npm run test:e2e`      | Playwright end-to-end suite                   |
-| `npm run report:allure` | Serve the Allure report from the last E2E run |
-| `npm run build`         | Build every workspace package                 |
+| Script                    | Purpose                                                                |
+| ------------------------- | ---------------------------------------------------------------------- |
+| `npm run lint`            | ESLint across the workspace                                            |
+| `npm run format`          | Prettier write                                                         |
+| `npm run format:check`    | Prettier check without writing                                         |
+| `npm run typecheck`       | TypeScript project checks per workspace                                |
+| `npm run test`            | Unit/integration tests per workspace                                   |
+| `npm run test:e2e`        | Playwright end-to-end suite                                            |
+| `npm run check:integrity` | Read-only stock/ledger sweep for every organization (exits 1 on drift) |
+| `npm run report:allure`   | Serve the Allure report from the last E2E run                          |
+| `npm run build`           | Build every workspace package                                          |

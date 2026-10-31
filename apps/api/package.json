@@ -6,6 +6,8 @@
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "node dist/main.js",
+    "check:integrity": "node scripts/integrity-check.mjs",
+    "grant:platform-admin": "node scripts/grant-platform-admin.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },

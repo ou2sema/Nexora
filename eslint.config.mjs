@@ -48,5 +48,9 @@ export default tseslint.config(
     files: ['**/*.config.{js,mjs,cjs,ts}', 'eslint.config.mjs'],
     rules: { 'no-console': 'off' },
   },
+  {
+    files: ['apps/api/scripts/**/*.mjs'],
+    rules: { 'no-console': 'off' },
+  },
   prettier,
 );

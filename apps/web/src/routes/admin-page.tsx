@@ -1,20 +1,56 @@
-import { Building2, Mail, Plus, RefreshCw, ShieldCheck, Users } from 'lucide-react';
+import { Activity, Building2, Mail, Plus, RefreshCw, ShieldCheck, Users } from 'lucide-react';
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router';
+
+import type { AdminAuditEvent } from '@mystock/contracts';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { AdminInviteDialog } from '@/features/admin/admin-invite-dialog';
-import { adminOrganizationsKey, useAdminOrganizations } from '@/features/admin/api';
+import {
+  adminAuditKey,
+  adminOrganizationsKey,
+  useAdminAudit,
+  useAdminOrganizations,
+} from '@/features/admin/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOrganization } from '@/features/organizations/organization-provider';
 import { CreateOrganizationForm } from '@/features/organizations/create-organization-form';
-import { formatDate } from '@/features/team/labels';
+import { formatDate, formatDateTime } from '@/features/team/labels';
+
+const auditActionLabels: Record<string, string> = {
+  organization_created: 'Created organization',
+  invitation_created: 'Invited member',
+  invitation_revoked: 'Revoked invitation',
+  member_role_changed: 'Changed role',
+  member_removed: 'Removed member',
+};
+
+function auditDetail(event: AdminAuditEvent): string {
+  const detail = event.detail;
+
+  switch (event.action) {
+    case 'organization_created':
+      return typeof detail.slug === 'string' ? detail.slug : '';
+    case 'invitation_created':
+    case 'invitation_revoked':
+      return typeof detail.role === 'string' ? `${detail.role} invitation` : '';
+    case 'member_role_changed':
+      return typeof detail.from === 'string' && typeof detail.to === 'string'
+        ? `${detail.from} → ${detail.to}`
+        : '';
+    case 'member_removed':
+      return typeof detail.role === 'string' ? `was ${detail.role}` : '';
+    default:
+      return '';
+  }
+}
 
 export function AdminPage() {
   const { platformAdmin } = useOrganization();
   const queryClient = useQueryClient();
   const organizations = useAdminOrganizations();
+  const audit = useAdminAudit();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -25,6 +61,7 @@ export function AdminPage() {
   }
 
   const items = organizations.data?.items ?? [];
+  const auditItems = audit.data?.items ?? [];
 
   const openInvite = (organizationId = '') => {
     setInviteOrganizationId(organizationId);
@@ -191,6 +228,90 @@ export function AdminPage() {
         )}
       </section>
 
+      <section
+        aria-labelledby="admin-audit-heading"
+        className="rounded-xl border border-slate-200 bg-white"
+      >
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-4 py-3">
+          <Activity aria-hidden="true" className="size-4 text-slate-500" />
+          <h2 id="admin-audit-heading" className="text-sm font-semibold text-slate-900">
+            Operator activity
+          </h2>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="ml-auto"
+            onClick={() => void audit.refetch()}
+            disabled={audit.isFetching}
+          >
+            <RefreshCw aria-hidden="true" className="size-4" />
+            Refresh
+          </Button>
+        </div>
+
+        {audit.isError ? (
+          <p role="alert" className="px-4 py-6 text-sm text-rose-800">
+            {audit.error instanceof Error ? audit.error.message : 'Activity failed to load.'}
+          </p>
+        ) : audit.isPending ? (
+          <p role="status" className="px-4 py-6 text-sm text-slate-500">
+            Loading activity…
+          </p>
+        ) : auditItems.length === 0 ? (
+          <p className="px-4 py-6 text-sm text-slate-600">
+            No operator activity yet. Organization, invitation, and role changes made from
+            administration are recorded here.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <caption className="sr-only">Recent platform administration activity</caption>
+              <thead className="text-xs uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-slate-200">
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    When
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    Action
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    Organization
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    Target
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    Actor
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {auditItems.map((event) => {
+                  const detail = auditDetail(event);
+
+                  return (
+                    <tr key={event.id} className="hover:bg-slate-50">
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                        {formatDateTime(event.createdAt)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-slate-900">
+                          {auditActionLabels[event.action] ?? event.action}
+                        </p>
+                        {detail ? <p className="mt-0.5 text-xs text-slate-500">{detail}</p> : null}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">{event.organizationName ?? '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{event.targetEmail ?? '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{event.actorEmail ?? '—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
       <p className="text-xs text-slate-500">
         Platform administration covers organizations, memberships and invitations. Stock, catalog,
         devices and orders require a membership in the relevant organization.
@@ -209,6 +330,7 @@ export function AdminPage() {
               onCreated={() => {
                 setCreateOpen(false);
                 void queryClient.invalidateQueries({ queryKey: adminOrganizationsKey });
+                void queryClient.invalidateQueries({ queryKey: adminAuditKey });
               }}
             />
           </div>

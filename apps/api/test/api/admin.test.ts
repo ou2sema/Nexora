@@ -197,4 +197,67 @@ describe('platform administration', () => {
     expect(orgA).toMatchObject({ memberCount: 3, pendingInvitationCount: 1 });
     expect(orgB).toMatchObject({ memberCount: 1, pendingInvitationCount: 1 });
   });
+
+  it('exposes the operator audit trail to platform admins only', async () => {
+    const forbidden = await request(server())
+      .get('/api/v1/admin/audit')
+      .set('authorization', auth(aliceToken));
+    expect(forbidden.status).toBe(403);
+    expect(forbidden.body.error.code).toBe('platform_admin_required');
+
+    const response = await request(server())
+      .get('/api/v1/admin/audit')
+      .set('authorization', auth(patToken));
+    expect(response.status).toBe(200);
+
+    const items = response.body.items as {
+      action: string;
+      actorEmail: string | null;
+      organizationName: string | null;
+      targetEmail: string | null;
+      detail: Record<string, unknown>;
+    }[];
+
+    expect(items.map((item) => item.action).sort()).toEqual([
+      'invitation_created',
+      'member_removed',
+      'member_role_changed',
+    ]);
+    expect(items.every((item) => item.actorEmail === 'operator@example.com')).toBe(true);
+
+    const invitation = items.find((item) => item.action === 'invitation_created');
+    expect(invitation).toMatchObject({
+      organizationName: 'Org B',
+      targetEmail: 'nextmanager@example.com',
+      detail: { role: 'manager' },
+    });
+
+    const roleChange = items.find((item) => item.action === 'member_role_changed');
+    expect(roleChange).toMatchObject({
+      targetEmail: 'carol@example.com',
+      detail: { from: 'viewer', to: 'manager' },
+    });
+
+    const removal = items.find((item) => item.action === 'member_removed');
+    expect(removal).toMatchObject({
+      targetEmail: 'carol@example.com',
+      detail: { role: 'manager' },
+    });
+
+    expect(items.some((item) => item.targetEmail === 'manager-viewer@example.com')).toBe(false);
+  });
+
+  it('caps and validates the audit page size', async () => {
+    const limited = await request(server())
+      .get('/api/v1/admin/audit?limit=1')
+      .set('authorization', auth(patToken));
+    expect(limited.status).toBe(200);
+    expect(limited.body.items).toHaveLength(1);
+
+    const invalid = await request(server())
+      .get('/api/v1/admin/audit?limit=0')
+      .set('authorization', auth(patToken));
+    expect(invalid.status).toBe(400);
+    expect(invalid.body.error.code).toBe('validation_error');
+  });
 });

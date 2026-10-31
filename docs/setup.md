@@ -505,7 +505,7 @@ cd apps/web
 npx playwright test --config playwright.local-stack.config.ts --headed
 ```
 
-Expected: 26 passing checks (13 tests × desktop/mobile). The administration test signs in as
+Expected: 28 passing checks (14 tests × desktop/mobile). The administration test signs in as
 pat, creates a project-specific organization with gina invited as manager, opens the
 organization picker to invite another manager, checks the pending counts, opens that
 organization's team page, and returns to `/admin`. The manager test signs in as gina and
@@ -533,6 +533,85 @@ query returning `true` for the operator (3 visible organizations) and `false` fo
 (2 visible organizations), so the pre-migration `500` on `/me` is resolved. The signed-in
 hosted organization-creation and cross-organization team flows have not been exercised yet;
 they are covered by the local-stack suite.
+
+## Operational hardening verification
+
+The Phase 11 suites run without a hosted project:
+
+```powershell
+npm run test --workspace @mystock/api -- test/db/admin-audit.test.ts test/api/admin.test.ts test/schema-guard.test.ts
+```
+
+Expected: 17 passing tests (4 audit database, 8 administration API, 5 schema guard). The
+audit suite proves that platform-admin organization, invitation, role, and removal actions
+write rows with the right actor, target, and detail; that the same actions performed by an
+organization owner are not logged; that non-platform users read zero rows and cannot insert
+directly; and that `member_role_changed` and `member_removed` record before/after state.
+The administration API suite adds the `/admin/audit` endpoint: 403 for an ordinary owner,
+row contents for the operator, no entry for a manager-created invitation, a `limit` cap, and
+`400 validation_error` for `limit=0`. The schema-guard suite runs every migration on PGlite,
+asserts the full schema passes, lists objects when only early migrations are applied,
+refuses an out-of-date schema, and distinguishes an unreachable database (warn and continue)
+from a server-side error (stop).
+
+The headed run uses the same local stack and now runs 28 checks (14 tests × desktop/mobile);
+the extra test is the top-bar bell regression added after Phase 10. The administration test now
+also asserts the Operator activity table on `/admin` lists the created organization and the
+invitation, including the target email and actor.
+
+The integrity CLI was exercised against the local stack on 2026-10-31:
+
+- Clean database: `Integrity check: 1 organization(s). OK Org A (0 stock line(s))`, exit `0`.
+- A deliberately inserted balance with no ledger movement: `DRIFT Org A — 1 of 1 stock
+line(s)` with `balance=5.0000 ledger=0 difference=5.0000`, exit `1`. The row was then
+  removed and the sweep returned to zero drift.
+
+The operator grant script was exercised the same day: it granted
+`alice@example.com`, a second run reported “already a platform administrator”, an unknown
+email exited `1`, and the audit row stored `jsonb_typeof(detail) = object` with
+`{"source":"grant-platform-admin.mjs"}` and a `null` actor.
+
+Full gates on 2026-10-31 for Phase 11: `format:check`, `lint`, `typecheck`, and `build`
+clean; 277 Vitest tests across the workspaces (228 API across 29 files, 33 domain, 8
+contracts, 8 config); the headed local-stack run passed 28/28; the web build emits one
+chunk per route.
+
+The Phase 11 migration (`20261031180000_admin_audit.sql`) has **not** been applied to the
+hosted project. Apply it before deploying this API version: the boot-time schema probe
+checks for `public.admin_audit_events` and stops the process otherwise. The restore drill
+in [`runbooks/restore-drill.md`](runbooks/restore-drill.md) is documented but has not been
+executed.
+
+## Operator tasks
+
+### Integrity sweep
+
+`npm run check:integrity` reads `DATABASE_URL` and `DATABASE_SSL` from the environment or
+the root `.env`, iterates every organization, calls `app.stock_reconciliation` with an
+owner/admin's JWT claims, and prints `OK`, `DRIFT`, or `SKIP` per organization. Exit code
+`0` means every projection matches its ledger; `1` means drift or an error. It is read-only
+and safe while the API runs.
+
+Schedule it daily or weekly and alert on a non-zero exit:
+
+- **Linux cron** — `15 6 * * * cd /srv/mystock && DATABASE_SSL=true npm run check:integrity >> /var/log/mystock-integrity.log 2>&1`.
+- **Windows Task Scheduler** — run `npm.cmd` with arguments `run check:integrity`, working
+  directory the repository root, with `DATABASE_URL` set for the task.
+- **CI** — a scheduled workflow step with the hosted `DATABASE_URL` in a repository secret.
+  Keep it separate from the deploy job so an outage is visible without blocking deploys.
+
+### Granting platform administration
+
+`npm run grant:platform-admin --workspace @mystock/api -- person@example.com` connects with
+`DATABASE_URL`, so it needs database administration rights (the migration role or the
+operator's own console). It is idempotent, refuses an email with no profile (the person must
+have signed in at least once), never prints the connection string, and writes a
+`platform_admin_granted` audit row with a `null` actor. There is still no HTTP grant path.
+
+### Restore drill
+
+Follow [`runbooks/restore-drill.md`](runbooks/restore-drill.md). It targets a scratch
+Supabase project, never production, and has not been executed yet.
 
 ## Quality gates
 
@@ -564,6 +643,7 @@ The schema is plain SQL in `supabase/migrations`, applied in filename order:
 | `20261031120000_returns_and_supplier_performance.sql` | purchase and sales returns, return numbering and lifecycle RPCs                                                        |
 | `20261031140000_team_access.sql`                      | profiles projection, email-keyed invitations, membership and invitation RPCs                                           |
 | `20261031160000_platform_administration.sql`          | platform-admin flag, restricted organization creation, cross-organization team access, manager viewer-only invitations |
+| `20261031180000_admin_audit.sql`                      | operator audit table, `app.log_admin_action`, logged organization/invitation/membership RPCs                           |
 
 Demo data lives in `supabase/seed.sql` and requires at least one signed-up user (it raises
 `seed_requires_auth_user` otherwise).
@@ -627,7 +707,10 @@ tenant isolation, and invitation acceptance are verified, while hosted role chan
 are still unexercised (see “Team access verification”). Phase 10
 (`20261031160000_platform_administration.sql`) was applied on 2026-10-31; hosted organization
 creation is now platform-admin-only, and the bootstrap flag for `ou3sema@gmail.com` is
-verified in `profiles`. The signed-in hosted Phase 10 UI flows remain to be exercised.
+verified in `profiles`. The signed-in hosted Phase 10 UI flows remain to be exercised. Phase 11
+(`20261031180000_admin_audit.sql`) is **not** applied to the hosted project yet; it must be
+applied before this API version is deployed there, because the boot-time schema guard refuses
+to start without `public.admin_audit_events` and `app.log_admin_action`.
 
 The Phase 3 migrations (`20261029130000_stock_ledger.sql` and
 `20261029140000_serialized_devices.sql`) were pushed to the hosted project on 2026-10-29 with
@@ -669,13 +752,14 @@ npm run test --workspace @mystock/api -- test/db
 
 ## Test suites
 
-| Command                                                         | What it runs                                                                                                                                                                                                                     |
-| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run test`                                                  | 266 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, team access, platform administration, API shell, env, contracts, domain |
-| `npm run test:e2e`                                              | Playwright against the API and dev server (16 checks: 8 tests × desktop/mobile)                                                                                                                                                  |
-| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                 |
-| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                      |
-| `npx playwright test --config playwright.local-stack.config.ts` | Phase 6–10 flows on the self-contained stack (26 checks: 13 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                                              |
+| Command                                                         | What it runs                                                                                                                                                                                                                                                |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run test`                                                  | 277 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, team access, platform administration, admin audit, schema guard, API shell, env, contracts, domain |
+| `npm run test:e2e`                                              | Playwright against the API and dev server (16 checks: 8 tests × desktop/mobile)                                                                                                                                                                             |
+| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                            |
+| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                 |
+| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–11 flows on the self-contained stack (28 checks: 14 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                                                                         |
+| `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                           |
 
 The API suites (`apps/api/test/api`) run the real migrations on PGlite, sign JWTs with
 locally generated ES256 keys, and serve the trusted public key from a temporary JWKS
@@ -710,16 +794,20 @@ first, so the report always reflects exactly one run. `allure-results/` and
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs two jobs on `ubuntu-latest` for every push to `main`
+`.github/workflows/ci.yml` runs three jobs on `ubuntu-latest` for every push to `main`
 and every pull request:
 
-| Job       | Steps                                                                                        |
-| --------- | -------------------------------------------------------------------------------------------- |
-| `quality` | `npm ci` → format check → lint → typecheck → unit tests → build                              |
-| `e2e`     | `npm ci` → install Chromium → write test `.env.local` → build → Playwright → artifact upload |
+| Job         | Steps                                                                                        |
+| ----------- | -------------------------------------------------------------------------------------------- |
+| `quality`   | `npm ci` → format check → lint → typecheck → unit tests → build                              |
+| `e2e`       | `npm ci` → install Chromium → write test `.env.local` → build → Playwright → artifact upload |
+| `e2e-local` | `npm ci` → install Chromium → build → full local-stack Playwright suite → artifact upload    |
 
-The E2E job writes placeholder `VITE_` values (no real project, no real secrets) and
-uploads `test-results/` plus `allure-results/` only when the run fails.
+The `e2e` job writes placeholder `VITE_` values (no real project, no real secrets) and
+uploads `test-results/` plus `allure-results/` only when the run fails. The `e2e-local` job
+boots embedded PostgreSQL, the fake auth/JWKS server, the built API, and Vite, so it needs
+no Supabase project; it runs the same 28 checks as the headed local run. The `e2e-local` job
+has not yet run on GitHub Actions; it was validated by running the same command locally.
 
 To reproduce the `quality` job locally, run the gates above in the same order after a
 clean `npm ci`. To reproduce the `e2e` job locally, stop any running dev servers first — CI mode never
