@@ -10,7 +10,7 @@ import {
   Tag,
   Wallet,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 
 import { Button } from '@/components/ui/button';
@@ -70,6 +70,14 @@ export function DashboardPage() {
   const [supplierDays, setSupplierDays] = useState(90);
   const [exporting, setExporting] = useState<'levels' | 'movements' | null>(null);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+  const organizationIdRef = useRef(organizationId);
+
+  useEffect(() => {
+    organizationIdRef.current = organizationId;
+    setWarehouseId('');
+    setCategoryId('');
+    setNotice(null);
+  }, [organizationId]);
 
   const overview = useReportOverview(organizationId, { warehouseId, categoryId, days });
   const lowStock = useLowStock(organizationId, {
@@ -164,6 +172,7 @@ export function DashboardPage() {
   ];
 
   const runExport = async (kind: 'levels' | 'movements') => {
+    const forOrganization = organizationId;
     setExporting(kind);
     setNotice(null);
     try {
@@ -171,6 +180,7 @@ export function DashboardPage() {
         kind === 'levels'
           ? await exportLevels({ warehouseId, categoryId })
           : await exportMovements({ warehouseId, categoryId, days });
+      if (organizationIdRef.current !== forOrganization) return;
       saveBlob(file.blob, file.filename);
       setNotice({
         tone: 'ok',

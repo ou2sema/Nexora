@@ -27,6 +27,28 @@ async function signIn(page: Page): Promise<void> {
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
 }
 
+test('clears export feedback and filters when switching organization', async ({ page }) => {
+  await signIn(page);
+
+  const warehouseSelect = page.locator('#report-warehouse');
+  await warehouseSelect.selectOption('50000000-0000-4000-8000-00000000000a');
+  await expect(warehouseSelect).toHaveValue('50000000-0000-4000-8000-00000000000a');
+
+  await page.getByRole('button', { name: 'Stock levels CSV' }).click();
+  const notice = page
+    .getByRole('status')
+    .filter({ hasText: /^Downloaded mystock-stock-levels-\d{4}-\d{2}-\d{2}\.csv$/ });
+  await expect(notice).toBeVisible();
+
+  await page.getByRole('combobox', { name: 'Organization' }).selectOption({ label: 'Org B' });
+
+  await expect(notice).toHaveCount(0);
+  await expect(warehouseSelect).toHaveValue('');
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Dashboard', exact: true }),
+  ).toBeVisible();
+});
+
 test('top-bar bell shows alerts and jumps to the low-stock section', async ({ page, request }) => {
   const token = await ownerToken();
   const patch = await request.patch(
