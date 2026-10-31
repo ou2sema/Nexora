@@ -513,19 +513,26 @@ confirms the viewer-only invitation form, no role selects or remove buttons, and
 action.
 
 To exercise it by hand locally, sign in as `pat@example.com` (any password on the fake auth
-server) and open **Administration**. On a hosted project, apply the Phase 10 migration first;
-the migration marks `ou3sema@gmail.com` as the first platform admin, and the flag is then
-changed only through SQL — there is no HTTP endpoint that grants it.
+server) and open **Administration**. On a hosted project the Phase 10 migration marks
+`ou3sema@gmail.com` as the first platform admin; the flag is then changed only through SQL —
+there is no HTTP endpoint that grants it. Apply the migration before deploying this API
+version, because `/me` reads the flag.
 
 Full gates on 2026-10-31 for Phase 10: `format:check`, `lint`, `typecheck`, and `build` clean;
 266 Vitest tests across the workspaces (217 API across 27 files, 33 domain, 8 contracts, 8
 config); the headed local-stack run passed 26/26 with Allure served at
 http://127.0.0.1:5055 for this run.
 
-The hosted project has not received the Phase 10 migration
-(`20261031160000_platform_administration.sql`). Until it is applied, hosted organization
-creation still uses the Phase 9 behavior and `/admin` returns `403 platform_admin_required`.
-Applying it is an operator action; see “Database” below.
+The hosted project received the Phase 10 migration
+(`20261031160000_platform_administration.sql`) on 2026-10-31 after the user approved the push;
+the dry run listed only that migration. A read-only check then confirmed the
+`profiles.is_platform_admin` column, the `app.is_platform_admin()` function, and the migration
+record, with `ou3sema@gmail.com` carrying the flag and the other profiles at `false`.
+Simulating each member's JWT claims under the `authenticated` role showed the exact `/me`
+query returning `true` for the operator (3 visible organizations) and `false` for the viewer
+(2 visible organizations), so the pre-migration `500` on `/me` is resolved. The signed-in
+hosted organization-creation and cross-organization team flows have not been exercised yet;
+they are covered by the local-stack suite.
 
 ## Quality gates
 
@@ -618,9 +625,9 @@ verification account was removed; only the owner remains. Phase 8 added no schem
 (`20261031140000_team_access.sql`) was applied on 2026-10-31; the hosted Team page, API,
 tenant isolation, and invitation acceptance are verified, while hosted role change and removal
 are still unexercised (see “Team access verification”). Phase 10
-(`20261031160000_platform_administration.sql`) is not applied yet: hosted organization
-creation remains owner-only until it is pushed, and the bootstrap flag for
-`ou3sema@gmail.com` lands with that migration.
+(`20261031160000_platform_administration.sql`) was applied on 2026-10-31; hosted organization
+creation is now platform-admin-only, and the bootstrap flag for `ou3sema@gmail.com` is
+verified in `profiles`. The signed-in hosted Phase 10 UI flows remain to be exercised.
 
 The Phase 3 migrations (`20261029130000_stock_ledger.sql` and
 `20261029140000_serialized_devices.sql`) were pushed to the hosted project on 2026-10-29 with

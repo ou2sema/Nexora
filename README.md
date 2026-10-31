@@ -36,8 +36,9 @@ and organization-scoped reporting.
 > viewer), list every organization, and administer members across organizations without joining
 > them. Organization owners and admins keep their roles; managers may read the invitation log and
 > invite viewers only. Platform administration covers identity rows, not business data, so stock,
-> catalog, devices, and orders still require membership. It is verified locally; the Phase 10
-> migration has not yet been applied to the hosted project. Nothing is production-ready yet.
+> catalog, devices, and orders still require membership. It is verified locally, and its
+> migration was applied to the hosted project on 2026-10-31 with the bootstrap flag verified
+> for the operator account. Nothing is production-ready yet.
 
 ## Stack
 
