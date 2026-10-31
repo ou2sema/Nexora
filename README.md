@@ -18,9 +18,9 @@ and organization-scoped reporting.
 > end-to-end socket delivery. Phase 6 adds a supplier directory, purchase orders with
 > incremental receiving (serialized lines register devices), outgoing orders that reserve on
 > confirmation and issue on fulfilment, per-organization/year document numbering, and
-> single-transaction lifecycle RPCs. It is verified locally on a self-contained stack, and its
-> hosted migration was applied on 2026-10-31; a signed-in hosted pass is still outstanding.
-> Nothing is production-ready yet.
+> single-transaction lifecycle RPCs. It is verified locally on a self-contained stack and, on
+> 2026-10-31, through a signed-in hosted pass over suppliers, a purchase order receipt, and an
+> outgoing order. Nothing is production-ready yet.
 
 ## Stack
 

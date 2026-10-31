@@ -268,11 +268,28 @@ RLS enabled, the twelve `app.*` operational functions are present (`save_supplie
 `receive_purchase_order`, `cancel_purchase_order`, `create_sales_order`,
 `confirm_sales_order`, `fulfil_sales_order`, `cancel_sales_order`,
 `operations_apply_stock`, `operations_apply_reservation`), and the migration is recorded in
-`supabase_migrations.schema_migrations`. All five tables were empty at check time, so no
-hosted operational data has been created yet.
+`supabase_migrations.schema_migrations`. All five tables were empty at check time.
 
-A signed-in hosted UI pass over suppliers, purchase orders, and outgoing orders has **not**
-been run; do it with a throwaway account rather than the owner's password.
+A signed-in pass followed the same day in the “MyStock” tenant against the hosted API:
+
+- **Suppliers**: created “Tunis Tech Distribution” with contact, email, address, and
+  `Tunis`/`TN`; the row rendered the location as `Tunis, TN`. Deactivate flipped the badge to
+  Inactive and Reactivate returned it to Active.
+- **Purchase orders**: created `PO-2026-0001` for one `CABLE-01` at `7,500 DT`, marked it
+  ordered (“PO-2026-0001 is now ordered.”), then received one unit; the detail view moved to
+  Received with ordered/received `1 / 1` and the receipt notice.
+- **Outgoing orders**: the product picker offered only active, non-serialized products (the
+  serialized `IPHONE-15` was absent). Created `SO-2026-0001` for one `CABLE-01` at
+  `8,900 DT`, confirmed it (“Reserved 1 unit”, reservation id shown), and fulfilled it
+  (“Issued 1 unit”, status Fulfilled).
+- **Ledger**: the dashboard stayed at 18 units on hand with 0 reserved while movements rose
+  11 → 13 (received 21, issued 6). Hosted rows agree: the receipt carries
+  `reference_type = purchase_order`, the issue `reference_type = outgoing_order`, the
+  reservation is `fulfilled`, balances are `A-01 = 16` and `A-02 = 2`, and the projection
+  sum equals the ledger sum (18 / 18, zero drift).
+
+That verification data remains in the tenant: supplier “Tunis Tech Distribution”,
+`PO-2026-0001`, and `SO-2026-0001`.
 
 ## Quality gates
 
