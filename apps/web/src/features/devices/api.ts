@@ -19,6 +19,7 @@ import { apiRequest, newIdempotencyKey } from '@/lib/api-client';
 export interface DeviceFilters {
   search: string;
   status: DeviceStatus | '';
+  productId?: string;
   page: number;
   pageSize: number;
 }
@@ -40,6 +41,7 @@ export function useDevices(organizationId: string | null, filters: DeviceFilters
       });
       if (filters.search.trim()) params.set('search', filters.search.trim());
       if (filters.status) params.set('status', filters.status);
+      if (filters.productId) params.set('productId', filters.productId);
 
       return apiRequest<DeviceListResponse>(
         `/organizations/${organizationId}/devices?${params.toString()}`,

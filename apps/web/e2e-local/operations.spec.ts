@@ -114,6 +114,84 @@ async function openLatestRow(page: Page, text: string): Promise<void> {
   await expect(page.getByRole('dialog')).toBeVisible();
 }
 
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function receivePurchaseOrder(
+  request: APIRequestContext,
+  supplierId: string,
+  productId: string,
+  quantity: number,
+): Promise<string> {
+  const created = await request.post(
+    `${API_BASE}/organizations/${ORGANIZATION_ID}/purchase-orders`,
+    {
+      headers: { ...authHeaders(), 'idempotency-key': crypto.randomUUID() },
+      data: {
+        supplierId,
+        warehouseId: WAREHOUSE_ID,
+        locationId: LOCATION_ID,
+        expectedOn: todayIso(),
+        lines: [{ productId, quantity, unitCostMinor: 4500 }],
+      },
+    },
+  );
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const order = (await created.json()) as { orderId: string };
+
+  const ordered = await request.post(
+    `${API_BASE}/organizations/${ORGANIZATION_ID}/purchase-orders/${order.orderId}/order`,
+    { headers: { ...authHeaders(), 'idempotency-key': crypto.randomUUID() } },
+  );
+  expect(ordered.ok(), await ordered.text()).toBeTruthy();
+
+  const detail = await request.get(
+    `${API_BASE}/organizations/${ORGANIZATION_ID}/purchase-orders/${order.orderId}`,
+    { headers: authHeaders() },
+  );
+  expect(detail.ok(), await detail.text()).toBeTruthy();
+  const lines = (await detail.json()) as { lines: { id: string }[] };
+
+  const received = await request.post(
+    `${API_BASE}/organizations/${ORGANIZATION_ID}/purchase-orders/${order.orderId}/receipts`,
+    {
+      headers: { ...authHeaders(), 'idempotency-key': crypto.randomUUID() },
+      data: { lines: [{ lineId: lines.lines[0].id, quantity }] },
+    },
+  );
+  expect(received.ok(), await received.text()).toBeTruthy();
+  return order.orderId;
+}
+
+async function fulfilSalesOrder(
+  request: APIRequestContext,
+  customerName: string,
+  quantity: number,
+): Promise<string> {
+  const created = await request.post(`${API_BASE}/organizations/${ORGANIZATION_ID}/sales-orders`, {
+    headers: { ...authHeaders(), 'idempotency-key': crypto.randomUUID() },
+    data: {
+      customerName,
+      warehouseId: WAREHOUSE_ID,
+      locationId: LOCATION_ID,
+      lines: [{ productId: CABLE_ID, quantity, unitPriceMinor: 8900 }],
+    },
+  });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const order = (await created.json()) as { orderId: string };
+
+  for (const action of ['confirm', 'fulfil']) {
+    const response = await request.post(
+      `${API_BASE}/organizations/${ORGANIZATION_ID}/sales-orders/${order.orderId}/${action}`,
+      { headers: { ...authHeaders(), 'idempotency-key': crypto.randomUUID() } },
+    );
+    expect(response.ok(), await response.text()).toBeTruthy();
+  }
+
+  return order.orderId;
+}
+
 test.beforeAll(async () => {
   token = await ownerToken();
 });
@@ -211,6 +289,41 @@ test.describe('purchase orders', () => {
     await expect(first.getByText('In stock')).toBeVisible();
     await expect(first).toContainText('iPhone 15 128GB');
   });
+
+  test('returns received goods to the supplier and reduces stock', async ({ page, request }) => {
+    const supplierName = `E2E Return Supplier ${RUN}`;
+    const supplierId = await createSupplier(request, supplierName);
+    const before = await onHand(request);
+    await receivePurchaseOrder(request, supplierId, CABLE_ID, 3);
+
+    await signIn(page);
+    await page.goto('/purchasing');
+    await page.locator('#po-search').fill(supplierName);
+    await openLatestRow(page, supplierName);
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('heading', { name: 'Returns to supplier' })).toBeVisible();
+    await dialog.getByRole('button', { name: 'New purchase return' }).click();
+
+    const returnDialog = page.getByRole('dialog', { name: 'Return goods to supplier' });
+    await expect(returnDialog).toBeVisible();
+    await returnDialog.getByLabel('Reason', { exact: true }).fill('Damaged cable batch');
+    await returnDialog.getByLabel('Return quantity for CABLE-USB-C').fill('1');
+    await returnDialog.getByRole('button', { name: 'Create return' }).click();
+    await expect(returnDialog).toBeHidden();
+
+    await expect(dialog.getByText(/created as a draft/)).toBeVisible();
+    const row = dialog.getByRole('row', { name: /PR-/ });
+    await expect(row).toContainText('Draft');
+    await row.getByRole('button', { name: 'Post return' }).click();
+    await expect(dialog.getByText(/Return PR-.* posted/)).toBeVisible();
+    await expect(row).toContainText('Posted');
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+
+    expect(await onHand(request)).toBe(before + 2);
+  });
 });
 
 test.describe('outgoing orders', () => {
@@ -252,6 +365,63 @@ test.describe('outgoing orders', () => {
     await expect(dialog).toBeHidden();
 
     expect(await onHand(request)).toBe(before - 2);
+  });
+
+  test('restocks a customer return after fulfilment', async ({ page, request }) => {
+    await postReceipt(request, 6);
+    const before = await onHand(request);
+    const customer = `E2E Return Customer ${RUN}`;
+    await fulfilSalesOrder(request, customer, 2);
+
+    await signIn(page);
+    await page.goto('/orders');
+    await page.locator('#so-search').fill(customer);
+    await openLatestRow(page, customer);
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('heading', { name: 'Returns from customer' })).toBeVisible();
+    await dialog.getByRole('button', { name: 'New sales return' }).click();
+
+    const returnDialog = page.getByRole('dialog', { name: 'Restock a customer return' });
+    await expect(returnDialog).toBeVisible();
+    await returnDialog
+      .getByLabel('Reason', { exact: true })
+      .fill('Customer returned an unused cable');
+    await returnDialog.getByLabel('Return quantity for CABLE-USB-C').fill('1');
+    await returnDialog.getByRole('button', { name: 'Create return' }).click();
+    await expect(returnDialog).toBeHidden();
+
+    await expect(dialog.getByText(/created as a draft/)).toBeVisible();
+    const row = dialog.getByRole('row', { name: /SR-/ });
+    await expect(row).toContainText('Draft');
+    await row.getByRole('button', { name: 'Post return' }).click();
+    await expect(dialog.getByText(/Return SR-.* posted/)).toBeVisible();
+    await expect(row).toContainText('Posted');
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+
+    expect(await onHand(request)).toBe(before - 1);
+  });
+});
+
+test.describe('supplier performance', () => {
+  test('shows delivery metrics on the dashboard', async ({ page, request }) => {
+    const supplierName = `E2E Perf Supplier ${RUN}`;
+    const supplierId = await createSupplier(request, supplierName);
+    await receivePurchaseOrder(request, supplierId, CABLE_ID, 2);
+
+    await signIn(page);
+    await page.goto('/');
+
+    const section = page.getByRole('region', { name: 'Supplier performance' });
+    await expect(section).toBeVisible();
+    await section.locator('#supplier-window').selectOption('30');
+
+    const row = section.getByRole('row', { name: new RegExp(escapeRegExp(supplierName)) });
+    await expect(row).toBeVisible();
+    await expect(row).toContainText('1 received');
+    await expect(row).toContainText('100%');
   });
 });
 

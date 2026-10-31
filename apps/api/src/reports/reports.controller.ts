@@ -7,10 +7,13 @@ import {
   type ReportOverview,
   type ReportOverviewQuery,
   type StockLevelExportQuery,
+  type SupplierPerformanceQuery,
+  type SupplierPerformanceResponse,
   lowStockQuerySchema,
   movementExportQuerySchema,
   reportOverviewQuerySchema,
   stockLevelExportQuerySchema,
+  supplierPerformanceQuerySchema,
 } from '@mystock/contracts';
 
 import type { AuthenticatedUser } from '../auth/authenticated-user';
@@ -41,6 +44,15 @@ export class ReportsController {
     @Query(new ZodValidationPipe(lowStockQuerySchema)) query: LowStockQuery,
   ): Promise<LowStockResponse> {
     return this.reports.lowStock(user.id, params.organizationId, query);
+  }
+
+  @Get('supplier-performance')
+  supplierPerformance(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param(new ZodValidationPipe(organizationParamsSchema)) params: OrganizationParams,
+    @Query(new ZodValidationPipe(supplierPerformanceQuerySchema)) query: SupplierPerformanceQuery,
+  ): Promise<SupplierPerformanceResponse> {
+    return this.reports.supplierPerformance(user.id, params.organizationId, query);
   }
 
   @Get('exports/stock-levels.csv')

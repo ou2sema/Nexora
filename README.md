@@ -4,7 +4,7 @@ Inventory management platform for electronics and technology products: multi-war
 stock, an immutable stock ledger, serialized-device traceability, barcode workflows,
 and organization-scoped reporting.
 
-> Status: Phase 6 (operational workflows) implemented and verified locally. Phase 2 proved
+> Status: Phase 7 (returns and supplier performance) implemented and verified locally. Phase 2 proved
 > schema, RLS, demo seed, sign-in token → API → tenant-scoped queries. Phase 3 added the
 > immutable stock ledger, atomic posting functions, balance projections, reservations,
 > serialized-device traceability, idempotent mutations, and reconciliation repair, and was
@@ -20,7 +20,11 @@ and organization-scoped reporting.
 > confirmation and issue on fulfilment, per-organization/year document numbering, and
 > single-transaction lifecycle RPCs. It is verified locally on a self-contained stack and, on
 > 2026-10-31, through a signed-in hosted pass over suppliers, a purchase order receipt, and an
-> outgoing order. Nothing is production-ready yet.
+> outgoing order. Phase 7 adds purchase returns (credit notes against received lines, with
+> disposal of serialized devices), sales returns that restock the order location, post-time
+> over-return revalidation, and an on-demand supplier performance report; it is verified
+> locally and its migration is prepared but not yet pushed to the hosted project. Nothing is
+> production-ready yet.
 
 ## Stack
 
@@ -44,7 +48,11 @@ idempotency, and device traceability are specified in
 and inventory counts are specified in
 [ADR-0006](docs/adr/0006-barcodes-scanning-and-stock-counts.md). Reporting, exports, and
 authorized realtime are specified in
-[ADR-0007](docs/adr/0007-reporting-and-realtime.md).
+[ADR-0007](docs/adr/0007-reporting-and-realtime.md). Suppliers, purchase orders, and outgoing
+orders are specified in
+[ADR-0008](docs/adr/0008-operational-workflows.md). Purchase returns, sales returns, and
+supplier performance are specified in
+[ADR-0009](docs/adr/0009-returns-and-supplier-performance.md).
 
 ## Layout
 
@@ -66,66 +74,77 @@ Users sign in through Supabase Auth on `/sign-in`. The SPA sends the session's a
 to the API as a bearer token; the API verifies it against the project JWKS and runs every
 query inside a transaction that holds the caller's identity, so RLS applies.
 
-| Method | Path                                                                  | Role required          |
-| ------ | --------------------------------------------------------------------- | ---------------------- |
-| GET    | `/api/v1/me`                                                          | any authenticated user |
-| POST   | `/api/v1/organizations`                                               | any authenticated user |
-| GET    | `/api/v1/organizations/:id/products`                                  | any member             |
-| POST   | `/api/v1/organizations/:id/products`                                  | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/products/:productId`                       | any member             |
-| PATCH  | `/api/v1/organizations/:id/products/:productId`                       | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/categories`                                | any member             |
-| POST   | `/api/v1/organizations/:id/categories`                                | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/brands`                                    | any member             |
-| POST   | `/api/v1/organizations/:id/brands`                                    | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/warehouses`                                | any member             |
-| POST   | `/api/v1/organizations/:id/warehouses`                                | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/warehouses/:warehouseId/locations`         | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/stock-levels`                              | any member             |
-| GET    | `/api/v1/organizations/:id/stock-levels/summary`                      | any member             |
-| GET    | `/api/v1/organizations/:id/stock-movements`                           | any member             |
-| POST   | `/api/v1/organizations/:id/stock-movements`                           | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/stock-transfers`                           | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/stock-reservations`                        | any member             |
-| POST   | `/api/v1/organizations/:id/stock-reservations`                        | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/stock-reservations/:reservationId/release` | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/stock-reconciliation`                      | owner, admin           |
-| POST   | `/api/v1/organizations/:id/stock-reconciliation/repair`               | owner, admin           |
-| GET    | `/api/v1/organizations/:id/devices`                                   | any member             |
-| POST   | `/api/v1/organizations/:id/devices`                                   | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/devices/:deviceId`                         | any member             |
-| GET    | `/api/v1/organizations/:id/devices/:deviceId/events`                  | any member             |
-| POST   | `/api/v1/organizations/:id/devices/:deviceId/status`                  | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/devices/:deviceId/location`                | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/scan`                                      | any member             |
-| POST   | `/api/v1/organizations/:id/products/:productId/barcode`               | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/labels`                                    | any member             |
-| GET    | `/api/v1/organizations/:id/stock-counts`                              | any member             |
-| POST   | `/api/v1/organizations/:id/stock-counts`                              | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/stock-counts/:countId`                     | any member             |
-| POST   | `/api/v1/organizations/:id/stock-counts/:countId/lines`               | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/stock-counts/:countId/post`                | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/stock-counts/:countId/discard`             | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/reports/overview`                          | any member             |
-| GET    | `/api/v1/organizations/:id/reports/low-stock`                         | any member             |
-| GET    | `/api/v1/organizations/:id/reports/exports/stock-levels.csv`          | any member             |
-| GET    | `/api/v1/organizations/:id/reports/exports/movements.csv`             | any member             |
-| GET    | `/api/v1/organizations/:id/suppliers`                                 | any member             |
-| POST   | `/api/v1/organizations/:id/suppliers`                                 | owner, admin, manager  |
-| PATCH  | `/api/v1/organizations/:id/suppliers/:supplierId`                     | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/suppliers/:supplierId/activation`          | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/purchase-orders`                           | any member             |
-| POST   | `/api/v1/organizations/:id/purchase-orders`                           | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId`          | any member             |
-| POST   | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/order`    | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/receipts` | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/cancel`   | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/sales-orders`                              | any member             |
-| POST   | `/api/v1/organizations/:id/sales-orders`                              | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/sales-orders/:salesOrderId`                | any member             |
-| POST   | `/api/v1/organizations/:id/sales-orders/:salesOrderId/confirm`        | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/sales-orders/:salesOrderId/fulfil`         | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/sales-orders/:salesOrderId/cancel`         | owner, admin, manager  |
+| Method | Path                                                                     | Role required          |
+| ------ | ------------------------------------------------------------------------ | ---------------------- |
+| GET    | `/api/v1/me`                                                             | any authenticated user |
+| POST   | `/api/v1/organizations`                                                  | any authenticated user |
+| GET    | `/api/v1/organizations/:id/products`                                     | any member             |
+| POST   | `/api/v1/organizations/:id/products`                                     | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/products/:productId`                          | any member             |
+| PATCH  | `/api/v1/organizations/:id/products/:productId`                          | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/categories`                                   | any member             |
+| POST   | `/api/v1/organizations/:id/categories`                                   | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/brands`                                       | any member             |
+| POST   | `/api/v1/organizations/:id/brands`                                       | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/warehouses`                                   | any member             |
+| POST   | `/api/v1/organizations/:id/warehouses`                                   | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/warehouses/:warehouseId/locations`            | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/stock-levels`                                 | any member             |
+| GET    | `/api/v1/organizations/:id/stock-levels/summary`                         | any member             |
+| GET    | `/api/v1/organizations/:id/stock-movements`                              | any member             |
+| POST   | `/api/v1/organizations/:id/stock-movements`                              | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/stock-transfers`                              | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/stock-reservations`                           | any member             |
+| POST   | `/api/v1/organizations/:id/stock-reservations`                           | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/stock-reservations/:reservationId/release`    | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/stock-reconciliation`                         | owner, admin           |
+| POST   | `/api/v1/organizations/:id/stock-reconciliation/repair`                  | owner, admin           |
+| GET    | `/api/v1/organizations/:id/devices`                                      | any member             |
+| POST   | `/api/v1/organizations/:id/devices`                                      | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/devices/:deviceId`                            | any member             |
+| GET    | `/api/v1/organizations/:id/devices/:deviceId/events`                     | any member             |
+| POST   | `/api/v1/organizations/:id/devices/:deviceId/status`                     | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/devices/:deviceId/location`                   | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/scan`                                         | any member             |
+| POST   | `/api/v1/organizations/:id/products/:productId/barcode`                  | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/labels`                                       | any member             |
+| GET    | `/api/v1/organizations/:id/stock-counts`                                 | any member             |
+| POST   | `/api/v1/organizations/:id/stock-counts`                                 | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/stock-counts/:countId`                        | any member             |
+| POST   | `/api/v1/organizations/:id/stock-counts/:countId/lines`                  | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/stock-counts/:countId/post`                   | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/stock-counts/:countId/discard`                | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/reports/overview`                             | any member             |
+| GET    | `/api/v1/organizations/:id/reports/low-stock`                            | any member             |
+| GET    | `/api/v1/organizations/:id/reports/exports/stock-levels.csv`             | any member             |
+| GET    | `/api/v1/organizations/:id/reports/exports/movements.csv`                | any member             |
+| GET    | `/api/v1/organizations/:id/suppliers`                                    | any member             |
+| POST   | `/api/v1/organizations/:id/suppliers`                                    | owner, admin, manager  |
+| PATCH  | `/api/v1/organizations/:id/suppliers/:supplierId`                        | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/suppliers/:supplierId/activation`             | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/purchase-orders`                              | any member             |
+| POST   | `/api/v1/organizations/:id/purchase-orders`                              | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId`             | any member             |
+| POST   | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/order`       | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/receipts`    | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/cancel`      | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/sales-orders`                                 | any member             |
+| POST   | `/api/v1/organizations/:id/sales-orders`                                 | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/sales-orders/:salesOrderId`                   | any member             |
+| POST   | `/api/v1/organizations/:id/sales-orders/:salesOrderId/confirm`           | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/sales-orders/:salesOrderId/fulfil`            | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/sales-orders/:salesOrderId/cancel`            | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/purchase-orders/:id/returns`                  | any member             |
+| POST   | `/api/v1/organizations/:id/purchase-orders/:id/returns`                  | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/purchase-orders/:id/returns/:returnId`        | any member             |
+| POST   | `/api/v1/organizations/:id/purchase-orders/:id/returns/:returnId/post`   | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/purchase-orders/:id/returns/:returnId/cancel` | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/sales-orders/:id/returns`                     | any member             |
+| POST   | `/api/v1/organizations/:id/sales-orders/:id/returns`                     | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/sales-orders/:id/returns/:returnId`           | any member             |
+| POST   | `/api/v1/organizations/:id/sales-orders/:id/returns/:returnId/post`      | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/sales-orders/:id/returns/:returnId/cancel`    | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/reports/supplier-performance`                 | any member             |
 
 Errors use `{ "error": { "code", "message", "details?", "requestId" } }` and repeat the
 `x-request-id` response header. Database constraint failures map to `409` or `400`; an
@@ -187,6 +206,17 @@ cancelling releases them; serialized products are rejected on order lines. Docum
 numbered per organization and year (`PO-2026-0001`, `SO-2026-0001`). Every create and
 transition requires an `Idempotency-Key` and claims it exactly once for the whole document, so
 a retried request returns the stored result instead of double-posting stock.
+
+Returns are documents of their own (`PR-2026-0001`, `SR-2026-0001`) that move
+`draft → posted` or `draft → cancelled`. A purchase return may cover any part of a received
+line; posting writes one ledger issue per line and, for serialized lines, disposes exactly the
+chosen in-stock devices with a `disposed` event and no quantity movement. A sales return
+restocks the quantity into the order's warehouse location. Remaining quantity is checked when
+the return is created and re-checked when it is posted while the source order line is locked,
+so overlapping drafts can never exceed what was received or fulfilled. `GET
+.../reports/supplier-performance` computes, over a default 90-day window, orders created and
+received, ordered and received value, on-time rate against expected dates, average lead time,
+and the posted-return rate; rates are `null` when their denominator is empty.
 
 ## Prerequisites
 

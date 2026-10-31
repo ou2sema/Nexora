@@ -23,6 +23,7 @@ import {
   useExportStockLevels,
   useLowStock,
   useReportOverview,
+  useSupplierPerformance,
 } from '@/features/reports/api';
 import { useStockRealtime } from '@/features/reports/use-stock-realtime';
 import { useApiHealth } from '@/features/system/use-api-health';
@@ -38,6 +39,10 @@ const RANGES = [
 
 function formatQuantity(value: number): string {
   return new Intl.NumberFormat('en-TN', { maximumFractionDigits: 4 }).format(value);
+}
+
+function formatRate(rate: number | null): string {
+  return rate === null ? '—' : `${Math.round(rate * 100)}%`;
 }
 
 function saveBlob(blob: Blob, filename: string): void {
@@ -58,6 +63,7 @@ export function DashboardPage() {
   const [warehouseId, setWarehouseId] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [days, setDays] = useState(30);
+  const [supplierDays, setSupplierDays] = useState(90);
   const [exporting, setExporting] = useState<'levels' | 'movements' | null>(null);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
 
@@ -70,6 +76,7 @@ export function DashboardPage() {
   });
   const warehouses = useWarehouses(organizationId);
   const categories = useCategories(organizationId);
+  const supplierPerformance = useSupplierPerformance(organizationId, { days: supplierDays });
   const realtime = useStockRealtime(organizationId);
   const exportLevels = useExportStockLevels(organizationId);
   const exportMovements = useExportMovements(organizationId);
@@ -499,6 +506,144 @@ export function DashboardPage() {
           )}
         </section>
       </div>
+
+      <section
+        aria-labelledby="supplier-performance-heading"
+        className="rounded-xl border border-slate-200 bg-white"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-5">
+          <div>
+            <h2 id="supplier-performance-heading" className="text-sm font-semibold text-slate-900">
+              Supplier performance
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              On-time delivery, lead time and return rate from purchase orders and posted returns.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <label htmlFor="supplier-window" className="sr-only">
+              Supplier performance window
+            </label>
+            <select
+              id="supplier-window"
+              value={supplierDays}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-indigo-500"
+              onChange={(event) => setSupplierDays(Number(event.target.value))}
+            >
+              <option value={30}>Last 30 days</option>
+              <option value={90}>Last 90 days</option>
+              <option value={180}>Last 180 days</option>
+            </select>
+            <Link
+              to="/suppliers"
+              className="text-sm font-medium text-indigo-700 hover:text-indigo-900"
+            >
+              Suppliers →
+            </Link>
+          </div>
+        </div>
+
+        {supplierPerformance.isError ? (
+          <div className="p-5">
+            <p role="alert" className="text-sm text-rose-700">
+              {supplierPerformance.error instanceof Error
+                ? supplierPerformance.error.message
+                : 'Supplier performance failed to load.'}
+            </p>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-3"
+              onClick={() => void supplierPerformance.refetch()}
+            >
+              Try again
+            </Button>
+          </div>
+        ) : (supplierPerformance.data?.suppliers ?? []).length === 0 ? (
+          <p className="p-5 text-sm text-slate-500">
+            {supplierPerformance.isPending
+              ? 'Loading supplier metrics…'
+              : 'No supplier orders in the selected window.'}
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <caption className="sr-only">Supplier performance metrics</caption>
+              <thead className="text-xs uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-slate-200">
+                  <th scope="col" className="px-5 py-3 font-semibold">
+                    Supplier
+                  </th>
+                  <th scope="col" className="px-5 py-3 text-right font-semibold">
+                    Orders
+                  </th>
+                  <th scope="col" className="px-5 py-3 text-right font-semibold">
+                    On time
+                  </th>
+                  <th scope="col" className="px-5 py-3 text-right font-semibold">
+                    Lead time
+                  </th>
+                  <th scope="col" className="px-5 py-3 text-right font-semibold">
+                    Received value
+                  </th>
+                  <th scope="col" className="px-5 py-3 text-right font-semibold">
+                    Return rate
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {supplierPerformance.data?.suppliers.map((row) => (
+                  <tr key={row.supplierId}>
+                    <th scope="row" className="px-5 py-3 font-medium text-slate-900">
+                      {row.supplierName}
+                    </th>
+                    <td className="px-5 py-3 text-right tabular-nums text-slate-700">
+                      {row.ordersCreated}
+                      <span className="ml-1 text-xs text-slate-500">
+                        ({row.ordersReceived} received)
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-right tabular-nums">
+                      <span
+                        className={cn(
+                          row.onTimeRate === null ? 'text-slate-400' : 'text-slate-900',
+                        )}
+                      >
+                        {formatRate(row.onTimeRate)}
+                      </span>
+                      <span className="block text-xs text-slate-500">
+                        {row.onTimeOrders} on time · {row.lateOrders} late
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-right tabular-nums text-slate-700">
+                      {row.averageLeadTimeDays === null
+                        ? '—'
+                        : `${row.averageLeadTimeDays.toFixed(1)} d`}
+                    </td>
+                    <td className="px-5 py-3 text-right tabular-nums text-slate-700">
+                      {formatTnd(row.receivedValueMinor, 'en-TN')}
+                    </td>
+                    <td className="px-5 py-3 text-right tabular-nums">
+                      <span
+                        className={cn(
+                          row.returnRate !== null && row.returnRate > 0
+                            ? 'text-rose-700'
+                            : 'text-slate-700',
+                        )}
+                      >
+                        {formatRate(row.returnRate)}
+                      </span>
+                      <span className="block text-xs text-slate-500">
+                        {formatQuantity(row.returnedQuantity)} returned
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <section
         aria-labelledby="warehouse-breakdown-heading"

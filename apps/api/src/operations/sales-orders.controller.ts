@@ -12,6 +12,9 @@ import {
 
 import {
   type OrderCancelInput,
+  type ReturnCancelResult,
+  type ReturnListQuery,
+  type ReturnPostResult,
   type SalesOrderCancelResult,
   type SalesOrderConfirmResult,
   type SalesOrderCreateInput,
@@ -20,9 +23,15 @@ import {
   type SalesOrderFulfilResult,
   type SalesOrderListQuery,
   type SalesOrderListResponse,
+  type SalesReturnCreateInput,
+  type ReturnCreateResult,
+  type SalesReturnDetail,
+  type SalesReturnListResponse,
   orderCancelSchema,
+  returnListQuerySchema,
   salesOrderCreateSchema,
   salesOrderListQuerySchema,
+  salesReturnCreateSchema,
 } from '@mystock/contracts';
 
 import type { AuthenticatedUser } from '../auth/authenticated-user';
@@ -32,7 +41,9 @@ import {
   organizationParamsSchema,
   type OrganizationParams,
   type SalesOrderParams,
+  type SalesReturnParams,
   salesOrderParamsSchema,
+  salesReturnParamsSchema,
 } from './operations.schemas';
 // The class is a DI token at runtime, so this cannot be a type-only import.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
@@ -111,6 +122,78 @@ export class SalesOrdersController {
       user.id,
       params.organizationId,
       params.salesOrderId,
+      idempotencyKey,
+      input,
+    );
+  }
+
+  @Get(':salesOrderId/returns')
+  listReturns(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param(new ZodValidationPipe(salesOrderParamsSchema)) params: SalesOrderParams,
+    @Query(new ZodValidationPipe(returnListQuerySchema)) query: ReturnListQuery,
+  ): Promise<SalesReturnListResponse> {
+    return this.salesOrders.listReturns(user.id, params.organizationId, params.salesOrderId, query);
+  }
+
+  @Post(':salesOrderId/returns')
+  createReturn(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param(new ZodValidationPipe(salesOrderParamsSchema)) params: SalesOrderParams,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body(new ZodValidationPipe(salesReturnCreateSchema)) input: SalesReturnCreateInput,
+  ): Promise<ReturnCreateResult> {
+    return this.salesOrders.createReturn(
+      user.id,
+      params.organizationId,
+      params.salesOrderId,
+      idempotencyKey,
+      input,
+    );
+  }
+
+  @Get(':salesOrderId/returns/:returnId')
+  getReturn(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param(new ZodValidationPipe(salesReturnParamsSchema)) params: SalesReturnParams,
+  ): Promise<SalesReturnDetail> {
+    return this.salesOrders.getReturn(
+      user.id,
+      params.organizationId,
+      params.salesOrderId,
+      params.returnId,
+    );
+  }
+
+  @Post(':salesOrderId/returns/:returnId/post')
+  @HttpCode(HttpStatus.OK)
+  postReturn(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param(new ZodValidationPipe(salesReturnParamsSchema)) params: SalesReturnParams,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+  ): Promise<ReturnPostResult> {
+    return this.salesOrders.postReturn(
+      user.id,
+      params.organizationId,
+      params.salesOrderId,
+      params.returnId,
+      idempotencyKey,
+    );
+  }
+
+  @Post(':salesOrderId/returns/:returnId/cancel')
+  @HttpCode(HttpStatus.OK)
+  cancelReturn(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param(new ZodValidationPipe(salesReturnParamsSchema)) params: SalesReturnParams,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body(new ZodValidationPipe(orderCancelSchema)) input: OrderCancelInput,
+  ): Promise<ReturnCancelResult> {
+    return this.salesOrders.cancelReturn(
+      user.id,
+      params.organizationId,
+      params.salesOrderId,
+      params.returnId,
       idempotencyKey,
       input,
     );

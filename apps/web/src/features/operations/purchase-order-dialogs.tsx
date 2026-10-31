@@ -28,6 +28,7 @@ import {
   useReceivePurchaseOrder,
 } from './api';
 import { purchaseOrderStatusLabels, purchaseOrderStatusStyles } from './labels';
+import { PurchaseReturnsSection } from './return-dialogs';
 
 function dialogError(error: unknown, fallback: string): string | null {
   if (error instanceof ApiError) return error.message;
@@ -518,6 +519,9 @@ export function PurchaseOrderDetailDialog({
                       Received
                     </th>
                     <th scope="col" className="px-3 py-2 text-right font-semibold">
+                      Returned
+                    </th>
+                    <th scope="col" className="px-3 py-2 text-right font-semibold">
                       Unit cost
                     </th>
                   </tr>
@@ -534,6 +538,9 @@ export function PurchaseOrderDetailDialog({
                       </td>
                       <td className="px-3 py-2 text-right text-slate-700">
                         {line.quantityReceived}
+                      </td>
+                      <td className="px-3 py-2 text-right text-slate-700">
+                        {line.quantityReturned}
                       </td>
                       <td className="px-3 py-2 text-right text-slate-700">
                         {line.unitCostMinor === null ? '—' : formatTnd(line.unitCostMinor)}
@@ -625,6 +632,14 @@ export function PurchaseOrderDetailDialog({
                   {receiveMutation.isPending ? 'Receiving…' : 'Post receipt'}
                 </Button>
               </section>
+            )}
+
+            {data.lines.some((line) => line.quantityReceived > 0) && (
+              <PurchaseReturnsSection
+                organizationId={organizationId}
+                order={data}
+                canWrite={canWrite}
+              />
             )}
 
             {canWrite && data.status === 'draft' && (

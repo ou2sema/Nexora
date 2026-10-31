@@ -139,3 +139,58 @@ export const movementExportQuerySchema = z
   });
 
 export type MovementExportQuery = z.infer<typeof movementExportQuerySchema>;
+
+const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use the YYYY-MM-DD format');
+
+export const supplierPerformanceQuerySchema = z
+  .object({
+    supplierId: z.uuid().optional(),
+    from: isoDateSchema.optional(),
+    to: isoDateSchema.optional(),
+  })
+  .refine(
+    (value) =>
+      !value.from ||
+      !value.to ||
+      Date.parse(`${value.from}T00:00:00Z`) <= Date.parse(`${value.to}T00:00:00Z`),
+    { message: 'The start of the window must not be after its end.', path: ['to'] },
+  )
+  .refine(
+    (value) =>
+      !value.from ||
+      !value.to ||
+      Date.parse(`${value.to}T00:00:00Z`) - Date.parse(`${value.from}T00:00:00Z`) <=
+        366 * 86_400_000,
+    { message: 'The reporting window cannot exceed 366 days.', path: ['from'] },
+  );
+
+export type SupplierPerformanceQuery = z.infer<typeof supplierPerformanceQuerySchema>;
+
+export const supplierPerformanceRowSchema = z.object({
+  supplierId: z.uuid(),
+  supplierName: z.string(),
+  ordersCreated: z.number().int().nonnegative(),
+  ordersReceived: z.number().int().nonnegative(),
+  onTimeOrders: z.number().int().nonnegative(),
+  lateOrders: z.number().int().nonnegative(),
+  /** Null when no fully received order in the window had an expected date. */
+  onTimeRate: z.number().min(0).max(1).nullable(),
+  /** Null when no order in the window has both an order and a receipt date. */
+  averageLeadTimeDays: z.number().nonnegative().nullable(),
+  orderedValueMinor: z.number().int().nonnegative(),
+  receivedValueMinor: z.number().int().nonnegative(),
+  receivedQuantity: z.number(),
+  returnedQuantity: z.number(),
+  /** Posted return quantity divided by received quantity; null without receipts. */
+  returnRate: z.number().nonnegative().nullable(),
+});
+
+export type SupplierPerformanceRow = z.infer<typeof supplierPerformanceRowSchema>;
+
+export const supplierPerformanceResponseSchema = z.object({
+  generatedAt: z.string(),
+  window: z.object({ from: z.string(), to: z.string() }),
+  suppliers: z.array(supplierPerformanceRowSchema),
+});
+
+export type SupplierPerformanceResponse = z.infer<typeof supplierPerformanceResponseSchema>;

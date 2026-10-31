@@ -15,6 +15,8 @@ export const stockReferenceTypeSchema = z.enum([
   'manual',
   'purchase_order',
   'outgoing_order',
+  'purchase_return',
+  'sales_return',
   'transfer',
   'reservation',
   'adjustment',

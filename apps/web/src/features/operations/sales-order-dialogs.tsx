@@ -28,6 +28,7 @@ import {
   useSalesOrder,
 } from './api';
 import { salesOrderStatusLabels, salesOrderStatusStyles } from './labels';
+import { SalesReturnsSection } from './return-dialogs';
 
 function dialogError(error: unknown, fallback: string): string | null {
   if (error instanceof ApiError) return error.message;
@@ -487,6 +488,9 @@ export function SalesOrderDetailDialog({
                       Quantity
                     </th>
                     <th scope="col" className="px-3 py-2 text-right font-semibold">
+                      Returned
+                    </th>
+                    <th scope="col" className="px-3 py-2 text-right font-semibold">
                       Unit price
                     </th>
                     <th scope="col" className="px-3 py-2 font-semibold">
@@ -502,6 +506,9 @@ export function SalesOrderDetailDialog({
                         <p className="font-mono text-xs text-slate-500">{line.productSku}</p>
                       </td>
                       <td className="px-3 py-2 text-right text-slate-700">{line.quantity}</td>
+                      <td className="px-3 py-2 text-right text-slate-700">
+                        {line.quantityReturned}
+                      </td>
                       <td className="px-3 py-2 text-right text-slate-700">
                         {line.unitPriceMinor === null ? '—' : formatTnd(line.unitPriceMinor)}
                       </td>
@@ -620,6 +627,14 @@ export function SalesOrderDetailDialog({
                   </p>
                 )}
               </section>
+            )}
+
+            {data.status === 'fulfilled' && (
+              <SalesReturnsSection
+                organizationId={organizationId}
+                order={data}
+                canWrite={canWrite}
+              />
             )}
           </div>
         ) : (

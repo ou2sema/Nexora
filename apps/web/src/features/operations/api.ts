@@ -10,6 +10,11 @@ import type {
   PurchaseOrderStatusResult,
   PurchaseReceiptInput,
   PurchaseReceiptResult,
+  PurchaseReturnCreateInput,
+  PurchaseReturnListResponse,
+  ReturnCancelResult,
+  ReturnCreateResult,
+  ReturnPostResult,
   SalesOrderCancelResult,
   SalesOrderConfirmResult,
   SalesOrderCreateInput,
@@ -18,6 +23,8 @@ import type {
   SalesOrderFulfilResult,
   SalesOrderListResponse,
   SalesOrderStatus,
+  SalesReturnCreateInput,
+  SalesReturnListResponse,
   SupplierCreateInput,
   SupplierListResponse,
   SupplierSummary,
@@ -289,6 +296,104 @@ export function useCancelSalesOrder(organizationId: string) {
   >(organizationId, ({ salesOrderId, input }, token) =>
     apiRequest<SalesOrderCancelResult>(
       `/organizations/${organizationId}/sales-orders/${salesOrderId}/cancel`,
+      { method: 'POST', token, body: input, headers: idempotencyHeaders() },
+    ),
+  );
+}
+
+export function usePurchaseReturns(organizationId: string | null, purchaseOrderId: string | null) {
+  const token = useAccessToken();
+
+  return useQuery({
+    queryKey: [...organizationKey(organizationId ?? ''), 'purchase-returns', purchaseOrderId ?? ''],
+    queryFn: () =>
+      apiRequest<PurchaseReturnListResponse>(
+        `/organizations/${organizationId}/purchase-orders/${purchaseOrderId}/returns?page=1&pageSize=50`,
+        { token },
+      ),
+    enabled: Boolean(organizationId) && Boolean(purchaseOrderId),
+  });
+}
+
+export function useCreatePurchaseReturn(organizationId: string) {
+  return useOperationsMutation<
+    { purchaseOrderId: string; input: PurchaseReturnCreateInput },
+    ReturnCreateResult
+  >(organizationId, ({ purchaseOrderId, input }, token) =>
+    apiRequest<ReturnCreateResult>(
+      `/organizations/${organizationId}/purchase-orders/${purchaseOrderId}/returns`,
+      { method: 'POST', token, body: input, headers: idempotencyHeaders() },
+    ),
+  );
+}
+
+export function usePostPurchaseReturn(organizationId: string) {
+  return useOperationsMutation<{ purchaseOrderId: string; returnId: string }, ReturnPostResult>(
+    organizationId,
+    ({ purchaseOrderId, returnId }, token) =>
+      apiRequest<ReturnPostResult>(
+        `/organizations/${organizationId}/purchase-orders/${purchaseOrderId}/returns/${returnId}/post`,
+        { method: 'POST', token, headers: idempotencyHeaders() },
+      ),
+  );
+}
+
+export function useCancelPurchaseReturn(organizationId: string) {
+  return useOperationsMutation<
+    { purchaseOrderId: string; returnId: string; input: OrderCancelInput },
+    ReturnCancelResult
+  >(organizationId, ({ purchaseOrderId, returnId, input }, token) =>
+    apiRequest<ReturnCancelResult>(
+      `/organizations/${organizationId}/purchase-orders/${purchaseOrderId}/returns/${returnId}/cancel`,
+      { method: 'POST', token, body: input, headers: idempotencyHeaders() },
+    ),
+  );
+}
+
+export function useSalesReturns(organizationId: string | null, salesOrderId: string | null) {
+  const token = useAccessToken();
+
+  return useQuery({
+    queryKey: [...organizationKey(organizationId ?? ''), 'sales-returns', salesOrderId ?? ''],
+    queryFn: () =>
+      apiRequest<SalesReturnListResponse>(
+        `/organizations/${organizationId}/sales-orders/${salesOrderId}/returns?page=1&pageSize=50`,
+        { token },
+      ),
+    enabled: Boolean(organizationId) && Boolean(salesOrderId),
+  });
+}
+
+export function useCreateSalesReturn(organizationId: string) {
+  return useOperationsMutation<
+    { salesOrderId: string; input: SalesReturnCreateInput },
+    ReturnCreateResult
+  >(organizationId, ({ salesOrderId, input }, token) =>
+    apiRequest<ReturnCreateResult>(
+      `/organizations/${organizationId}/sales-orders/${salesOrderId}/returns`,
+      { method: 'POST', token, body: input, headers: idempotencyHeaders() },
+    ),
+  );
+}
+
+export function usePostSalesReturn(organizationId: string) {
+  return useOperationsMutation<{ salesOrderId: string; returnId: string }, ReturnPostResult>(
+    organizationId,
+    ({ salesOrderId, returnId }, token) =>
+      apiRequest<ReturnPostResult>(
+        `/organizations/${organizationId}/sales-orders/${salesOrderId}/returns/${returnId}/post`,
+        { method: 'POST', token, headers: idempotencyHeaders() },
+      ),
+  );
+}
+
+export function useCancelSalesReturn(organizationId: string) {
+  return useOperationsMutation<
+    { salesOrderId: string; returnId: string; input: OrderCancelInput },
+    ReturnCancelResult
+  >(organizationId, ({ salesOrderId, returnId, input }, token) =>
+    apiRequest<ReturnCancelResult>(
+      `/organizations/${organizationId}/sales-orders/${salesOrderId}/returns/${returnId}/cancel`,
       { method: 'POST', token, body: input, headers: idempotencyHeaders() },
     ),
   );

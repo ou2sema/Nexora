@@ -16,7 +16,17 @@ export const salesOrderParamsSchema = organizationParamsSchema.extend({
   salesOrderId: z.uuid(),
 });
 
+export const purchaseReturnParamsSchema = purchaseOrderParamsSchema.extend({
+  returnId: z.uuid(),
+});
+
+export const salesReturnParamsSchema = salesOrderParamsSchema.extend({
+  returnId: z.uuid(),
+});
+
 export type OrganizationParams = z.infer<typeof organizationParamsSchema>;
 export type SupplierParams = z.infer<typeof supplierParamsSchema>;
 export type PurchaseOrderParams = z.infer<typeof purchaseOrderParamsSchema>;
 export type SalesOrderParams = z.infer<typeof salesOrderParamsSchema>;
+export type PurchaseReturnParams = z.infer<typeof purchaseReturnParamsSchema>;
+export type SalesReturnParams = z.infer<typeof salesReturnParamsSchema>;

@@ -39,6 +39,17 @@ const CONSTRAINT_MESSAGES: Record<string, string> = {
   sales_order_reservation_missing: 'This outgoing order is missing its stock reservation.',
   serial_count_mismatch: 'Provide one serial number per received unit.',
   serial_numbers_not_supported: 'This product is not serialized; remove the serial numbers.',
+  purchase_order_not_returnable: 'Only received purchase orders can be returned.',
+  purchase_return_exceeds_received:
+    'The return exceeds the quantity received and not yet returned.',
+  purchase_return_not_postable: 'Only draft purchase returns can be posted.',
+  purchase_return_not_cancellable: 'Only draft purchase returns can be cancelled.',
+  sales_order_not_returnable: 'Only fulfilled outgoing orders can be returned.',
+  sales_return_exceeds_fulfilled: 'The return exceeds the quantity fulfilled and not yet returned.',
+  sales_return_not_postable: 'Only draft sales returns can be posted.',
+  sales_return_not_cancellable: 'Only draft sales returns can be cancelled.',
+  device_not_in_stock: 'This device is not in stock.',
+  device_product_mismatch: 'This device does not belong to the product on the line.',
 };
 
 const VALIDATION_MESSAGES: Record<string, string> = {
@@ -50,6 +61,9 @@ const VALIDATION_MESSAGES: Record<string, string> = {
   invalid_supplier_name: 'Enter a supplier name.',
   invalid_country_code: 'Use a two-letter country code.',
   invalid_quantity: 'Quantity must be greater than zero.',
+  return_reason_required: 'Explain why the goods are being returned (at least 3 characters).',
+  return_line_invalid: 'Each return line needs an order line and a positive quantity.',
+  duplicate_device: 'Each device may appear only once.',
 };
 
 const NOT_FOUND_MESSAGES: Record<string, string> = {
@@ -63,6 +77,9 @@ const NOT_FOUND_MESSAGES: Record<string, string> = {
   purchase_order_not_found: 'Purchase order not found.',
   purchase_order_line_not_found: 'Purchase order line not found.',
   sales_order_not_found: 'Outgoing order not found.',
+  sales_order_line_not_found: 'Outgoing order line not found.',
+  purchase_return_not_found: 'Purchase return not found.',
+  sales_return_not_found: 'Sales return not found.',
 };
 
 /**

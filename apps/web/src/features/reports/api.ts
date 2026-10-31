@@ -1,6 +1,10 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
-import type { LowStockResponse, ReportOverview } from '@mystock/contracts';
+import type {
+  LowStockResponse,
+  ReportOverview,
+  SupplierPerformanceResponse,
+} from '@mystock/contracts';
 
 import { useAccessToken } from '@/features/auth/auth-provider';
 import { apiDownload, apiRequest, type DownloadedFile } from '@/lib/api-client';
@@ -59,6 +63,37 @@ export function useLowStock(organizationId: string | null, filters: LowStockFilt
 
       return apiRequest<LowStockResponse>(
         `/organizations/${organizationId}/reports/low-stock?${params.toString()}`,
+        { token },
+      );
+    },
+    enabled: Boolean(organizationId),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export interface SupplierPerformanceFilters {
+  days: number;
+  supplierId?: string;
+}
+
+export function useSupplierPerformance(
+  organizationId: string | null,
+  filters: SupplierPerformanceFilters,
+) {
+  const token = useAccessToken();
+
+  return useQuery({
+    queryKey: [...organizationKey(organizationId), 'reports', 'supplier-performance', filters],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      params.set(
+        'from',
+        new Date(Date.now() - filters.days * 86_400_000).toISOString().slice(0, 10),
+      );
+      if (filters.supplierId) params.set('supplierId', filters.supplierId);
+
+      return apiRequest<SupplierPerformanceResponse>(
+        `/organizations/${organizationId}/reports/supplier-performance?${params.toString()}`,
         { token },
       );
     },

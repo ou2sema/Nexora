@@ -47,7 +47,9 @@ afterAll(async () => {
 beforeEach(async () => {
   await database.asPostgres((client) =>
     client.query(`
-      truncate public.purchase_order_lines, public.sales_order_lines,
+      truncate public.purchase_return_devices, public.purchase_return_lines,
+        public.purchase_returns, public.sales_return_lines, public.sales_returns,
+        public.purchase_order_lines, public.sales_order_lines,
         public.purchase_orders, public.sales_orders, public.suppliers,
         public.document_sequences, public.device_events, public.devices,
         public.stock_operations, public.stock_movements, public.stock_reservations,

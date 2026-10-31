@@ -206,6 +206,7 @@ export const purchaseOrderLineSchema = z.object({
   isSerialized: z.boolean(),
   quantityOrdered: z.number(),
   quantityReceived: z.number(),
+  quantityReturned: z.number(),
   unitCostMinor: z.number().int().nullable(),
 });
 
@@ -321,6 +322,7 @@ export const salesOrderLineSchema = z.object({
   productSku: z.string(),
   productName: z.string(),
   quantity: z.number(),
+  quantityReturned: z.number(),
   unitPriceMinor: z.number().int().nullable(),
   reservationId: z.uuid().nullable(),
 });
@@ -367,3 +369,189 @@ export type SalesOrderListQuery = z.infer<typeof salesOrderListQuerySchema>;
 
 export const salesOrderListResponseSchema = paginatedSchema(salesOrderSchema);
 export type SalesOrderListResponse = z.infer<typeof salesOrderListResponseSchema>;
+
+export const returnStatusSchema = z.enum(['draft', 'posted', 'cancelled']);
+export type ReturnStatus = z.infer<typeof returnStatusSchema>;
+
+const returnLinesUnique = (lines: { purchaseOrderLineId?: string; salesOrderLineId?: string }[]) =>
+  new Set(lines.map((line) => line.purchaseOrderLineId ?? line.salesOrderLineId)).size ===
+  lines.length;
+
+export const purchaseReturnLineCreateSchema = z.object({
+  purchaseOrderLineId: z.uuid(),
+  quantity: positiveQuantitySchema,
+  deviceIds: z.array(z.uuid()).min(1).max(100).optional(),
+});
+
+export type PurchaseReturnLineCreateInput = z.infer<typeof purchaseReturnLineCreateSchema>;
+
+export const purchaseReturnCreateSchema = z
+  .object({
+    reason: z.string().trim().min(3, 'Explain why the goods are going back').max(500),
+    reference: z.string().trim().max(120).nullish(),
+    lines: z.array(purchaseReturnLineCreateSchema).min(1).max(100),
+  })
+  .refine((value) => returnLinesUnique(value.lines), {
+    message: 'Each order line may appear only once',
+    path: ['lines'],
+  });
+
+export type PurchaseReturnCreateInput = z.infer<typeof purchaseReturnCreateSchema>;
+
+export const salesReturnLineCreateSchema = z.object({
+  salesOrderLineId: z.uuid(),
+  quantity: positiveQuantitySchema,
+});
+
+export type SalesReturnLineCreateInput = z.infer<typeof salesReturnLineCreateSchema>;
+
+export const salesReturnCreateSchema = z
+  .object({
+    reason: z.string().trim().min(3, 'Explain why the goods are coming back').max(500),
+    reference: z.string().trim().max(120).nullish(),
+    lines: z.array(salesReturnLineCreateSchema).min(1).max(100),
+  })
+  .refine((value) => returnLinesUnique(value.lines), {
+    message: 'Each order line may appear only once',
+    path: ['lines'],
+  });
+
+export type SalesReturnCreateInput = z.infer<typeof salesReturnCreateSchema>;
+
+export const returnCreateResultSchema = z.object({
+  returnId: z.uuid(),
+  number: z.string(),
+  status: returnStatusSchema,
+  lineCount: z.number().int(),
+  quantity: z.number(),
+  duplicate: z.boolean(),
+});
+
+export type ReturnCreateResult = z.infer<typeof returnCreateResultSchema>;
+
+export const returnStatusResultSchema = z.object({
+  returnId: z.uuid(),
+  number: z.string(),
+  status: returnStatusSchema,
+  duplicate: z.boolean(),
+});
+
+export type ReturnStatusResult = z.infer<typeof returnStatusResultSchema>;
+
+export const returnPostResultSchema = returnStatusResultSchema.extend({
+  quantity: z.number(),
+});
+
+export type ReturnPostResult = z.infer<typeof returnPostResultSchema>;
+
+export const returnCancelResultSchema = returnStatusResultSchema.extend({
+  releasedDevices: z.number().int().optional(),
+});
+
+export type ReturnCancelResult = z.infer<typeof returnCancelResultSchema>;
+
+export const purchaseReturnDeviceSchema = z.object({
+  deviceId: z.uuid(),
+  serialNumber: z.string(),
+});
+
+export type PurchaseReturnDevice = z.infer<typeof purchaseReturnDeviceSchema>;
+
+export const purchaseReturnLineSchema = z.object({
+  id: z.uuid(),
+  purchaseOrderLineId: z.uuid(),
+  productId: z.uuid(),
+  productSku: z.string(),
+  productName: z.string(),
+  isSerialized: z.boolean(),
+  quantity: z.number(),
+  quantityReceived: z.number(),
+  devices: z.array(purchaseReturnDeviceSchema),
+});
+
+export type PurchaseReturnLineSummary = z.infer<typeof purchaseReturnLineSchema>;
+
+export const purchaseReturnSchema = z.object({
+  id: z.uuid(),
+  organizationId: z.uuid(),
+  number: z.string(),
+  purchaseOrderId: z.uuid(),
+  purchaseOrderNumber: z.string(),
+  supplierId: z.uuid(),
+  supplierName: z.string(),
+  warehouseId: z.uuid(),
+  warehouseCode: z.string(),
+  locationId: z.uuid(),
+  locationCode: z.string(),
+  status: returnStatusSchema,
+  reason: z.string(),
+  reference: z.string().nullable(),
+  postedAt: z.string().nullable(),
+  cancelledAt: z.string().nullable(),
+  lineCount: z.number().int(),
+  totalQuantity: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type PurchaseReturnSummary = z.infer<typeof purchaseReturnSchema>;
+
+export const purchaseReturnDetailSchema = purchaseReturnSchema.extend({
+  lines: z.array(purchaseReturnLineSchema),
+});
+
+export type PurchaseReturnDetail = z.infer<typeof purchaseReturnDetailSchema>;
+
+export const salesReturnLineSchema = z.object({
+  id: z.uuid(),
+  salesOrderLineId: z.uuid(),
+  productId: z.uuid(),
+  productSku: z.string(),
+  productName: z.string(),
+  quantity: z.number(),
+  quantityFulfilled: z.number(),
+});
+
+export type SalesReturnLineSummary = z.infer<typeof salesReturnLineSchema>;
+
+export const salesReturnSchema = z.object({
+  id: z.uuid(),
+  organizationId: z.uuid(),
+  number: z.string(),
+  salesOrderId: z.uuid(),
+  salesOrderNumber: z.string(),
+  customerName: z.string(),
+  warehouseId: z.uuid(),
+  warehouseCode: z.string(),
+  locationId: z.uuid(),
+  locationCode: z.string(),
+  status: returnStatusSchema,
+  reason: z.string(),
+  reference: z.string().nullable(),
+  postedAt: z.string().nullable(),
+  cancelledAt: z.string().nullable(),
+  lineCount: z.number().int(),
+  totalQuantity: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type SalesReturnSummary = z.infer<typeof salesReturnSchema>;
+
+export const salesReturnDetailSchema = salesReturnSchema.extend({
+  lines: z.array(salesReturnLineSchema),
+});
+
+export type SalesReturnDetail = z.infer<typeof salesReturnDetailSchema>;
+
+export const returnListQuerySchema = paginationQuerySchema.extend({
+  status: returnStatusSchema.optional(),
+});
+
+export type ReturnListQuery = z.infer<typeof returnListQuerySchema>;
+
+export const purchaseReturnListResponseSchema = paginatedSchema(purchaseReturnSchema);
+export type PurchaseReturnListResponse = z.infer<typeof purchaseReturnListResponseSchema>;
+
+export const salesReturnListResponseSchema = paginatedSchema(salesReturnSchema);
+export type SalesReturnListResponse = z.infer<typeof salesReturnListResponseSchema>;

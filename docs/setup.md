@@ -247,15 +247,40 @@ cd apps/web
 npx playwright test --config playwright.local-stack.config.ts --headed
 ```
 
-Expected: 10 passing checks (5 tests × desktop/mobile): supplier create, deactivate and
+Expected: 16 passing checks (8 tests × desktop/mobile): supplier create, deactivate and
 reactivate; purchase order order → receipt with an on-hand delta; a serialized receipt
-registering two devices visible on the Devices page; outgoing order confirm → fulfil with an
-on-hand delta; and a viewer seeing disabled write controls on all three pages.
+registering two devices visible on the Devices page; a purchase return created, posted, and
+reflected in the on-hand delta; outgoing order confirm → fulfil with an on-hand delta; a sales
+return created after fulfilment that restocks the order location; the dashboard supplier
+performance card showing the fresh supplier at 100% on time; and a viewer seeing disabled write
+controls on all three pages.
 
-Full gates on 2026-10-31: `format:check`, `lint`, `typecheck`, and `build` clean; 208 Vitest
-tests across the workspaces (159 API, including the 11 operations API tests); the Phase 6
-headed run above passed 10/10 with Allure at 100% (served at http://localhost:5051 for this
-run; port 5050 already hosted an older preview); the shell regression suite passed 16/16.
+Full gates on 2026-10-31 for Phase 6: `format:check`, `lint`, `typecheck`, and `build` clean;
+208 Vitest tests across the workspaces (159 API, including the 11 operations API tests); the
+Phase 6 headed run above passed 10/10 with Allure at 100% (served at http://localhost:5051 for
+this run; port 5050 already hosted an older preview); the shell regression suite passed 16/16.
+
+## Returns and supplier performance verification
+
+The Phase 7 API and database suites run without a hosted project:
+
+```powershell
+npm run test --workspace @mystock/api -- test/api/returns.test.ts test/db/returns.test.ts
+```
+
+Expected: 12 passing tests (8 database, 4 API). They cover purchase-return numbering and
+idempotent posting, over-return rejection at creation and across overlapping drafts (with the
+source line locked at post time), serialized device selection, disposal, device events and zero
+quantity movements, draft cancellation, sales-return restocking and over-return rejection,
+tenant boundaries, and supplier performance computed from fully received orders with expected
+dates (including the returned-quantity rate).
+
+Full gates on 2026-10-31 for Phase 7: `format:check`, `lint`, `typecheck`, and `build` clean;
+220 Vitest tests across the workspaces (171 API); the Phase 7 headed local-stack run above
+passed 16/16 (desktop and mobile) with Allure results written and served at
+http://localhost:5052 for this run; the shell regression suite passed 16/16. The Phase 7
+migration (`20261031120000_returns_and_supplier_performance.sql`) is committed but **not**
+pushed to hosted; that remains a manual step against the hosted project.
 
 ### Hosted check (2026-10-31)
 
@@ -364,7 +389,9 @@ pooler. `migration list` and `db push` work through it.
 Current hosted state (project `kohrmjzwmtqnwrmkymez`, checked 2026-10-31): the Phase 1–6
 migrations (tenancy, catalog, stock ledger, serialized devices, barcode workflows, reporting
 and realtime, operational workflows) are applied, RLS is enabled on every table, and the demo seed has run against the
-first signed-up user, who is owner of “SBS VISION” with 7 products and 2 warehouses. A Phase 2 hosted end-to-end check passed:
+first signed-up user, who is owner of “SBS VISION” with 7 products and 2 warehouses. The Phase 7
+returns migration is prepared in the repository but has not been pushed; hosted remains at the
+Phase 6 schema until that step is run manually. A Phase 2 hosted end-to-end check passed:
 a real Supabase password grant produced a token the API accepted, the callers' organizations were
 isolated, and a foreign organization returned `404`. The temporary verification account was
 removed; only the owner remains.
@@ -409,13 +436,13 @@ npm run test --workspace @mystock/api -- test/db
 
 ## Test suites
 
-| Command                                                         | What it runs                                                                                                                                                  |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run test`                                                  | 208 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, API shell, env, contracts, domain |
-| `npm run test:e2e`                                              | Playwright against the API and dev server (16 checks: 8 tests × desktop/mobile)                                                                               |
-| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                              |
-| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                   |
-| `npx playwright test --config playwright.local-stack.config.ts` | Phase 6 flows on the self-contained stack (10 checks: 5 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                               |
+| Command                                                         | What it runs                                                                                                                                                           |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run test`                                                  | 220 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, API shell, env, contracts, domain |
+| `npm run test:e2e`                                              | Playwright against the API and dev server (16 checks: 8 tests × desktop/mobile)                                                                                        |
+| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                       |
+| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                            |
+| `npx playwright test --config playwright.local-stack.config.ts` | Phase 7 flows on the self-contained stack (16 checks: 8 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                        |
 
 The API suites (`apps/api/test/api`) run the real migrations on PGlite, sign JWTs with
 locally generated ES256 keys, and serve the trusted public key from a temporary JWKS
