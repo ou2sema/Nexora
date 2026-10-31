@@ -1,3 +1,5 @@
+import { constants, inflateSync } from 'node:zlib';
+
 import { PDFDocument } from 'pdf-lib';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -14,6 +16,34 @@ function pdfParser(
   const chunks: Buffer[] = [];
   response.on('data', (chunk: Buffer) => chunks.push(chunk));
   response.on('end', () => callback(null, Buffer.concat(chunks)));
+}
+
+/** Decodes the Flate-compressed content streams and pulls out drawn text runs. */
+function pdfText(pdf: Buffer): string {
+  const raw = pdf.toString('latin1');
+  let content = '';
+  const streams = /stream\r?\n/g;
+  let stream: RegExpExecArray | null;
+  while ((stream = streams.exec(raw)) !== null) {
+    const start = stream.index + stream[0].length;
+    const end = raw.indexOf('endstream', start);
+    if (end < 0) continue;
+    try {
+      content += inflateSync(pdf.subarray(start, end), {
+        finishFlush: constants.Z_SYNC_FLUSH,
+      }).toString('latin1');
+    } catch {
+      // Streams that are not Flate-compressed carry no visible text here.
+    }
+  }
+
+  let text = '';
+  const runs = /<([0-9A-Fa-f]+)>\s*Tj/g;
+  let run: RegExpExecArray | null;
+  while ((run = runs.exec(content)) !== null) {
+    text += `${Buffer.from(run[1], 'hex').toString('latin1')}\n`;
+  }
+  return text;
 }
 
 describe('purchase document PDFs', () => {
@@ -111,6 +141,12 @@ describe('purchase document PDFs', () => {
     const parsed = await PDFDocument.load(pdf);
     expect(parsed.getPageCount()).toBe(1);
     expect(parsed.getTitle()).toBe(`Purchase order ${order.number}`);
+
+    const shipToInstruction = pdfText(pdf).replace(/\s+/g, ' ');
+    expect(shipToInstruction).toContain(
+      'Deliver to this location. Quote the purchase order number on all documents.',
+    );
+    expect(shipToInstruction).not.toContain('on all d...');
 
     const viewer = await fetchPdf(`${purchaseUrl}/${order.orderId}/pdf`, daveToken);
     expect(viewer.status).toBe(200);

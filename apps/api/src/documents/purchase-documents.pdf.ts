@@ -181,6 +181,24 @@ function drawContinuationHeader(page: PDFPage, document: PurchaseDocument, fonts
   return y - 12;
 }
 
+function drawPartyDetails(
+  page: PDFPage,
+  font: PDFFont,
+  details: string[],
+  x: number,
+  startY: number,
+  maxWidth: number,
+): number {
+  let y = startY;
+  for (const detail of details) {
+    for (const line of wrapText(font, 8, detail, maxWidth)) {
+      text(page, font, 8, line, x, y, MUTED);
+      y -= 10.5;
+    }
+  }
+  return y;
+}
+
 function drawParties(context: RenderContext, startY: number): number {
   const { page, document, fonts } = context;
   const labelY = startY;
@@ -195,36 +213,24 @@ function drawParties(context: RenderContext, startY: number): number {
   text(page, fonts.bold, 9.5, document.supplier.name, leftX, bodyStart);
   text(page, fonts.bold, 9.5, document.shipTo.name, rightX, bodyStart);
 
-  let lineY = bodyStart - 12;
-  for (const detail of document.supplier.details) {
-    text(
-      page,
-      fonts.regular,
-      8,
-      fitText(fonts.regular, 8, detail, columnWidth),
-      leftX,
-      lineY,
-      MUTED,
-    );
-    lineY -= 10.5;
-  }
+  const supplierY = drawPartyDetails(
+    page,
+    fonts.regular,
+    document.supplier.details,
+    leftX,
+    bodyStart - 12,
+    columnWidth,
+  );
+  const shipToY = drawPartyDetails(
+    page,
+    fonts.regular,
+    document.shipTo.details,
+    rightX,
+    bodyStart - 12,
+    columnWidth,
+  );
 
-  let shipY = bodyStart - 12;
-  for (const detail of document.shipTo.details) {
-    text(
-      page,
-      fonts.regular,
-      8,
-      fitText(fonts.regular, 8, detail, columnWidth),
-      rightX,
-      shipY,
-      MUTED,
-    );
-    shipY -= 10.5;
-  }
-
-  const detailLines = Math.max(document.supplier.details.length, document.shipTo.details.length, 1);
-  return bodyStart - 12 - detailLines * 10.5 - 10;
+  return Math.min(supplierY, shipToY) - 10;
 }
 
 function drawMeta(context: RenderContext, startY: number): number {
