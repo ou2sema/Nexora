@@ -578,9 +578,13 @@ chunk per route.
 
 The Phase 11 migration (`20261031180000_admin_audit.sql`) has **not** been applied to the
 hosted project. Apply it before deploying this API version: the boot-time schema probe
-checks for `public.admin_audit_events` and stops the process otherwise. The restore drill
-in [`runbooks/restore-drill.md`](runbooks/restore-drill.md) is documented but has not been
-executed.
+checks for `public.admin_audit_events` and stops the process otherwise. This was verified
+against hosted on 2026-10-31 by booting the production build with the root `.env`: the process
+refused to start with `Database schema is out of date; missing public.admin_audit_events.
+Apply supabase/migrations before starting the API.` No hosted schema change was made, and the
+locally running API on `:4100` was left on the previous build, so the app stayed available.
+The restore drill in [`runbooks/restore-drill.md`](runbooks/restore-drill.md) is documented but
+has not been executed.
 
 ## Operator tasks
 
