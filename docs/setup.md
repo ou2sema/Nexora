@@ -257,17 +257,22 @@ tests across the workspaces (159 API, including the 11 operations API tests); th
 headed run above passed 10/10 with Allure at 100% (served at http://localhost:5051 for this
 run; port 5050 already hosted an older preview); the shell regression suite passed 16/16.
 
-### Hosted check
+### Hosted check (2026-10-31)
 
-The Phase 6 migration (`20261030140000_operational_workflows.sql`) has **not** been pushed to
-the hosted project; it awaits explicit approval. Preview it first:
+The Phase 6 migration (`20261030140000_operational_workflows.sql`) was pushed to the hosted
+project on 2026-10-31 with `npx supabase db push --db-url "$DATABASE_URL" --yes` after a dry
+run listed exactly that one migration. A read-only check then confirmed `suppliers`,
+`purchase_orders`, `purchase_order_lines`, `sales_orders`, and `sales_order_lines` exist with
+RLS enabled, the twelve `app.*` operational functions are present (`save_supplier`,
+`set_supplier_active`, `create_purchase_order`, `order_purchase_order`,
+`receive_purchase_order`, `cancel_purchase_order`, `create_sales_order`,
+`confirm_sales_order`, `fulfil_sales_order`, `cancel_sales_order`,
+`operations_apply_stock`, `operations_apply_reservation`), and the migration is recorded in
+`supabase_migrations.schema_migrations`. All five tables were empty at check time, so no
+hosted operational data has been created yet.
 
-```powershell
-npx supabase db push --db-url $env:DATABASE_URL --dry-run
-```
-
-Do not push against the owner's production tenant without approval, and verify the hosted
-pages with a throwaway account rather than the owner's password.
+A signed-in hosted UI pass over suppliers, purchase orders, and outgoing orders has **not**
+been run; do it with a throwaway account rather than the owner's password.
 
 ## Quality gates
 
@@ -339,9 +344,9 @@ network without an IPv6 route, use the session pooler instead: host
 `postgres`, TLS required. The pooler URL is also shown in Dashboard → Connect → Session
 pooler. `migration list` and `db push` work through it.
 
-Current hosted state (project `kohrmjzwmtqnwrmkymez`, checked 2026-10-30): the Phase 1–5
+Current hosted state (project `kohrmjzwmtqnwrmkymez`, checked 2026-10-31): the Phase 1–6
 migrations (tenancy, catalog, stock ledger, serialized devices, barcode workflows, reporting
-and realtime) are applied, RLS is enabled on every table, and the demo seed has run against the
+and realtime, operational workflows) are applied, RLS is enabled on every table, and the demo seed has run against the
 first signed-up user, who is owner of “SBS VISION” with 7 products and 2 warehouses. A Phase 2 hosted end-to-end check passed:
 a real Supabase password grant produced a token the API accepted, the callers' organizations were
 isolated, and a foreign organization returned `404`. The temporary verification account was
