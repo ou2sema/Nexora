@@ -449,9 +449,26 @@ Full gates on 2026-10-31 for Phase 9: `format:check`, `lint`, `typecheck`, and `
 config); the headed local-stack run passed 22/22 with Allure served at
 http://127.0.0.1:5054 for this run; the shell regression suite passed 16/16.
 
-The hosted project does not yet carry the Phase 9 migration (`20261031140000_team_access.sql`).
-The Team page requires it, so the verification above is local only; applying that migration to
-the hosted project is the project owner's step.
+The hosted project (`kohrmjzwmtqnwrmkymez`) received the Phase 9 migration on 2026-10-31. The
+dry run listed only `20261031140000_team_access.sql`; after the push, a read-only check found
+`public.profiles` and `public.organization_invitations` with RLS enabled, the
+`auth_users_sync_profile` trigger feeding `app.sync_profile_email`, the eight `app.*` team
+functions (the six mutating ones executable by `authenticated` only, not `anon`), the
+`profiles_select_self_or_shared` / `organization_invitations_select_admin` policies, the
+tightened `memberships_*_admin` policies, and the migration record. The profiles backfill
+matched the hosted account count (2). Simulating each account's JWT claims under the
+`authenticated` role confirmed isolation: the SBS VISION account sees only its own profile, no
+MyStock invitation rows, and its pending MyStock invitation through
+`app.my_pending_invitations()`; the MyStock owner sees only their own profile and the
+invitation row. The signed-in Team page in the “MyStock” tenant listed the owner, showed the
+pending invitation, and the API returned 200 for members and invitations, an empty pending
+list for the owner, and `409 invitation_already_pending` for a duplicate invite.
+
+Hosted acceptance, role change, and removal are not yet exercised: the owner created a pending
+invitation to `ou2sema@gmail.com`, and the remaining steps need that invitee's own sign-in
+(no throwaway GoTrue account can be used — GoTrue rejects synthetic auth rows). The invitation
+expires on 2026-11-14. Phase 9 is otherwise verified hosted; the acceptance path itself is
+covered by the database and headed local-stack suites above.
 
 ## Quality gates
 
@@ -535,9 +552,10 @@ enabled on every table, and the demo seed has run against the first signed-up us
 owner of “SBS VISION” with 7 products and 2 warehouses. A Phase 2 hosted end-to-end check
 passed: a real Supabase password grant produced a token the API accepted, the callers'
 organizations were isolated, and a foreign organization returned `404`. The temporary
-verification account was removed; only the owner remains. Phase 8 added no schema. The Phase 9
-team migration (`20261031140000_team_access.sql`) has not been applied, so Team is verified on
-the local stack only until the project owner pushes it.
+verification account was removed; only the owner remains. Phase 8 added no schema. Phase 9
+(`20261031140000_team_access.sql`) was applied on 2026-10-31; the hosted Team page, API, and
+tenant isolation are verified, while invitation acceptance and the member-management steps
+still need the invitee's own sign-in (see “Team access verification”).
 
 The Phase 3 migrations (`20261029130000_stock_ledger.sql` and
 `20261029140000_serialized_devices.sql`) were pushed to the hosted project on 2026-10-29 with
