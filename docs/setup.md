@@ -477,6 +477,56 @@ Revoked row. Hosted role change and removal are still unexercised (they would al
 membership); both are covered by the database and headed suites above. A pending invitation to
 `test@gmail.com` created during this pass remains in the tenant.
 
+## Platform administration verification
+
+The Phase 10 suites run without a hosted project:
+
+```powershell
+npm run test --workspace @mystock/api -- test/db/platform-administration.test.ts test/api/admin.test.ts test/api/account.test.ts
+```
+
+Expected: 25 passing tests (8 database, 6 administration API, 11 account API). The database
+suite proves the platform flag reads organizations and profiles across tenants, does not widen
+access to products or stock levels, restricts `app.create_organization` to platform admins,
+manages invitations and memberships in an organization the admin does not belong to, keeps the
+last-owner trigger in force for platform admins, and gives managers viewer-only invitations
+without role changes, removal, or revocation. The API suite covers the `/admin/organizations`
+listing and its `403 platform_admin_required` for ordinary owners, cross-organization team
+management, the last-owner guard through HTTP, outsider `404`s, manager viewer-only invitations,
+and pending-invitation counts. The account suite covers the `platformAdmin` field in `/me`,
+organization creation restricted to the flag, and first-member invitation on creation.
+
+The headed run uses the same local stack, which now seeds `gina@example.com` as a manager in
+Org A and `pat@example.com` as a platform admin with no membership:
+
+```powershell
+npm run build:apps
+cd apps/web
+npx playwright test --config playwright.local-stack.config.ts --headed
+```
+
+Expected: 26 passing checks (13 tests × desktop/mobile). The administration test signs in as
+pat, creates a project-specific organization with gina invited as manager, opens the
+organization picker to invite another manager, checks the pending counts, opens that
+organization's team page, and returns to `/admin`. The manager test signs in as gina and
+confirms the viewer-only invitation form, no role selects or remove buttons, and no revoke
+action.
+
+To exercise it by hand locally, sign in as `pat@example.com` (any password on the fake auth
+server) and open **Administration**. On a hosted project, apply the Phase 10 migration first;
+the migration marks `ou3sema@gmail.com` as the first platform admin, and the flag is then
+changed only through SQL — there is no HTTP endpoint that grants it.
+
+Full gates on 2026-10-31 for Phase 10: `format:check`, `lint`, `typecheck`, and `build` clean;
+266 Vitest tests across the workspaces (217 API across 27 files, 33 domain, 8 contracts, 8
+config); the headed local-stack run passed 26/26 with Allure served at
+http://127.0.0.1:5055 for this run.
+
+The hosted project has not received the Phase 10 migration
+(`20261031160000_platform_administration.sql`). Until it is applied, hosted organization
+creation still uses the Phase 9 behavior and `/admin` returns `403 platform_admin_required`.
+Applying it is an operator action; see “Database” below.
+
 ## Quality gates
 
 ```powershell
@@ -495,17 +545,18 @@ alphabetically, so `@mystock/api` would otherwise build against a stale or missi
 
 The schema is plain SQL in `supabase/migrations`, applied in filename order:
 
-| Migration                                             | Contents                                                                     |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `20261029120000_tenancy.sql`                          | organizations, memberships, helper functions, base RLS                       |
-| `20261029121000_catalog.sql`                          | products, categories, brands, warehouses, storage locations                  |
-| `20261029130000_stock_ledger.sql`                     | ledger, balances, reservations, idempotency, reconciliation RPCs             |
-| `20261029140000_serialized_devices.sql`               | devices, device events, lifecycle transitions                                |
-| `20261030100000_barcode_workflows.sql`                | GTIN checks, barcode assignment, stock counts and posting RPCs               |
-| `20261030120000_reporting_realtime.sql`               | guarded realtime publication for balances, movements, reservations, devices  |
-| `20261030140000_operational_workflows.sql`            | suppliers, purchase orders, outgoing orders, numbering and lifecycle RPCs    |
-| `20261031120000_returns_and_supplier_performance.sql` | purchase and sales returns, return numbering and lifecycle RPCs              |
-| `20261031140000_team_access.sql`                      | profiles projection, email-keyed invitations, membership and invitation RPCs |
+| Migration                                             | Contents                                                                                                               |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `20261029120000_tenancy.sql`                          | organizations, memberships, helper functions, base RLS                                                                 |
+| `20261029121000_catalog.sql`                          | products, categories, brands, warehouses, storage locations                                                            |
+| `20261029130000_stock_ledger.sql`                     | ledger, balances, reservations, idempotency, reconciliation RPCs                                                       |
+| `20261029140000_serialized_devices.sql`               | devices, device events, lifecycle transitions                                                                          |
+| `20261030100000_barcode_workflows.sql`                | GTIN checks, barcode assignment, stock counts and posting RPCs                                                         |
+| `20261030120000_reporting_realtime.sql`               | guarded realtime publication for balances, movements, reservations, devices                                            |
+| `20261030140000_operational_workflows.sql`            | suppliers, purchase orders, outgoing orders, numbering and lifecycle RPCs                                              |
+| `20261031120000_returns_and_supplier_performance.sql` | purchase and sales returns, return numbering and lifecycle RPCs                                                        |
+| `20261031140000_team_access.sql`                      | profiles projection, email-keyed invitations, membership and invitation RPCs                                           |
+| `20261031160000_platform_administration.sql`          | platform-admin flag, restricted organization creation, cross-organization team access, manager viewer-only invitations |
 
 Demo data lives in `supabase/seed.sql` and requires at least one signed-up user (it raises
 `seed_requires_auth_user` otherwise).
@@ -530,7 +581,11 @@ and no hosted credentials.
 | viewer  | no                              | no            | yes  |
 
 Admins manage non-owner members and invitations; only owners can change, remove, or promote to
-owner, and the last-owner trigger prevents losing the final owner.
+owner, and the last-owner trigger prevents losing the final owner. Managers may read invitations
+and create viewer invitations. A platform administrator is an app-level
+`profiles.is_platform_admin` flag, not an organization role: platform admins may create
+organizations and administer identity rows (organizations, memberships, profiles, invitations)
+across tenants, but business tables still require membership.
 
 Applying migrations to the hosted project (needs your access token and database password):
 
@@ -562,7 +617,10 @@ organizations were isolated, and a foreign organization returned `404`. The temp
 verification account was removed; only the owner remains. Phase 8 added no schema. Phase 9
 (`20261031140000_team_access.sql`) was applied on 2026-10-31; the hosted Team page, API,
 tenant isolation, and invitation acceptance are verified, while hosted role change and removal
-are still unexercised (see “Team access verification”).
+are still unexercised (see “Team access verification”). Phase 10
+(`20261031160000_platform_administration.sql`) is not applied yet: hosted organization
+creation remains owner-only until it is pushed, and the bootstrap flag for
+`ou3sema@gmail.com` lands with that migration.
 
 The Phase 3 migrations (`20261029130000_stock_ledger.sql` and
 `20261029140000_serialized_devices.sql`) were pushed to the hosted project on 2026-10-29 with
@@ -604,13 +662,13 @@ npm run test --workspace @mystock/api -- test/db
 
 ## Test suites
 
-| Command                                                         | What it runs                                                                                                                                                                                            |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run test`                                                  | 248 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, team access, API shell, env, contracts, domain |
-| `npm run test:e2e`                                              | Playwright against the API and dev server (16 checks: 8 tests × desktop/mobile)                                                                                                                         |
-| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                        |
-| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                             |
-| `npx playwright test --config playwright.local-stack.config.ts` | Phase 6–9 flows on the self-contained stack (22 checks: 11 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                      |
+| Command                                                         | What it runs                                                                                                                                                                                                                     |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run test`                                                  | 266 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, team access, platform administration, API shell, env, contracts, domain |
+| `npm run test:e2e`                                              | Playwright against the API and dev server (16 checks: 8 tests × desktop/mobile)                                                                                                                                                  |
+| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                 |
+| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                      |
+| `npx playwright test --config playwright.local-stack.config.ts` | Phase 6–10 flows on the self-contained stack (26 checks: 13 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                                              |
 
 The API suites (`apps/api/test/api`) run the real migrations on PGlite, sign JWTs with
 locally generated ES256 keys, and serve the trusted public key from a temporary JWKS

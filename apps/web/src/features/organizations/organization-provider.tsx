@@ -9,6 +9,7 @@ const STORAGE_KEY = 'mystock.organization';
 interface OrganizationContextValue {
   memberships: MembershipSummary[];
   organization: MembershipSummary | null;
+  platformAdmin: boolean;
   selectOrganization(id: string): void;
   isPending: boolean;
   error: Error | null;
@@ -63,6 +64,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     return {
       memberships,
       organization,
+      platformAdmin: me.data?.user.platformAdmin === true,
       selectOrganization: (id: string) => {
         setSelectedId(id);
         try {

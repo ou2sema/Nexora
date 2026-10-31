@@ -29,6 +29,14 @@ const USERS = {
     id: '00000000-0000-4000-8000-00000000000c',
     role: 'viewer',
   },
+  'gina@example.com': {
+    id: '00000000-0000-4000-8000-0000000000f2',
+    role: 'manager',
+  },
+  'pat@example.com': {
+    id: '00000000-0000-4000-8000-0000000000f0',
+    role: 'authenticated',
+  },
 };
 
 const AUTH_SHIM = `
@@ -45,14 +53,20 @@ const FIXTURES = `
 insert into auth.users (id, email) values
   ('00000000-0000-4000-8000-00000000000a', 'alice@example.com'),
   ('00000000-0000-4000-8000-00000000000d', 'dave@example.com'),
-  ('00000000-0000-4000-8000-00000000000c', 'carol@example.com');
+  ('00000000-0000-4000-8000-00000000000c', 'carol@example.com'),
+  ('00000000-0000-4000-8000-0000000000f2', 'gina@example.com'),
+  ('00000000-0000-4000-8000-0000000000f0', 'pat@example.com');
+
+update public.profiles set is_platform_admin = true
+where id = '00000000-0000-4000-8000-0000000000f0';
 
 insert into public.organizations (id, name, slug) values
   ('10000000-0000-4000-8000-00000000000a', 'Org A', 'org-a');
 
 insert into public.memberships (organization_id, user_id, role) values
   ('10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-00000000000a', 'owner'),
-  ('10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-00000000000d', 'viewer');
+  ('10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-00000000000d', 'viewer'),
+  ('10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-0000000000f2', 'manager');
 
 insert into public.categories (id, organization_id, parent_id, name, slug) values
   ('30000000-0000-4000-8000-0000000000a0', '10000000-0000-4000-8000-00000000000a', null, 'Phones', 'phones'),

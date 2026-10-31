@@ -14,6 +14,7 @@ export const meResponseSchema = z.object({
   user: z.object({
     id: z.uuid(),
     email: z.string().nullable(),
+    platformAdmin: z.boolean(),
   }),
   memberships: z.array(membershipSchema),
 });
@@ -31,6 +32,9 @@ export const organizationSchema = z.object({
 
 export type OrganizationSummary = z.infer<typeof organizationSchema>;
 
+export const firstMemberRoleSchema = z.enum(['admin', 'manager', 'viewer']);
+export type FirstMemberRole = z.infer<typeof firstMemberRoleSchema>;
+
 export const createOrganizationSchema = z.object({
   name: z.string().trim().min(1).max(120),
   slug: z
@@ -40,6 +44,8 @@ export const createOrganizationSchema = z.object({
     .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'Use lowercase words separated by hyphens')
     .max(60)
     .optional(),
+  firstMemberEmail: z.string().trim().toLowerCase().pipe(z.email().max(254)).optional(),
+  firstMemberRole: firstMemberRoleSchema.optional(),
 });
 
 export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>;

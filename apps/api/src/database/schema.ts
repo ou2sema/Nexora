@@ -42,6 +42,7 @@ export const memberships = pgTable('memberships', {
 export const profiles = pgTable('profiles', {
   id: uuid('id').primaryKey(),
   email: text('email'),
+  isPlatformAdmin: boolean('is_platform_admin').notNull().default(false),
   ...timestamps,
 });
 

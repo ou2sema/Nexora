@@ -13,7 +13,7 @@ import { CreateOrganizationForm } from './create-organization-form';
 import { useOrganization } from './organization-provider';
 
 export function OrganizationSwitcher() {
-  const { memberships, organization, selectOrganization } = useOrganization();
+  const { memberships, organization, platformAdmin, selectOrganization } = useOrganization();
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
@@ -38,23 +38,25 @@ export function OrganizationSwitcher() {
         <p className="text-sm font-medium text-slate-500">No organization</p>
       )}
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogTrigger asChild>
-          <Button variant="ghost" size="sm" aria-label="Create organization">
-            <Plus aria-hidden="true" className="size-4" />
-            <span className="hidden sm:inline">New org</span>
-          </Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogTitle>Create organization</DialogTitle>
-          <DialogDescription>
-            You become the owner. The slug is derived from the name and must be unique.
-          </DialogDescription>
-          <div className="mt-4">
-            <CreateOrganizationForm onCreated={() => setCreateOpen(false)} />
-          </div>
-        </DialogContent>
-      </Dialog>
+      {platformAdmin && (
+        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <DialogTrigger asChild>
+            <Button variant="ghost" size="sm" aria-label="Create organization">
+              <Plus aria-hidden="true" className="size-4" />
+              <span className="hidden sm:inline">New org</span>
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogTitle>Create organization</DialogTitle>
+            <DialogDescription>
+              You become the owner. The slug is derived from the name and must be unique.
+            </DialogDescription>
+            <div className="mt-4">
+              <CreateOrganizationForm onCreated={() => setCreateOpen(false)} />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

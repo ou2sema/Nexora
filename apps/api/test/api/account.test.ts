@@ -4,11 +4,18 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { USERS } from '../db/fixtures';
 import { createTestContext, type TestContext } from './test-app';
 
+const PLATFORM_ADMIN = '00000000-0000-4000-8000-0000000000f0';
+
 describe('authentication', () => {
   let ctx: TestContext;
 
   beforeAll(async () => {
     ctx = await createTestContext();
+
+    await ctx.database.exec(`
+      insert into auth.users (id, email) values ('${PLATFORM_ADMIN}', 'operator@example.com');
+      update public.profiles set is_platform_admin = true where id = '${PLATFORM_ADMIN}';
+    `);
   });
 
   afterAll(async () => {
@@ -66,7 +73,11 @@ describe('authentication', () => {
       .set('authorization', `Bearer ${token}`);
 
     expect(response.status).toBe(200);
-    expect(response.body.user).toEqual({ id: USERS.alice, email: 'alice@example.com' });
+    expect(response.body.user).toEqual({
+      id: USERS.alice,
+      email: 'alice@example.com',
+      platformAdmin: false,
+    });
     expect(response.body.memberships).toEqual([
       {
         organizationId: '10000000-0000-4000-8000-00000000000a',
@@ -94,18 +105,34 @@ describe('authentication', () => {
     expect(carol.body.memberships).toEqual([]);
   });
 
-  it('creates an organization owned by the caller', async () => {
-    const token = await ctx.tokenFor(USERS.carol);
+  it('reports the platform admin flag', async () => {
+    const token = await ctx.tokenFor(PLATFORM_ADMIN, { email: 'operator@example.com' });
+
+    const response = await request(ctx.app.getHttpServer())
+      .get('/api/v1/me')
+      .set('authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.user).toEqual({
+      id: PLATFORM_ADMIN,
+      email: 'operator@example.com',
+      platformAdmin: true,
+    });
+    expect(response.body.memberships).toEqual([]);
+  });
+
+  it('creates an organization owned by the platform admin', async () => {
+    const token = await ctx.tokenFor(PLATFORM_ADMIN);
 
     const response = await request(ctx.app.getHttpServer())
       .post('/api/v1/organizations')
       .set('authorization', `Bearer ${token}`)
-      .send({ name: 'Carol Trading' });
+      .send({ name: 'Operator Trading' });
 
     expect(response.status).toBe(201);
     expect(response.body).toMatchObject({
-      name: 'Carol Trading',
-      slug: 'carol-trading',
+      name: 'Operator Trading',
+      slug: 'operator-trading',
       role: 'owner',
     });
 
@@ -119,20 +146,62 @@ describe('authentication', () => {
     });
   });
 
-  it('rejects a duplicate organization slug', async () => {
+  it('refuses organization creation without the platform flag', async () => {
     const token = await ctx.tokenFor(USERS.carol);
 
     const response = await request(ctx.app.getHttpServer())
       .post('/api/v1/organizations')
       .set('authorization', `Bearer ${token}`)
-      .send({ name: 'Another Carol', slug: 'carol-trading' });
+      .send({ name: 'Carol Trading' });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe('platform_admin_required');
+  });
+
+  it('invites the chosen first member for the new organization', async () => {
+    const token = await ctx.tokenFor(PLATFORM_ADMIN);
+
+    const response = await request(ctx.app.getHttpServer())
+      .post('/api/v1/organizations')
+      .set('authorization', `Bearer ${token}`)
+      .send({
+        name: 'Invite Org',
+        firstMemberEmail: 'carol@example.com',
+        firstMemberRole: 'manager',
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({ name: 'Invite Org', role: 'owner' });
+
+    const carolToken = await ctx.tokenFor(USERS.carol, { email: 'carol@example.com' });
+    const pending = await request(ctx.app.getHttpServer())
+      .get('/api/v1/me/invitations')
+      .set('authorization', `Bearer ${carolToken}`);
+
+    expect(pending.status).toBe(200);
+    expect(pending.body.items).toEqual([
+      expect.objectContaining({
+        organizationId: response.body.id,
+        organizationName: 'Invite Org',
+        role: 'manager',
+      }),
+    ]);
+  });
+
+  it('rejects a duplicate organization slug', async () => {
+    const token = await ctx.tokenFor(PLATFORM_ADMIN);
+
+    const response = await request(ctx.app.getHttpServer())
+      .post('/api/v1/organizations')
+      .set('authorization', `Bearer ${token}`)
+      .send({ name: 'Another Operator', slug: 'operator-trading' });
 
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe('conflict');
   });
 
   it('validates the organization payload', async () => {
-    const token = await ctx.tokenFor(USERS.carol);
+    const token = await ctx.tokenFor(PLATFORM_ADMIN);
 
     const response = await request(ctx.app.getHttpServer())
       .post('/api/v1/organizations')

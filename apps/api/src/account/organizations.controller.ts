@@ -42,6 +42,16 @@ export class OrganizationsController {
         throw new AppError('internal_error', 'The organization could not be created.', 500);
       }
 
+      if (input.firstMemberEmail) {
+        await tx.execute(sql`
+          select app.create_organization_invitation(
+            ${created.data}::uuid,
+            ${input.firstMemberEmail},
+            ${input.firstMemberRole ?? 'manager'}::app.member_role
+          )
+        `);
+      }
+
       const [row] = await tx
         .select({
           id: organizations.id,

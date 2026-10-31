@@ -1,7 +1,9 @@
 import { Mail, ShieldCheck, UserMinus, UserPlus, Users } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router';
 
 import type {
+  InvitationRole,
   InvitationStatus,
   InvitationSummary,
   MemberRole,
@@ -30,32 +32,48 @@ const invitationStatusClasses: Record<InvitationStatus, string> = {
   revoked: 'bg-rose-50 text-rose-700 ring-rose-200',
 };
 
+const ALL_ROLES: MemberRole[] = ['owner', 'admin', 'manager', 'viewer'];
+const NON_OWNER_ROLES: MemberRole[] = ['admin', 'manager', 'viewer'];
+
 function errorText(error: unknown, fallback: string): string | null {
   if (!error) return null;
   return error instanceof ApiError ? error.message : fallback;
 }
 
-export function TeamPage() {
-  const { organization } = useOrganization();
+interface TeamViewProps {
+  organizationId: string;
+  organizationName: string;
+  role: MemberRole | null;
+  platformAdmin?: boolean;
+}
+
+export function TeamView({
+  organizationId,
+  organizationName,
+  role,
+  platformAdmin = false,
+}: TeamViewProps) {
   const { session } = useAuth();
-  const organizationId = organization?.organizationId ?? null;
   const currentUserId = session?.user.id ?? null;
 
-  const role = organization?.role;
-  const canManage = role === 'owner' || role === 'admin';
-  const isOwner = role === 'owner';
+  const canManageMembers = platformAdmin || role === 'owner' || role === 'admin';
+  const canManageInvitations = canManageMembers || role === 'manager';
+  const canAssignAnyRole = platformAdmin || role === 'owner' || role === 'admin';
+  const canTouchOwners = platformAdmin || role === 'owner';
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [removing, setRemoving] = useState<TeamMemberSummary | null>(null);
 
   const members = useTeamMembers(organizationId);
-  const invitations = useInvitations(organizationId, canManage);
-  const changeRole = useChangeMemberRole(organizationId ?? '');
-  const revoke = useRevokeInvitation(organizationId ?? '');
+  const invitations = useInvitations(organizationId, canManageInvitations);
+  const changeRole = useChangeMemberRole(organizationId);
+  const revoke = useRevokeInvitation(organizationId);
 
-  const roleOptions: MemberRole[] = isOwner
-    ? ['owner', 'admin', 'manager', 'viewer']
-    : ['admin', 'manager', 'viewer'];
+  const roleOptions: MemberRole[] = canTouchOwners ? ALL_ROLES : NON_OWNER_ROLES;
+  const inviteRoles: InvitationRole[] = canAssignAnyRole
+    ? ['viewer', 'manager', 'admin']
+    : ['viewer'];
+  const inviteLabel = canAssignAnyRole ? 'Invite member' : 'Invite viewer';
 
   const roleError = errorText(changeRole.error, 'The role could not be changed.');
   const revokeError = errorText(revoke.error, 'The invitation could not be revoked.');
@@ -65,22 +83,21 @@ export function TeamPage() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Team</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Members and access for {organization?.organizationName ?? 'this organization'}.
-          </p>
+          <p className="mt-1 text-sm text-slate-600">Members and access for {organizationName}.</p>
         </div>
-        {canManage && (
+        {canManageInvitations && (
           <Button onClick={() => setInviteOpen(true)}>
             <UserPlus aria-hidden="true" className="size-4" />
-            Invite member
+            {inviteLabel}
           </Button>
         )}
       </header>
 
-      {!canManage && (
+      {!canManageMembers && (
         <p className="rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">
-          Your {role ? roleLabels[role].toLowerCase() : 'read-only'} role can view the team. Owners
-          and admins manage members and invitations.
+          {role === 'manager'
+            ? 'Managers can invite viewers. Owners and admins manage roles and invitations.'
+            : `Your ${role ? roleLabels[role].toLowerCase() : 'read-only'} role can view the team. Owners and admins manage members and invitations.`}
         </p>
       )}
 
@@ -152,8 +169,8 @@ export function TeamPage() {
                 {members.data.items.map((member) => {
                   const isSelf = member.userId === currentUserId;
                   const ownerRow = member.role === 'owner';
-                  const canChangeRole = canManage && (isOwner || !ownerRow);
-                  const canRemove = canManage && !isSelf && (isOwner || !ownerRow);
+                  const canChangeRole = canManageMembers && (canTouchOwners || !ownerRow);
+                  const canRemove = canManageMembers && !isSelf && (canTouchOwners || !ownerRow);
                   const rolePending =
                     changeRole.isPending && changeRole.variables?.userId === member.userId;
 
@@ -199,7 +216,7 @@ export function TeamPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end">
-                          {canManage ? (
+                          {canManageMembers ? (
                             <Button
                               variant="secondary"
                               size="sm"
@@ -231,7 +248,7 @@ export function TeamPage() {
         )}
       </section>
 
-      {canManage && (
+      {canManageInvitations && (
         <section
           aria-labelledby="team-invitations-heading"
           className="rounded-xl border border-slate-200 bg-white"
@@ -350,7 +367,7 @@ export function TeamPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end">
-                          {invitation.status === 'pending' ? (
+                          {canManageMembers && invitation.status === 'pending' ? (
                             <Button
                               variant="secondary"
                               size="sm"
@@ -375,26 +392,53 @@ export function TeamPage() {
         </section>
       )}
 
-      {organizationId && (
-        <>
-          <InviteDialog
-            organizationId={organizationId}
-            open={inviteOpen}
-            onOpenChange={setInviteOpen}
-          />
-          {removing && (
-            <RemoveMemberDialog
-              key={removing.userId}
-              organizationId={organizationId}
-              member={removing}
-              open
-              onOpenChange={(open) => {
-                if (!open) setRemoving(null);
-              }}
-            />
-          )}
-        </>
+      <InviteDialog
+        organizationId={organizationId}
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        allowedRoles={inviteRoles}
+      />
+      {removing && (
+        <RemoveMemberDialog
+          key={removing.userId}
+          organizationId={organizationId}
+          member={removing}
+          open
+          onOpenChange={(open) => {
+            if (!open) setRemoving(null);
+          }}
+        />
       )}
     </div>
+  );
+}
+
+export function TeamPage() {
+  const { organization } = useOrganization();
+
+  if (!organization) {
+    return (
+      <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-8">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Team</h1>
+        <p className="mt-2 text-sm text-slate-600">
+          Select an organization to view its team, or ask a platform administrator to add you to
+          one.
+        </p>
+        <Link
+          to="/admin"
+          className="mt-4 inline-block text-sm font-medium text-indigo-700 hover:text-indigo-900"
+        >
+          Administration →
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <TeamView
+      organizationId={organization.organizationId}
+      organizationName={organization.organizationName}
+      role={organization.role}
+    />
   );
 }

@@ -2,6 +2,7 @@ import { Boxes } from 'lucide-react';
 import { NavLink } from 'react-router';
 
 import { navItems } from '@/components/layout/nav-items';
+import { useOrganization } from '@/features/organizations/organization-provider';
 import { cn } from '@/lib/cn';
 
 interface SidebarProps {
@@ -10,6 +11,14 @@ interface SidebarProps {
 }
 
 export function Sidebar({ className, onNavigate }: SidebarProps) {
+  const { memberships, platformAdmin } = useOrganization();
+  const hasOrganization = memberships.length > 0;
+  const items = navItems.filter(
+    (item) =>
+      (!item.platformAdminOnly || platformAdmin) &&
+      (hasOrganization || item.requiresOrganization === false),
+  );
+
   return (
     <div className={cn('flex h-full flex-col bg-ink-950 text-slate-300', className)}>
       <div className="flex h-16 items-center gap-3 px-5">
@@ -21,7 +30,7 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
 
       <nav aria-label="Main navigation" className="flex-1 px-3 py-4">
         <ul className="space-y-1">
-          {navItems.map((item) => (
+          {items.map((item) => (
             <li key={item.to}>
               <NavLink
                 to={item.to}
@@ -42,17 +51,10 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
             </li>
           ))}
         </ul>
-
-        <p className="mt-8 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
-          Coming next
-        </p>
-        <ul className="mt-2 space-y-1 px-3 text-sm text-slate-500">
-          <li>Reports · Phase 5</li>
-        </ul>
       </nav>
 
       <div className="border-t border-white/10 px-5 py-4 text-xs text-slate-500">
-        Stock ledger, devices &amp; scanning · Phase 4
+        Stock ledger, devices &amp; team access · Phase 10
       </div>
     </div>
   );

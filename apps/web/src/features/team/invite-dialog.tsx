@@ -33,16 +33,22 @@ const schema = z.object({
 
 type Values = z.infer<typeof schema>;
 
-const emptyValues: Values = { email: '', role: 'viewer' };
-
 interface InviteDialogProps {
   organizationId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  allowedRoles?: InvitationRole[];
 }
 
-export function InviteDialog({ organizationId, open, onOpenChange }: InviteDialogProps) {
+export function InviteDialog({
+  organizationId,
+  open,
+  onOpenChange,
+  allowedRoles = ['viewer', 'manager', 'admin'],
+}: InviteDialogProps) {
   const mutation = useCreateInvitation(organizationId);
+  const defaultRole = allowedRoles[0] ?? 'viewer';
+  const emptyValues: Values = { email: '', role: defaultRole };
   const {
     register,
     handleSubmit,
@@ -51,8 +57,8 @@ export function InviteDialog({ organizationId, open, onOpenChange }: InviteDialo
   } = useForm<Values>({ resolver: zodResolver(schema), defaultValues: emptyValues });
 
   useEffect(() => {
-    if (open) reset(emptyValues);
-  }, [open, reset]);
+    if (open) reset({ email: '', role: defaultRole });
+  }, [open, reset, defaultRole]);
 
   const errorMessage =
     mutation.error instanceof ApiError
@@ -103,13 +109,23 @@ export function InviteDialog({ organizationId, open, onOpenChange }: InviteDialo
             <label htmlFor="invite-role" className="block text-sm font-medium text-slate-700">
               Role
             </label>
-            <select id="invite-role" className={fieldClass} {...register('role')}>
-              <option value="viewer">{roleLabels.viewer}</option>
-              <option value="manager">{roleLabels.manager}</option>
-              <option value="admin">{roleLabels.admin}</option>
-            </select>
+            {allowedRoles.length > 1 ? (
+              <select id="invite-role" className={fieldClass} {...register('role')}>
+                {allowedRoles.map((role) => (
+                  <option key={role} value={role}>
+                    {roleLabels[role]}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+                {roleLabels[defaultRole]}
+              </p>
+            )}
             <p className="mt-1 text-xs text-slate-500">
-              Ownership is transferred by changing an existing member, not by invitation.
+              {allowedRoles.length === 1
+                ? 'Managers can invite viewers only.'
+                : 'Ownership is transferred by changing an existing member, not by invitation.'}
             </p>
           </div>
 

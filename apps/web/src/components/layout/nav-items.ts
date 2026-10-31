@@ -9,6 +9,7 @@ import {
   Scale,
   ScanLine,
   Send,
+  ShieldCheck,
   Smartphone,
   Tags,
   Users,
@@ -21,6 +22,8 @@ export interface NavItem {
   label: string;
   icon: LucideIcon;
   end?: boolean;
+  platformAdminOnly?: boolean;
+  requiresOrganization?: boolean;
 }
 
 export const navItems: NavItem[] = [
@@ -38,4 +41,11 @@ export const navItems: NavItem[] = [
   { to: '/warehouses', label: 'Warehouses', icon: Warehouse },
   { to: '/catalog', label: 'Catalog settings', icon: Tags },
   { to: '/team', label: 'Team', icon: Users },
+  {
+    to: '/admin',
+    label: 'Administration',
+    icon: ShieldCheck,
+    platformAdminOnly: true,
+    requiresOrganization: false,
+  },
 ];

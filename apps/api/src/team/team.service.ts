@@ -59,7 +59,7 @@ export class TeamService {
   ) {}
 
   async listMembers(userId: string, organizationId: string): Promise<TeamMembersResponse> {
-    return this.access.runAsMember(userId, organizationId, async (tx) => {
+    return this.access.runAsTeamMember(userId, organizationId, async (tx) => {
       const rows = await tx
         .select({
           userId: memberships.userId,
@@ -91,7 +91,7 @@ export class TeamService {
     targetUserId: string,
     role: TeamMemberSummary['role'],
   ): Promise<TeamMemberSummary> {
-    return this.access.runAsMember(
+    return this.access.runAsTeamMember(
       userId,
       organizationId,
       async (tx) => {
@@ -108,7 +108,7 @@ export class TeamService {
   }
 
   async removeMember(userId: string, organizationId: string, targetUserId: string): Promise<void> {
-    await this.access.runAsMember(
+    await this.access.runAsTeamMember(
       userId,
       organizationId,
       async (tx) => {
@@ -123,7 +123,7 @@ export class TeamService {
   }
 
   async listInvitations(userId: string, organizationId: string): Promise<InvitationListResponse> {
-    return this.access.runAsMember(
+    return this.access.runAsTeamMember(
       userId,
       organizationId,
       async (tx) => {
@@ -157,7 +157,7 @@ export class TeamService {
           })),
         };
       },
-      { roles: ORG_ADMINS },
+      { roles: ['owner', 'admin', 'manager'] },
     );
   }
 
@@ -167,10 +167,18 @@ export class TeamService {
     email: string,
     role: InvitationSummary['role'],
   ): Promise<InvitationSummary> {
-    return this.access.runAsMember(
+    return this.access.runAsTeamMember(
       userId,
       organizationId,
-      async (tx) => {
+      async (tx, access) => {
+        if (!access.platformAdmin && access.role === 'manager' && role !== 'viewer') {
+          throw new AppError(
+            'manager_invites_viewers_only',
+            'Managers can invite viewers only. Ask an owner or admin to add a manager.',
+            403,
+          );
+        }
+
         const [saved] = resultRows<{ id: string | null }>(
           await tx.execute(sql`
             select app.create_organization_invitation(
@@ -185,7 +193,7 @@ export class TeamService {
 
         return this.findInvitation(tx, organizationId, saved.id);
       },
-      { roles: ORG_ADMINS },
+      { roles: ['owner', 'admin', 'manager'] },
     );
   }
 
@@ -194,7 +202,7 @@ export class TeamService {
     organizationId: string,
     invitationId: string,
   ): Promise<InvitationSummary> {
-    return this.access.runAsMember(
+    return this.access.runAsTeamMember(
       userId,
       organizationId,
       async (tx) => {

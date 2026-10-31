@@ -4,7 +4,7 @@ Inventory management platform for electronics and technology products: multi-war
 stock, an immutable stock ledger, serialized-device traceability, barcode workflows,
 and organization-scoped reporting.
 
-> Status: Phase 8 (purchasing documents) implemented and verified locally. Phase 2 proved
+> Status: Phase 10 (platform administration) implemented and verified locally. Phase 2 proved
 > schema, RLS, demo seed, sign-in token → API → tenant-scoped queries. Phase 3 added the
 > immutable stock ledger, atomic posting functions, balance projections, reservations,
 > serialized-device traceability, idempotent mutations, and reconciliation repair, and was
@@ -30,8 +30,14 @@ and organization-scoped reporting.
 > verified locally and needs no schema change. Phase 9 adds organization team management: a
 > member list with role changes and removal, plus email-keyed invitations that the invited
 > person accepts after signing in, with owner-only control over owners. It is verified locally
-> on the self-contained stack; the new migration still has to be applied to the hosted
-> project before Team works there. Nothing is production-ready yet.
+> and on the hosted project, where its migration was applied and invitation acceptance was
+> exercised. Phase 10 adds platform administration: a database-managed `profiles.is_platform_admin`
+> flag lets an operator create organizations (optionally inviting the first admin, manager, or
+> viewer), list every organization, and administer members across organizations without joining
+> them. Organization owners and admins keep their roles; managers may read the invitation log and
+> invite viewers only. Platform administration covers identity rows, not business data, so stock,
+> catalog, devices, and orders still require membership. It is verified locally; the Phase 10
+> migration has not yet been applied to the hosted project. Nothing is production-ready yet.
 
 ## Stack
 
@@ -61,7 +67,8 @@ orders are specified in
 supplier performance are specified in
 [ADR-0009](docs/adr/0009-returns-and-supplier-performance.md). Purchase document rendering is
 specified in [ADR-0010](docs/adr/0010-purchasing-documents.md). Team roles and invitations are
-specified in [ADR-0011](docs/adr/0011-team-access.md).
+specified in [ADR-0011](docs/adr/0011-team-access.md). Platform administration and the
+operator flag are specified in [ADR-0012](docs/adr/0012-platform-administration.md).
 
 ## Layout
 
@@ -83,87 +90,88 @@ Users sign in through Supabase Auth on `/sign-in`. The SPA sends the session's a
 to the API as a bearer token; the API verifies it against the project JWKS and runs every
 query inside a transaction that holds the caller's identity, so RLS applies.
 
-| Method | Path                                                                     | Role required          |
-| ------ | ------------------------------------------------------------------------ | ---------------------- |
-| GET    | `/api/v1/me`                                                             | any authenticated user |
-| POST   | `/api/v1/organizations`                                                  | any authenticated user |
-| GET    | `/api/v1/organizations/:id/products`                                     | any member             |
-| POST   | `/api/v1/organizations/:id/products`                                     | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/products/:productId`                          | any member             |
-| PATCH  | `/api/v1/organizations/:id/products/:productId`                          | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/categories`                                   | any member             |
-| POST   | `/api/v1/organizations/:id/categories`                                   | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/brands`                                       | any member             |
-| POST   | `/api/v1/organizations/:id/brands`                                       | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/warehouses`                                   | any member             |
-| POST   | `/api/v1/organizations/:id/warehouses`                                   | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/warehouses/:warehouseId/locations`            | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/stock-levels`                                 | any member             |
-| GET    | `/api/v1/organizations/:id/stock-levels/summary`                         | any member             |
-| GET    | `/api/v1/organizations/:id/stock-movements`                              | any member             |
-| POST   | `/api/v1/organizations/:id/stock-movements`                              | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/stock-transfers`                              | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/stock-reservations`                           | any member             |
-| POST   | `/api/v1/organizations/:id/stock-reservations`                           | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/stock-reservations/:reservationId/release`    | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/stock-reconciliation`                         | owner, admin           |
-| POST   | `/api/v1/organizations/:id/stock-reconciliation/repair`                  | owner, admin           |
-| GET    | `/api/v1/organizations/:id/devices`                                      | any member             |
-| POST   | `/api/v1/organizations/:id/devices`                                      | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/devices/:deviceId`                            | any member             |
-| GET    | `/api/v1/organizations/:id/devices/:deviceId/events`                     | any member             |
-| POST   | `/api/v1/organizations/:id/devices/:deviceId/status`                     | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/devices/:deviceId/location`                   | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/scan`                                         | any member             |
-| POST   | `/api/v1/organizations/:id/products/:productId/barcode`                  | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/labels`                                       | any member             |
-| GET    | `/api/v1/organizations/:id/stock-counts`                                 | any member             |
-| POST   | `/api/v1/organizations/:id/stock-counts`                                 | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/stock-counts/:countId`                        | any member             |
-| POST   | `/api/v1/organizations/:id/stock-counts/:countId/lines`                  | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/stock-counts/:countId/post`                   | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/stock-counts/:countId/discard`                | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/reports/overview`                             | any member             |
-| GET    | `/api/v1/organizations/:id/reports/low-stock`                            | any member             |
-| GET    | `/api/v1/organizations/:id/reports/exports/stock-levels.csv`             | any member             |
-| GET    | `/api/v1/organizations/:id/reports/exports/movements.csv`                | any member             |
-| GET    | `/api/v1/organizations/:id/suppliers`                                    | any member             |
-| POST   | `/api/v1/organizations/:id/suppliers`                                    | owner, admin, manager  |
-| PATCH  | `/api/v1/organizations/:id/suppliers/:supplierId`                        | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/suppliers/:supplierId/activation`             | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/purchase-orders`                              | any member             |
-| POST   | `/api/v1/organizations/:id/purchase-orders`                              | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId`             | any member             |
-| POST   | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/order`       | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/receipts`    | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/cancel`      | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/pdf`         | any member             |
-| GET    | `/api/v1/organizations/:id/sales-orders`                                 | any member             |
-| POST   | `/api/v1/organizations/:id/sales-orders`                                 | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/sales-orders/:salesOrderId`                   | any member             |
-| POST   | `/api/v1/organizations/:id/sales-orders/:salesOrderId/confirm`           | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/sales-orders/:salesOrderId/fulfil`            | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/sales-orders/:salesOrderId/cancel`            | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/purchase-orders/:id/returns`                  | any member             |
-| POST   | `/api/v1/organizations/:id/purchase-orders/:id/returns`                  | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/purchase-orders/:id/returns/:returnId`        | any member             |
-| POST   | `/api/v1/organizations/:id/purchase-orders/:id/returns/:returnId/post`   | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/purchase-orders/:id/returns/:returnId/cancel` | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/purchase-orders/:id/returns/:returnId/pdf`    | any member             |
-| GET    | `/api/v1/organizations/:id/sales-orders/:id/returns`                     | any member             |
-| POST   | `/api/v1/organizations/:id/sales-orders/:id/returns`                     | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/sales-orders/:id/returns/:returnId`           | any member             |
-| POST   | `/api/v1/organizations/:id/sales-orders/:id/returns/:returnId/post`      | owner, admin, manager  |
-| POST   | `/api/v1/organizations/:id/sales-orders/:id/returns/:returnId/cancel`    | owner, admin, manager  |
-| GET    | `/api/v1/organizations/:id/reports/supplier-performance`                 | any member             |
-| GET    | `/api/v1/organizations/:id/members`                                      | any member             |
-| PATCH  | `/api/v1/organizations/:id/members/:userId`                              | owner, admin           |
-| DELETE | `/api/v1/organizations/:id/members/:userId`                              | owner, admin           |
-| GET    | `/api/v1/organizations/:id/invitations`                                  | owner, admin           |
-| POST   | `/api/v1/organizations/:id/invitations`                                  | owner, admin           |
-| POST   | `/api/v1/organizations/:id/invitations/:invitationId/revocation`         | owner, admin           |
-| GET    | `/api/v1/me/invitations`                                                 | any authenticated user |
-| POST   | `/api/v1/me/invitations/:invitationId/acceptance`                        | any authenticated user |
+| Method | Path                                                                     | Role required                                       |
+| ------ | ------------------------------------------------------------------------ | --------------------------------------------------- |
+| GET    | `/api/v1/me`                                                             | any authenticated user                              |
+| GET    | `/api/v1/admin/organizations`                                            | platform admin                                      |
+| POST   | `/api/v1/organizations`                                                  | platform admin                                      |
+| GET    | `/api/v1/organizations/:id/products`                                     | any member                                          |
+| POST   | `/api/v1/organizations/:id/products`                                     | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/products/:productId`                          | any member                                          |
+| PATCH  | `/api/v1/organizations/:id/products/:productId`                          | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/categories`                                   | any member                                          |
+| POST   | `/api/v1/organizations/:id/categories`                                   | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/brands`                                       | any member                                          |
+| POST   | `/api/v1/organizations/:id/brands`                                       | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/warehouses`                                   | any member                                          |
+| POST   | `/api/v1/organizations/:id/warehouses`                                   | owner, admin, manager                               |
+| POST   | `/api/v1/organizations/:id/warehouses/:warehouseId/locations`            | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/stock-levels`                                 | any member                                          |
+| GET    | `/api/v1/organizations/:id/stock-levels/summary`                         | any member                                          |
+| GET    | `/api/v1/organizations/:id/stock-movements`                              | any member                                          |
+| POST   | `/api/v1/organizations/:id/stock-movements`                              | owner, admin, manager                               |
+| POST   | `/api/v1/organizations/:id/stock-transfers`                              | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/stock-reservations`                           | any member                                          |
+| POST   | `/api/v1/organizations/:id/stock-reservations`                           | owner, admin, manager                               |
+| POST   | `/api/v1/organizations/:id/stock-reservations/:reservationId/release`    | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/stock-reconciliation`                         | owner, admin                                        |
+| POST   | `/api/v1/organizations/:id/stock-reconciliation/repair`                  | owner, admin                                        |
+| GET    | `/api/v1/organizations/:id/devices`                                      | any member                                          |
+| POST   | `/api/v1/organizations/:id/devices`                                      | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/devices/:deviceId`                            | any member                                          |
+| GET    | `/api/v1/organizations/:id/devices/:deviceId/events`                     | any member                                          |
+| POST   | `/api/v1/organizations/:id/devices/:deviceId/status`                     | owner, admin, manager                               |
+| POST   | `/api/v1/organizations/:id/devices/:deviceId/location`                   | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/scan`                                         | any member                                          |
+| POST   | `/api/v1/organizations/:id/products/:productId/barcode`                  | owner, admin, manager                               |
+| POST   | `/api/v1/organizations/:id/labels`                                       | any member                                          |
+| GET    | `/api/v1/organizations/:id/stock-counts`                                 | any member                                          |
+| POST   | `/api/v1/organizations/:id/stock-counts`                                 | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/stock-counts/:countId`                        | any member                                          |
+| POST   | `/api/v1/organizations/:id/stock-counts/:countId/lines`                  | owner, admin, manager                               |
+| POST   | `/api/v1/organizations/:id/stock-counts/:countId/post`                   | owner, admin, manager                               |
+| POST   | `/api/v1/organizations/:id/stock-counts/:countId/discard`                | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/reports/overview`                             | any member                                          |
+| GET    | `/api/v1/organizations/:id/reports/low-stock`                            | any member                                          |
+| GET    | `/api/v1/organizations/:id/reports/exports/stock-levels.csv`             | any member                                          |
+| GET    | `/api/v1/organizations/:id/reports/exports/movements.csv`                | any member                                          |
+| GET    | `/api/v1/organizations/:id/suppliers`                                    | any member                                          |
+| POST   | `/api/v1/organizations/:id/suppliers`                                    | owner, admin, manager                               |
+| PATCH  | `/api/v1/organizations/:id/suppliers/:supplierId`                        | owner, admin, manager                               |
+| POST   | `/api/v1/organizations/:id/suppliers/:supplierId/activation`             | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/purchase-orders`                              | any member                                          |
+| POST   | `/api/v1/organizations/:id/purchase-orders`                              | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId`             | any member                                          |
+| POST   | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/order`       | owner, admin, manager                               |
+| POST   | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/receipts`    | owner, admin, manager                               |
+| POST   | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/cancel`      | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/pdf`         | any member                                          |
+| GET    | `/api/v1/organizations/:id/sales-orders`                                 | any member                                          |
+| POST   | `/api/v1/organizations/:id/sales-orders`                                 | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/sales-orders/:salesOrderId`                   | any member                                          |
+| POST   | `/api/v1/organizations/:id/sales-orders/:salesOrderId/confirm`           | owner, admin, manager                               |
+| POST   | `/api/v1/organizations/:id/sales-orders/:salesOrderId/fulfil`            | owner, admin, manager                               |
+| POST   | `/api/v1/organizations/:id/sales-orders/:salesOrderId/cancel`            | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/purchase-orders/:id/returns`                  | any member                                          |
+| POST   | `/api/v1/organizations/:id/purchase-orders/:id/returns`                  | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/purchase-orders/:id/returns/:returnId`        | any member                                          |
+| POST   | `/api/v1/organizations/:id/purchase-orders/:id/returns/:returnId/post`   | owner, admin, manager                               |
+| POST   | `/api/v1/organizations/:id/purchase-orders/:id/returns/:returnId/cancel` | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/purchase-orders/:id/returns/:returnId/pdf`    | any member                                          |
+| GET    | `/api/v1/organizations/:id/sales-orders/:id/returns`                     | any member                                          |
+| POST   | `/api/v1/organizations/:id/sales-orders/:id/returns`                     | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/sales-orders/:id/returns/:returnId`           | any member                                          |
+| POST   | `/api/v1/organizations/:id/sales-orders/:id/returns/:returnId/post`      | owner, admin, manager                               |
+| POST   | `/api/v1/organizations/:id/sales-orders/:id/returns/:returnId/cancel`    | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/reports/supplier-performance`                 | any member                                          |
+| GET    | `/api/v1/organizations/:id/members`                                      | any member or platform admin                        |
+| PATCH  | `/api/v1/organizations/:id/members/:userId`                              | owner, admin, platform admin                        |
+| DELETE | `/api/v1/organizations/:id/members/:userId`                              | owner, admin, platform admin                        |
+| GET    | `/api/v1/organizations/:id/invitations`                                  | owner, admin, manager, platform admin               |
+| POST   | `/api/v1/organizations/:id/invitations`                                  | owner, admin, manager (viewer only), platform admin |
+| POST   | `/api/v1/organizations/:id/invitations/:invitationId/revocation`         | owner, admin, platform admin                        |
+| GET    | `/api/v1/me/invitations`                                                 | any authenticated user                              |
+| POST   | `/api/v1/me/invitations/:invitationId/acceptance`                        | any authenticated user                              |
 
 Errors use `{ "error": { "code", "message", "details?", "requestId" } }` and repeat the
 `x-request-id` response header. Database constraint failures map to `409` or `400`; an
@@ -258,6 +266,18 @@ claim in the caller's token, expires after 14 days, and can only grant admin, ma
 viewer — ownership is transferred by changing an existing member. A background projection of
 `auth.users` emails into `public.profiles` backs the member list without granting the API access
 to the auth schema. See [ADR-0011](docs/adr/0011-team-access.md).
+
+Platform administrators are marked by `public.profiles.is_platform_admin`, a database-managed
+flag with no HTTP grant path; `ou3sema@gmail.com` is the first operator in the migration. A
+platform admin can create an organization (becoming its owner) with an optional first
+admin/manager/viewer invitation, open `/admin` to list every organization with member and
+pending-invitation counts, and open any organization's team page to invite, change roles, remove
+members, and revoke invitations — even without a membership there. Their visibility is limited
+to identity rows (organizations, memberships, profiles, invitations); catalog, stock, devices,
+orders, and reports remain behind ordinary RLS membership checks. Managers may read invitations
+and invite viewers only; owners and admins continue to manage roles, removals, and revocations,
+and the last-owner trigger applies to every caller, platform admins included. See
+[ADR-0012](docs/adr/0012-platform-administration.md).
 
 ## Prerequisites
 

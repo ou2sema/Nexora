@@ -3,11 +3,18 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ORGS, PRODUCTS, USERS, seedFixtures } from './fixtures';
 import { createTestDatabase, type TestDatabase } from './harness';
 
+const PLATFORM_ADMIN = '00000000-0000-4000-8000-0000000000f1';
+
 let database: TestDatabase;
 
 beforeAll(async () => {
   database = await createTestDatabase();
   await seedFixtures(database.client);
+
+  await database.client.exec(`
+    insert into auth.users (id, email) values ('${PLATFORM_ADMIN}', 'operator@example.com');
+    update public.profiles set is_platform_admin = true where id = '${PLATFORM_ADMIN}';
+  `);
 });
 
 afterAll(async () => {
@@ -15,12 +22,12 @@ afterAll(async () => {
 });
 
 describe('organization bootstrap and owner protection', () => {
-  it('creates an organization and its first owner membership for the caller', async () => {
+  it('creates an organization and its first owner membership for a platform admin', async () => {
     const created = await database.asUser(
-      USERS.carol,
+      PLATFORM_ADMIN,
       (client) =>
         client.query<{ create_organization: string }>(
-          "select app.create_organization('Carol Trading', 'Carol-Trading') as create_organization",
+          "select app.create_organization('Operator Trading', 'Operator-Trading') as create_organization",
         ),
       { commit: true },
     );
@@ -28,17 +35,20 @@ describe('organization bootstrap and owner protection', () => {
     const organizationId = created.rows[0]?.create_organization;
     expect(organizationId).toBeTruthy();
 
-    const visible = await database.asUser(USERS.carol, (client) =>
-      client.query<{ id: string; slug: string }>('select id, slug from public.organizations'),
-    );
-    const membership = await database.asUser(USERS.carol, (client) =>
-      client.query<{ role: string }>(
-        'select role from public.memberships where organization_id = $1',
+    const visible = await database.asUser(PLATFORM_ADMIN, (client) =>
+      client.query<{ id: string; slug: string }>(
+        'select id, slug from public.organizations where id = $1',
         [organizationId],
       ),
     );
+    const membership = await database.asUser(PLATFORM_ADMIN, (client) =>
+      client.query<{ role: string }>(
+        'select role from public.memberships where organization_id = $1 and user_id = $2',
+        [organizationId, PLATFORM_ADMIN],
+      ),
+    );
 
-    expect(visible.rows).toEqual([{ id: organizationId, slug: 'carol-trading' }]);
+    expect(visible.rows).toEqual([{ id: organizationId, slug: 'operator-trading' }]);
     expect(membership.rows).toEqual([{ role: 'owner' }]);
   });
 
@@ -50,10 +60,26 @@ describe('organization bootstrap and owner protection', () => {
     ).rejects.toThrow(/authentication_required/);
   });
 
-  it('refuses a duplicate organization slug', async () => {
+  it('refuses organization creation for users without the platform flag', async () => {
     await expect(
       database.asUser(
         USERS.carol,
+        (client) =>
+          client.query("select app.create_organization('Carol Trading', 'carol-trading')"),
+        { commit: true },
+      ),
+    ).rejects.toThrow(/platform_admin_required/);
+
+    const visible = await database.asUser(USERS.carol, (client) =>
+      client.query('select id from public.organizations where slug = $1', ['carol-trading']),
+    );
+    expect(visible.rows).toHaveLength(0);
+  });
+
+  it('refuses a duplicate organization slug', async () => {
+    await expect(
+      database.asUser(
+        PLATFORM_ADMIN,
         (client) => client.query("select app.create_organization('Copycat', 'org-a')"),
         { commit: true },
       ),

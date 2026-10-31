@@ -1,7 +1,5 @@
 import { Building2 } from 'lucide-react';
 
-import { CreateOrganizationForm } from '@/features/organizations/create-organization-form';
-
 export function OrganizationOnboardingPage() {
   return (
     <div className="mx-auto max-w-xl">
@@ -10,15 +8,17 @@ export function OrganizationOnboardingPage() {
           <Building2 aria-hidden="true" className="size-6" />
         </span>
         <h1 className="mt-5 text-2xl font-semibold tracking-tight text-slate-900">
-          Create your first organization
+          Your account is not in an organization yet
         </h1>
         <p className="mt-2 text-sm text-slate-600">
-          Products, warehouses and stock movements are scoped to an organization. You will be its
-          first owner and can invite the rest of the team later.
+          A platform administrator creates organizations and assigns the first manager. If you were
+          invited, ask them to send the invitation to this email address; it appears in the
+          pending-invitation banner after you sign in.
         </p>
-        <div className="mt-6">
-          <CreateOrganizationForm />
-        </div>
+        <p className="mt-4 text-sm text-slate-500">
+          MyStock does not send invitation email. The person who invited you will share it with you
+          directly.
+        </p>
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 
 import { AccountModule } from './account/account.module';
+import { AdminModule } from './admin/admin.module';
 import { AuthGuard } from './auth/auth.guard';
 import { AuthModule } from './auth/auth.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -63,6 +64,7 @@ import { TenancyModule } from './tenancy/tenancy.module';
     TenancyModule,
     AuthModule,
     AccountModule,
+    AdminModule,
     CatalogModule,
     StockModule,
     DevicesModule,

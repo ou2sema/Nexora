@@ -1,6 +1,8 @@
 import { createBrowserRouter } from 'react-router';
 
 import { AppShell } from '@/components/layout/app-shell';
+import { AdminPage } from '@/routes/admin-page';
+import { AdminTeamPage } from '@/routes/admin-team-page';
 import { CatalogSettingsPage } from '@/routes/catalog-settings-page';
 import { DashboardPage } from '@/routes/dashboard-page';
 import { DevicesPage } from '@/routes/devices-page';
@@ -38,6 +40,8 @@ export const router = createBrowserRouter([
       { path: 'warehouses', element: <WarehousesPage /> },
       { path: 'catalog', element: <CatalogSettingsPage /> },
       { path: 'team', element: <TeamPage /> },
+      { path: 'admin', element: <AdminPage /> },
+      { path: 'admin/organizations/:organizationId/team', element: <AdminTeamPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

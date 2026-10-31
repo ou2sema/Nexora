@@ -37,8 +37,9 @@ export function AppShell() {
 
 function AuthenticatedShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const { memberships, isPending, error, refetch } = useOrganization();
+  const { memberships, platformAdmin, isPending, error, refetch } = useOrganization();
   const { signOut } = useAuth();
+  const location = useLocation();
 
   if (isPending) {
     return <LoadingScreen label="Loading your workspace…" />;
@@ -81,7 +82,17 @@ function AuthenticatedShell() {
         <Topbar onOpenNav={() => setMobileNavOpen(true)} />
         <main id="main-content" className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <PendingInvitations />
-          {memberships.length === 0 ? <OrganizationOnboardingPage /> : <Outlet />}
+          {memberships.length > 0 ? (
+            <Outlet />
+          ) : platformAdmin ? (
+            location.pathname === '/' ? (
+              <Navigate to="/admin" replace />
+            ) : (
+              <Outlet />
+            )
+          ) : (
+            <OrganizationOnboardingPage />
+          )}
         </main>
       </div>
     </div>

@@ -1,6 +1,8 @@
 export {
   type CreateOrganizationInput,
   createOrganizationSchema,
+  type FirstMemberRole,
+  firstMemberRoleSchema,
   type MeResponse,
   type MembershipSummary,
   memberRoleSchema,
@@ -10,6 +12,12 @@ export {
   type OrganizationSummary,
   organizationSchema,
 } from './account';
+export {
+  type AdminOrganizationSummary,
+  type AdminOrganizationsResponse,
+  adminOrganizationSchema,
+  adminOrganizationsResponseSchema,
+} from './admin';
 export {
   type BrandCreateInput,
   type BrandSummary,

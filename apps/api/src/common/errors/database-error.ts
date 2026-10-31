@@ -210,6 +210,20 @@ export function toDatabaseErrorDescriptor(error: unknown): ErrorDescriptor | nul
           message: 'Only an owner can manage owners.',
         };
       }
+      if (rawMessage === 'platform_admin_required') {
+        return {
+          status: 403,
+          code: 'platform_admin_required',
+          message: 'Only platform administrators can create organizations.',
+        };
+      }
+      if (rawMessage === 'manager_invites_viewers_only') {
+        return {
+          status: 403,
+          code: 'manager_invites_viewers_only',
+          message: 'Managers can invite viewers only. Ask an owner or admin to add a manager.',
+        };
+      }
       if (rawMessage === 'invitation_email_mismatch') {
         return {
           status: 403,
