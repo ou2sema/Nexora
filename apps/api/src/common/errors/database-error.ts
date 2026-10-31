@@ -26,6 +26,30 @@ const CONSTRAINT_MESSAGES: Record<string, string> = {
   stock_count_empty: 'Record at least one line before posting the count.',
   stock_count_below_reserved: 'The counted quantity is below the reserved quantity.',
   product_not_countable: 'Serialized products are tracked per device, not by quantity.',
+  supplier_inactive: 'This supplier is inactive.',
+  product_serialized_order_unsupported:
+    'Serialized products are issued per device, not through an order line.',
+  purchase_order_over_receipt: 'The received quantity exceeds the ordered quantity.',
+  purchase_order_not_receivable: 'Only ordered purchase orders can receive stock.',
+  purchase_order_not_cancellable: 'A purchase order that received stock cannot be cancelled.',
+  purchase_order_not_draft: 'Only draft purchase orders can be ordered.',
+  sales_order_not_draft: 'Only draft outgoing orders can be confirmed.',
+  sales_order_not_fulfillable: 'Only confirmed outgoing orders can be fulfilled.',
+  sales_order_not_cancellable: 'Only draft or confirmed outgoing orders can be cancelled.',
+  sales_order_reservation_missing: 'This outgoing order is missing its stock reservation.',
+  serial_count_mismatch: 'Provide one serial number per received unit.',
+  serial_numbers_not_supported: 'This product is not serialized; remove the serial numbers.',
+};
+
+const VALIDATION_MESSAGES: Record<string, string> = {
+  order_requires_lines: 'Add at least one line.',
+  order_too_many_lines: 'An order can have at most 100 lines.',
+  order_line_invalid: 'Each line needs a product and a positive quantity.',
+  duplicate_order_line: 'Each product may appear only once.',
+  customer_name_required: 'Enter the customer name.',
+  invalid_supplier_name: 'Enter a supplier name.',
+  invalid_country_code: 'Use a two-letter country code.',
+  invalid_quantity: 'Quantity must be greater than zero.',
 };
 
 const NOT_FOUND_MESSAGES: Record<string, string> = {
@@ -35,6 +59,10 @@ const NOT_FOUND_MESSAGES: Record<string, string> = {
   device_not_found: 'Device not found.',
   warehouse_not_found: 'Warehouse not found.',
   location_not_found: 'Location not found.',
+  supplier_not_found: 'Supplier not found.',
+  purchase_order_not_found: 'Purchase order not found.',
+  purchase_order_line_not_found: 'Purchase order line not found.',
+  sales_order_not_found: 'Outgoing order not found.',
 };
 
 /**
@@ -67,6 +95,27 @@ export function toDatabaseErrorDescriptor(error: unknown): ErrorDescriptor | nul
           status: 409,
           code: 'idempotency_conflict',
           message: 'This Idempotency-Key was already used for a different request.',
+        };
+      }
+      if (rawMessage === 'supplier_name_conflict') {
+        return {
+          status: 409,
+          code: 'conflict',
+          message: 'A supplier with this name already exists.',
+        };
+      }
+      if (constraint === 'devices_org_serial_key') {
+        return {
+          status: 409,
+          code: 'conflict',
+          message: 'A device with this serial number is already registered.',
+        };
+      }
+      if (constraint === 'devices_org_imei_key') {
+        return {
+          status: 409,
+          code: 'conflict',
+          message: 'A device with this IMEI is already registered.',
         };
       }
       return {
@@ -124,7 +173,7 @@ export function toDatabaseErrorDescriptor(error: unknown): ErrorDescriptor | nul
       return {
         status: 400,
         code: 'validation_error',
-        message: 'A value has an invalid type or range.',
+        message: VALIDATION_MESSAGES[rawMessage] ?? 'A value has an invalid type or range.',
       };
     default:
       return { status: 500, code: 'internal_error', message: 'Internal server error' };

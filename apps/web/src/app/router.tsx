@@ -6,12 +6,15 @@ import { DashboardPage } from '@/routes/dashboard-page';
 import { DevicesPage } from '@/routes/devices-page';
 import { NotFoundPage } from '@/routes/not-found-page';
 import { ProductsPage } from '@/routes/products-page';
+import { PurchaseOrdersPage } from '@/routes/purchase-orders-page';
 import { ReconciliationPage } from '@/routes/reconciliation-page';
 import { ReservationsPage } from '@/routes/reservations-page';
+import { SalesOrdersPage } from '@/routes/sales-orders-page';
 import { ScanningPage } from '@/routes/scanning-page';
 import { SignInPage } from '@/routes/sign-in-page';
 import { StockLevelsPage } from '@/routes/stock-levels-page';
 import { StockMovementsPage } from '@/routes/stock-movements-page';
+import { SuppliersPage } from '@/routes/suppliers-page';
 import { WarehousesPage } from '@/routes/warehouses-page';
 
 export const router = createBrowserRouter([
@@ -28,6 +31,9 @@ export const router = createBrowserRouter([
       { path: 'stock/reservations', element: <ReservationsPage /> },
       { path: 'stock/reconciliation', element: <ReconciliationPage /> },
       { path: 'devices', element: <DevicesPage /> },
+      { path: 'suppliers', element: <SuppliersPage /> },
+      { path: 'purchasing', element: <PurchaseOrdersPage /> },
+      { path: 'orders', element: <SalesOrdersPage /> },
       { path: 'warehouses', element: <WarehousesPage /> },
       { path: 'catalog', element: <CatalogSettingsPage /> },
       { path: '*', element: <NotFoundPage /> },

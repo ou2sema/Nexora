@@ -4,7 +4,7 @@ Inventory management platform for electronics and technology products: multi-war
 stock, an immutable stock ledger, serialized-device traceability, barcode workflows,
 and organization-scoped reporting.
 
-> Status: Phase 5 (reporting and realtime) implemented and verified locally. Phase 2 proved
+> Status: Phase 6 (operational workflows) implemented and verified locally. Phase 2 proved
 > schema, RLS, demo seed, sign-in token → API → tenant-scoped queries. Phase 3 added the
 > immutable stock ledger, atomic posting functions, balance projections, reservations,
 > serialized-device traceability, idempotent mutations, and reconciliation repair, and was
@@ -15,7 +15,11 @@ and organization-scoped reporting.
 > category, and window filters, stock valuation, movement trends, low-stock alerts, CSV
 > exports, and RLS-authorized realtime updates backed by an unconditional 30-second poll. It
 > is verified locally and against the hosted project, including the publication migration and
-> end-to-end socket delivery. Nothing is production-ready yet.
+> end-to-end socket delivery. Phase 6 adds a supplier directory, purchase orders with
+> incremental receiving (serialized lines register devices), outgoing orders that reserve on
+> confirmation and issue on fulfilment, per-organization/year document numbering, and
+> single-transaction lifecycle RPCs. It is verified locally on a self-contained stack; its
+> hosted migration awaits approval. Nothing is production-ready yet.
 
 ## Stack
 
@@ -105,6 +109,22 @@ query inside a transaction that holds the caller's identity, so RLS applies.
 | GET    | `/api/v1/organizations/:id/reports/low-stock`                         | any member             |
 | GET    | `/api/v1/organizations/:id/reports/exports/stock-levels.csv`          | any member             |
 | GET    | `/api/v1/organizations/:id/reports/exports/movements.csv`             | any member             |
+| GET    | `/api/v1/organizations/:id/suppliers`                                 | any member             |
+| POST   | `/api/v1/organizations/:id/suppliers`                                 | owner, admin, manager  |
+| PATCH  | `/api/v1/organizations/:id/suppliers/:supplierId`                     | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/suppliers/:supplierId/activation`          | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/purchase-orders`                           | any member             |
+| POST   | `/api/v1/organizations/:id/purchase-orders`                           | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId`          | any member             |
+| POST   | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/order`    | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/receipts` | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/cancel`   | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/sales-orders`                              | any member             |
+| POST   | `/api/v1/organizations/:id/sales-orders`                              | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/sales-orders/:salesOrderId`                | any member             |
+| POST   | `/api/v1/organizations/:id/sales-orders/:salesOrderId/confirm`        | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/sales-orders/:salesOrderId/fulfil`         | owner, admin, manager  |
+| POST   | `/api/v1/organizations/:id/sales-orders/:salesOrderId/cancel`         | owner, admin, manager  |
 
 Errors use `{ "error": { "code", "message", "details?", "requestId" } }` and repeat the
 `x-request-id` response header. Database constraint failures map to `409` or `400`; an
@@ -153,6 +173,19 @@ rows with `422 export_too_large`, and are fetched as authenticated blobs. The da
 subscribes to Realtime changes on balances, movements, reservations, and devices; RLS
 authorizes every event. It also polls every 30 seconds unconditionally, because a channel can
 report connected without delivering events when its tables are not in the publication.
+
+Suppliers belong to one organization and their names are unique; deactivation keeps the
+history but removes them from new purchase orders. Purchase orders move
+`draft → ordered → partially_received → received`, and may only be cancelled before any stock
+is received (a partial receipt also closes cancellation). Each receipt covers part of every
+open line and writes one ledger receipt per line. A serialized line receives `serial|IMEI`
+entries and registers one device plus a `registered` event per serial instead of posting a
+quantity. Outgoing orders move `draft → confirmed → fulfilled`: confirming reserves every line
+at the document's warehouse and location, fulfilling issues against those reservations, and
+cancelling releases them; serialized products are rejected on order lines. Documents are
+numbered per organization and year (`PO-2026-0001`, `SO-2026-0001`). Every create and
+transition requires an `Idempotency-Key` and claims it exactly once for the whole document, so
+a retried request returns the stored result instead of double-posting stock.
 
 ## Prerequisites
 

@@ -16,6 +16,7 @@ import { CatalogModule } from './catalog/catalog.module';
 import { DatabaseModule } from './database/database.module';
 import { DevicesModule } from './devices/devices.module';
 import { HealthModule } from './health/health.module';
+import { OperationsModule } from './operations/operations.module';
 import { ReportsModule } from './reports/reports.module';
 import { ScanningModule } from './scanning/scanning.module';
 import { StockModule } from './stock/stock.module';
@@ -66,6 +67,7 @@ import { TenancyModule } from './tenancy/tenancy.module';
     DevicesModule,
     ScanningModule,
     ReportsModule,
+    OperationsModule,
     HealthModule,
   ],
   providers: [

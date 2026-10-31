@@ -2,6 +2,7 @@ import {
   bigint,
   boolean,
   char,
+  date,
   jsonb,
   numeric,
   pgTable,
@@ -10,7 +11,13 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
-import type { MemberRole, ProductStatus, UnitOfMeasure } from '@mystock/contracts';
+import type {
+  MemberRole,
+  ProductStatus,
+  PurchaseOrderStatus,
+  SalesOrderStatus,
+  UnitOfMeasure,
+} from '@mystock/contracts';
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -95,6 +102,86 @@ export const storageLocations = pgTable('storage_locations', {
   ...timestamps,
 });
 
+export const suppliers = pgTable('suppliers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull(),
+  name: text('name').notNull(),
+  contactName: text('contact_name'),
+  email: text('email'),
+  phone: text('phone'),
+  addressLine: text('address_line'),
+  city: text('city'),
+  countryCode: char('country_code', { length: 2 }),
+  taxId: text('tax_id'),
+  notes: text('notes'),
+  isActive: boolean('is_active').notNull().default(true),
+  ...timestamps,
+});
+
+export const purchaseOrders = pgTable('purchase_orders', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull(),
+  number: text('number').notNull(),
+  supplierId: uuid('supplier_id').notNull(),
+  warehouseId: uuid('warehouse_id').notNull(),
+  locationId: uuid('location_id').notNull(),
+  status: text('status').$type<PurchaseOrderStatus>().notNull().default('draft'),
+  reference: text('reference'),
+  notes: text('notes'),
+  expectedOn: date('expected_on', { mode: 'string' }),
+  orderedAt: timestamp('ordered_at', { withTimezone: true }),
+  receivedAt: timestamp('received_at', { withTimezone: true }),
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  createdBy: uuid('created_by'),
+  ...timestamps,
+});
+
+export const purchaseOrderLines = pgTable('purchase_order_lines', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull(),
+  purchaseOrderId: uuid('purchase_order_id').notNull(),
+  productId: uuid('product_id').notNull(),
+  quantityOrdered: numeric('quantity_ordered', { precision: 18, scale: 4 })
+    .$type<string>()
+    .notNull(),
+  quantityReceived: numeric('quantity_received', { precision: 18, scale: 4 })
+    .$type<string>()
+    .notNull()
+    .default('0'),
+  unitCostMinor: bigint('unit_cost_minor', { mode: 'number' }),
+  ...timestamps,
+});
+
+export const salesOrders = pgTable('sales_orders', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull(),
+  number: text('number').notNull(),
+  customerName: text('customer_name').notNull(),
+  customerEmail: text('customer_email'),
+  customerPhone: text('customer_phone'),
+  warehouseId: uuid('warehouse_id').notNull(),
+  locationId: uuid('location_id').notNull(),
+  status: text('status').$type<SalesOrderStatus>().notNull().default('draft'),
+  reference: text('reference'),
+  notes: text('notes'),
+  confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+  fulfilledAt: timestamp('fulfilled_at', { withTimezone: true }),
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  createdBy: uuid('created_by'),
+  ...timestamps,
+});
+
+export const salesOrderLines = pgTable('sales_order_lines', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull(),
+  salesOrderId: uuid('sales_order_id').notNull(),
+  productId: uuid('product_id').notNull(),
+  quantity: numeric('quantity', { precision: 18, scale: 4 }).$type<string>().notNull(),
+  unitPriceMinor: bigint('unit_price_minor', { mode: 'number' }),
+  reservationId: uuid('reservation_id'),
+  ...timestamps,
+});
+
 export type Organization = typeof organizations.$inferSelect;
 export type Membership = typeof memberships.$inferSelect;
 export type Category = typeof categories.$inferSelect;
@@ -102,3 +189,8 @@ export type Brand = typeof brands.$inferSelect;
 export type Product = typeof products.$inferSelect;
 export type Warehouse = typeof warehouses.$inferSelect;
 export type StorageLocation = typeof storageLocations.$inferSelect;
+export type Supplier = typeof suppliers.$inferSelect;
+export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
+export type PurchaseOrderLine = typeof purchaseOrderLines.$inferSelect;
+export type SalesOrder = typeof salesOrders.$inferSelect;
+export type SalesOrderLine = typeof salesOrderLines.$inferSelect;

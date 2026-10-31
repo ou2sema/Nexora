@@ -221,6 +221,54 @@ The local dev servers pointed at the hosted project, signed in as the owner:
   channel received an inserted movement in about one second, and the open dashboard advanced
   from 17 to 18 units without a reload, so socket delivery is verified end to end.
 
+## Operational workflow verification
+
+The Phase 6 API suite runs without a hosted project:
+
+```powershell
+npm run test --workspace @mystock/api -- test/api/operations.test.ts test/db/operational-workflows.test.ts
+```
+
+Expected: 24 passing tests (13 database, 11 API). They cover supplier uniqueness, activation,
+role denial and tenant boundaries; purchase-order numbering, replay and conflict on the
+idempotency key, partial and serialized receipts, over-receipt rejection, cancellation rules,
+and foreign-product rejection; and outgoing-order reservation, issuance, over-sell rejection,
+cancellation release, and rejection of serialized lines.
+
+The signed-in UI runs against a self-contained stack with no hosted project and no
+credentials. `apps/api/scripts/local-e2e-stack.mjs` boots embedded PostgreSQL 18, applies the
+real migrations, serves a local JWKS plus password-grant endpoint on 4200, seeds an owner
+(`alice@example.com`) and a viewer (`dave@example.com`) in one organization, and starts the
+built API on 4101. Playwright adds Vite on 5174:
+
+```powershell
+npm run build:apps
+cd apps/web
+npx playwright test --config playwright.local-stack.config.ts --headed
+```
+
+Expected: 10 passing checks (5 tests × desktop/mobile): supplier create, deactivate and
+reactivate; purchase order order → receipt with an on-hand delta; a serialized receipt
+registering two devices visible on the Devices page; outgoing order confirm → fulfil with an
+on-hand delta; and a viewer seeing disabled write controls on all three pages.
+
+Full gates on 2026-10-31: `format:check`, `lint`, `typecheck`, and `build` clean; 208 Vitest
+tests across the workspaces (159 API, including the 11 operations API tests); the Phase 6
+headed run above passed 10/10 with Allure at 100% (served at http://localhost:5051 for this
+run; port 5050 already hosted an older preview); the shell regression suite passed 16/16.
+
+### Hosted check
+
+The Phase 6 migration (`20261030140000_operational_workflows.sql`) has **not** been pushed to
+the hosted project; it awaits explicit approval. Preview it first:
+
+```powershell
+npx supabase db push --db-url $env:DATABASE_URL --dry-run
+```
+
+Do not push against the owner's production tenant without approval, and verify the hosted
+pages with a throwaway account rather than the owner's password.
+
 ## Quality gates
 
 ```powershell
@@ -239,14 +287,15 @@ alphabetically, so `@mystock/api` would otherwise build against a stale or missi
 
 The schema is plain SQL in `supabase/migrations`, applied in filename order:
 
-| Migration                               | Contents                                                                    |
-| --------------------------------------- | --------------------------------------------------------------------------- |
-| `20261029120000_tenancy.sql`            | organizations, memberships, helper functions, base RLS                      |
-| `20261029121000_catalog.sql`            | products, categories, brands, warehouses, storage locations                 |
-| `20261029130000_stock_ledger.sql`       | ledger, balances, reservations, idempotency, reconciliation RPCs            |
-| `20261029140000_serialized_devices.sql` | devices, device events, lifecycle transitions                               |
-| `20261030100000_barcode_workflows.sql`  | GTIN checks, barcode assignment, stock counts and posting RPCs              |
-| `20261030120000_reporting_realtime.sql` | guarded realtime publication for balances, movements, reservations, devices |
+| Migration                                  | Contents                                                                    |
+| ------------------------------------------ | --------------------------------------------------------------------------- |
+| `20261029120000_tenancy.sql`               | organizations, memberships, helper functions, base RLS                      |
+| `20261029121000_catalog.sql`               | products, categories, brands, warehouses, storage locations                 |
+| `20261029130000_stock_ledger.sql`          | ledger, balances, reservations, idempotency, reconciliation RPCs            |
+| `20261029140000_serialized_devices.sql`    | devices, device events, lifecycle transitions                               |
+| `20261030100000_barcode_workflows.sql`     | GTIN checks, barcode assignment, stock counts and posting RPCs              |
+| `20261030120000_reporting_realtime.sql`    | guarded realtime publication for balances, movements, reservations, devices |
+| `20261030140000_operational_workflows.sql` | suppliers, purchase orders, outgoing orders, numbering and lifecycle RPCs   |
 
 Demo data lives in `supabase/seed.sql` and requires at least one signed-up user (it raises
 `seed_requires_auth_user` otherwise).
@@ -290,10 +339,10 @@ network without an IPv6 route, use the session pooler instead: host
 `postgres`, TLS required. The pooler URL is also shown in Dashboard → Connect → Session
 pooler. `migration list` and `db push` work through it.
 
-Current hosted state (project `kohrmjzwmtqnwrmkymez`, checked 2026-10-30): the Phase 1–4
-migrations (tenancy, catalog, stock ledger, serialized devices, barcode workflows) are applied,
-RLS is enabled on every table, and the demo seed has run against the first signed-up user, who is
-owner of “SBS VISION” with 7 products and 2 warehouses. A Phase 2 hosted end-to-end check passed:
+Current hosted state (project `kohrmjzwmtqnwrmkymez`, checked 2026-10-30): the Phase 1–5
+migrations (tenancy, catalog, stock ledger, serialized devices, barcode workflows, reporting
+and realtime) are applied, RLS is enabled on every table, and the demo seed has run against the
+first signed-up user, who is owner of “SBS VISION” with 7 products and 2 warehouses. A Phase 2 hosted end-to-end check passed:
 a real Supabase password grant produced a token the API accepted, the callers' organizations were
 isolated, and a foreign organization returned `404`. The temporary verification account was
 removed; only the owner remains.
@@ -338,12 +387,13 @@ npm run test --workspace @mystock/api -- test/db
 
 ## Test suites
 
-| Command                                 | What it runs                                                                                                                           |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run test`                          | 175 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, API shell, env, contracts, domain |
-| `npm run test:e2e`                      | Playwright against the API and dev server (16 checks: 8 tests × desktop/mobile)                                                        |
-| `npm run test:e2e:headed`               | Same, with visible browsers (local verification)                                                                                       |
-| `npm run test:e2e -- --project=desktop` | One Playwright project only                                                                                                            |
+| Command                                                         | What it runs                                                                                                                                                  |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run test`                                                  | 208 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, API shell, env, contracts, domain |
+| `npm run test:e2e`                                              | Playwright against the API and dev server (16 checks: 8 tests × desktop/mobile)                                                                               |
+| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                              |
+| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                   |
+| `npx playwright test --config playwright.local-stack.config.ts` | Phase 6 flows on the self-contained stack (10 checks: 5 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                               |
 
 The API suites (`apps/api/test/api`) run the real migrations on PGlite, sign JWTs with
 locally generated ES256 keys, and serve the trusted public key from a temporary JWKS
