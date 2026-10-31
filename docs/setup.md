@@ -279,8 +279,9 @@ Full gates on 2026-10-31 for Phase 7: `format:check`, `lint`, `typecheck`, and `
 220 Vitest tests across the workspaces (171 API); the Phase 7 headed local-stack run above
 passed 16/16 (desktop and mobile) with Allure results written and served at
 http://localhost:5052 for this run; the shell regression suite passed 16/16. The Phase 7
-migration (`20261031120000_returns_and_supplier_performance.sql`) is committed but **not**
-pushed to hosted; that remains a manual step against the hosted project.
+migration (`20261031120000_returns_and_supplier_performance.sql`) was pushed to the hosted
+project on 2026-10-31, and a signed-in hosted purchase return was posted against it; the check
+is recorded below.
 
 ### Hosted check (2026-10-31)
 
@@ -316,6 +317,41 @@ A signed-in pass followed the same day in the “MyStock” tenant against the h
 That verification data remains in the tenant: supplier “Tunis Tech Distribution”,
 `PO-2026-0001`, and `SO-2026-0001`.
 
+### Hosted check: returns and supplier performance (2026-10-31)
+
+The Phase 7 migration (`20261031120000_returns_and_supplier_performance.sql`) was pushed to the
+hosted project on 2026-10-31 with `npx supabase db push --db-url "$DATABASE_URL" --yes` after a
+dry run listed exactly that one migration. A read-only check then confirmed `purchase_returns`,
+`purchase_return_lines`, `purchase_return_devices`, `sales_returns`, and `sales_return_lines`
+exist with RLS enabled, the six return functions are present (`create_purchase_return`,
+`post_purchase_return`, `cancel_purchase_return`, `create_sales_return`, `post_sales_return`,
+`cancel_sales_return`), the migration is recorded in `supabase_migrations.schema_migrations`,
+the enums (`app.stock_reference_type`, `app.document_kind`, `app.return_status`) carry the
+return labels, and the `stock_operations_operation_check` constraint accepts the return
+tokens. Both return tables were empty at check time.
+
+A signed-in pass followed in the same “MyStock” tenant against the hosted API. Baselines:
+`CABLE-01` held 16 at `MAIN / A-01` plus 2 at `A-02` (18 on hand) with 13 movements, and
+`PO-2026-0001` was fully received (1 / 1).
+
+- **Purchase return**: created draft `PR-2026-0001` against that received line with reason
+  “Hosted verification: damaged cable”, reference `HOSTED-PR-2026-10-31`, one unit, then posted
+  it. The section switched to Posted and “New purchase return” became disabled.
+- **Ledger**: hosted rows show the return `posted` with `posted_at` set, its line at quantity 1,
+  and exactly one movement of `-1.0000` with `reference_type = purchase_return` and
+  `reference_id` equal to the return id, leaving `A-01` at 15. Balances are 15 + 2 = 17, the
+  movement count is 14, and the projection still equals the ledger (zero drift).
+- **Dashboard**: 17 units on hand and 14 movements after the post. The supplier performance
+  card listed “Tunis Tech Distribution” with 1 order (1 received), on-time `—` (the order
+  carries no expected date), 0.0 d lead time, `7.500 DT` received value, and a 100% return rate
+  from 1 returned unit.
+- **Over-return guard**: a second one-unit return for the same line was rejected by the API with
+  HTTP 400 `constraint_violation` — “The return exceeds the quantity received and not yet
+  returned.” — and a follow-up query confirmed it left no extra return row and no extra
+  movement.
+
+The posted return and its movement remain in that tenant.
+
 ## Quality gates
 
 ```powershell
@@ -334,15 +370,16 @@ alphabetically, so `@mystock/api` would otherwise build against a stale or missi
 
 The schema is plain SQL in `supabase/migrations`, applied in filename order:
 
-| Migration                                  | Contents                                                                    |
-| ------------------------------------------ | --------------------------------------------------------------------------- |
-| `20261029120000_tenancy.sql`               | organizations, memberships, helper functions, base RLS                      |
-| `20261029121000_catalog.sql`               | products, categories, brands, warehouses, storage locations                 |
-| `20261029130000_stock_ledger.sql`          | ledger, balances, reservations, idempotency, reconciliation RPCs            |
-| `20261029140000_serialized_devices.sql`    | devices, device events, lifecycle transitions                               |
-| `20261030100000_barcode_workflows.sql`     | GTIN checks, barcode assignment, stock counts and posting RPCs              |
-| `20261030120000_reporting_realtime.sql`    | guarded realtime publication for balances, movements, reservations, devices |
-| `20261030140000_operational_workflows.sql` | suppliers, purchase orders, outgoing orders, numbering and lifecycle RPCs   |
+| Migration                                             | Contents                                                                    |
+| ----------------------------------------------------- | --------------------------------------------------------------------------- |
+| `20261029120000_tenancy.sql`                          | organizations, memberships, helper functions, base RLS                      |
+| `20261029121000_catalog.sql`                          | products, categories, brands, warehouses, storage locations                 |
+| `20261029130000_stock_ledger.sql`                     | ledger, balances, reservations, idempotency, reconciliation RPCs            |
+| `20261029140000_serialized_devices.sql`               | devices, device events, lifecycle transitions                               |
+| `20261030100000_barcode_workflows.sql`                | GTIN checks, barcode assignment, stock counts and posting RPCs              |
+| `20261030120000_reporting_realtime.sql`               | guarded realtime publication for balances, movements, reservations, devices |
+| `20261030140000_operational_workflows.sql`            | suppliers, purchase orders, outgoing orders, numbering and lifecycle RPCs   |
+| `20261031120000_returns_and_supplier_performance.sql` | purchase and sales returns, return numbering and lifecycle RPCs             |
 
 Demo data lives in `supabase/seed.sql` and requires at least one signed-up user (it raises
 `seed_requires_auth_user` otherwise).
@@ -386,15 +423,14 @@ network without an IPv6 route, use the session pooler instead: host
 `postgres`, TLS required. The pooler URL is also shown in Dashboard → Connect → Session
 pooler. `migration list` and `db push` work through it.
 
-Current hosted state (project `kohrmjzwmtqnwrmkymez`, checked 2026-10-31): the Phase 1–6
+Current hosted state (project `kohrmjzwmtqnwrmkymez`, checked 2026-10-31): the Phase 1–7
 migrations (tenancy, catalog, stock ledger, serialized devices, barcode workflows, reporting
-and realtime, operational workflows) are applied, RLS is enabled on every table, and the demo seed has run against the
-first signed-up user, who is owner of “SBS VISION” with 7 products and 2 warehouses. The Phase 7
-returns migration is prepared in the repository but has not been pushed; hosted remains at the
-Phase 6 schema until that step is run manually. A Phase 2 hosted end-to-end check passed:
-a real Supabase password grant produced a token the API accepted, the callers' organizations were
-isolated, and a foreign organization returned `404`. The temporary verification account was
-removed; only the owner remains.
+and realtime, operational workflows, returns and supplier performance) are applied, RLS is
+enabled on every table, and the demo seed has run against the first signed-up user, who is
+owner of “SBS VISION” with 7 products and 2 warehouses. A Phase 2 hosted end-to-end check
+passed: a real Supabase password grant produced a token the API accepted, the callers'
+organizations were isolated, and a foreign organization returned `404`. The temporary
+verification account was removed; only the owner remains.
 
 The Phase 3 migrations (`20261029130000_stock_ledger.sql` and
 `20261029140000_serialized_devices.sql`) were pushed to the hosted project on 2026-10-29 with
