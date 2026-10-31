@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { PurchaseDocumentsService } from '../documents/purchase-documents.service';
 import { PurchaseOrdersController } from './purchase-orders.controller';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { SalesOrdersController } from './sales-orders.controller';
@@ -9,6 +10,11 @@ import { SuppliersService } from './suppliers.service';
 
 @Module({
   controllers: [SuppliersController, PurchaseOrdersController, SalesOrdersController],
-  providers: [SuppliersService, PurchaseOrdersService, SalesOrdersService],
+  providers: [
+    SuppliersService,
+    PurchaseOrdersService,
+    SalesOrdersService,
+    PurchaseDocumentsService,
+  ],
 })
 export class OperationsModule {}

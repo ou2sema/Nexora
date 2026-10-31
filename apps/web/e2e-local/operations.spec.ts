@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
 const AUTH_ORIGIN = 'http://localhost:4200';
@@ -114,6 +116,23 @@ async function openLatestRow(page: Page, text: string): Promise<void> {
   await expect(page.getByRole('dialog')).toBeVisible();
 }
 
+async function expectPdfDownload(
+  page: Page,
+  trigger: () => Promise<void>,
+  filenamePattern: RegExp,
+): Promise<void> {
+  const downloadPromise = page.waitForEvent('download');
+  await trigger();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(filenamePattern);
+
+  const path = await download.path();
+  expect(path).toBeTruthy();
+  const bytes = await readFile(path!);
+  expect(bytes.length).toBeGreaterThan(1200);
+  expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
+}
+
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -162,6 +181,41 @@ async function receivePurchaseOrder(
   );
   expect(received.ok(), await received.text()).toBeTruthy();
   return order.orderId;
+}
+
+async function createPostedReturn(
+  request: APIRequestContext,
+  orderId: string,
+  quantity: number,
+): Promise<void> {
+  const detail = await request.get(
+    `${API_BASE}/organizations/${ORGANIZATION_ID}/purchase-orders/${orderId}`,
+    { headers: authHeaders() },
+  );
+  expect(detail.ok(), await detail.text()).toBeTruthy();
+  const lines = (await detail.json()) as { lines: { id: string; productSku: string }[] };
+  const line = lines.lines.find((candidate) => candidate.productSku === 'CABLE-USB-C');
+  expect(line).toBeTruthy();
+
+  const created = await request.post(
+    `${API_BASE}/organizations/${ORGANIZATION_ID}/purchase-orders/${orderId}/returns`,
+    {
+      headers: { ...authHeaders(), 'idempotency-key': crypto.randomUUID() },
+      data: {
+        reason: 'Purchase document download check',
+        reference: 'E2E-DOC',
+        lines: [{ purchaseOrderLineId: line!.id, quantity }],
+      },
+    },
+  );
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const purchaseReturn = (await created.json()) as { returnId: string };
+
+  const posted = await request.post(
+    `${API_BASE}/organizations/${ORGANIZATION_ID}/purchase-orders/${orderId}/returns/${purchaseReturn.returnId}/post`,
+    { headers: { ...authHeaders(), 'idempotency-key': crypto.randomUUID() } },
+  );
+  expect(posted.ok(), await posted.text()).toBeTruthy();
 }
 
 async function fulfilSalesOrder(
@@ -323,6 +377,36 @@ test.describe('purchase orders', () => {
     await expect(dialog).toBeHidden();
 
     expect(await onHand(request)).toBe(before + 2);
+  });
+
+  test('downloads the purchase order and its return note as PDFs', async ({ page, request }) => {
+    const supplierName = `E2E Docs Supplier ${RUN}`;
+    const supplierId = await createSupplier(request, supplierName);
+    const orderId = await receivePurchaseOrder(request, supplierId, CABLE_ID, 2);
+    await createPostedReturn(request, orderId, 1);
+
+    await signIn(page);
+    await page.goto('/purchasing');
+    await page.locator('#po-search').fill(supplierName);
+    await openLatestRow(page, supplierName);
+
+    const dialog = page.getByRole('dialog');
+    await expectPdfDownload(
+      page,
+      () => dialog.getByRole('button', { name: 'Download purchase order PDF' }).click(),
+      /^mystock-PO-\d{4}-\d{4}\.pdf$/,
+    );
+
+    const returnRow = dialog.getByRole('row', { name: /PR-/ });
+    await expect(returnRow).toContainText('Posted');
+    await expectPdfDownload(
+      page,
+      () => returnRow.getByRole('button', { name: 'Download PDF' }).click(),
+      /^mystock-PR-\d{4}-\d{4}\.pdf$/,
+    );
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
   });
 });
 

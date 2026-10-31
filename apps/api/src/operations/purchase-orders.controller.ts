@@ -8,6 +8,7 @@ import {
   Param,
   Post,
   Query,
+  StreamableFile,
 } from '@nestjs/common';
 
 import {
@@ -38,6 +39,10 @@ import {
 import type { AuthenticatedUser } from '../auth/authenticated-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import type { RenderedDocument } from '../documents/purchase-documents.service';
+// The class is a DI token at runtime, so this cannot be a type-only import.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import { PurchaseDocumentsService } from '../documents/purchase-documents.service';
 import {
   organizationParamsSchema,
   type OrganizationParams,
@@ -52,7 +57,10 @@ import { PurchaseOrdersService } from './purchase-orders.service';
 
 @Controller('organizations/:organizationId/purchase-orders')
 export class PurchaseOrdersController {
-  constructor(private readonly purchaseOrders: PurchaseOrdersService) {}
+  constructor(
+    private readonly purchaseOrders: PurchaseOrdersService,
+    private readonly documents: PurchaseDocumentsService,
+  ) {}
 
   @Get()
   list(
@@ -79,6 +87,19 @@ export class PurchaseOrdersController {
     @Param(new ZodValidationPipe(purchaseOrderParamsSchema)) params: PurchaseOrderParams,
   ): Promise<PurchaseOrderDetail> {
     return this.purchaseOrders.get(user.id, params.organizationId, params.purchaseOrderId);
+  }
+
+  @Get(':purchaseOrderId/pdf')
+  async purchaseOrderPdf(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param(new ZodValidationPipe(purchaseOrderParamsSchema)) params: PurchaseOrderParams,
+  ): Promise<StreamableFile> {
+    const file = await this.documents.purchaseOrderPdf(
+      user.id,
+      params.organizationId,
+      params.purchaseOrderId,
+    );
+    return this.stream(file);
   }
 
   @Post(':purchaseOrderId/order')
@@ -173,6 +194,20 @@ export class PurchaseOrdersController {
     );
   }
 
+  @Get(':purchaseOrderId/returns/:returnId/pdf')
+  async purchaseReturnPdf(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param(new ZodValidationPipe(purchaseReturnParamsSchema)) params: PurchaseReturnParams,
+  ): Promise<StreamableFile> {
+    const file = await this.documents.purchaseReturnPdf(
+      user.id,
+      params.organizationId,
+      params.purchaseOrderId,
+      params.returnId,
+    );
+    return this.stream(file);
+  }
+
   @Post(':purchaseOrderId/returns/:returnId/post')
   @HttpCode(HttpStatus.OK)
   postReturn(
@@ -205,5 +240,13 @@ export class PurchaseOrdersController {
       idempotencyKey,
       input,
     );
+  }
+
+  private stream(file: RenderedDocument): StreamableFile {
+    return new StreamableFile(file.pdf, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="${file.fileName}"`,
+      length: file.pdf.byteLength,
+    });
   }
 }

@@ -20,12 +20,14 @@ import {
 import { useDevices } from '@/features/devices/api';
 import { ApiError } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
+import { saveBlob } from '@/lib/download';
 import { fieldClass } from '@/lib/form-field';
 import {
   useCancelPurchaseReturn,
   useCancelSalesReturn,
   useCreatePurchaseReturn,
   useCreateSalesReturn,
+  useDownloadPurchaseReturnPdf,
   usePostPurchaseReturn,
   usePostSalesReturn,
   usePurchaseReturns,
@@ -330,9 +332,11 @@ export function PurchaseReturnsSection({
   const returns = usePurchaseReturns(organizationId, order.id);
   const postMutation = usePostPurchaseReturn(organizationId);
   const cancelMutation = useCancelPurchaseReturn(organizationId);
+  const downloadPdf = useDownloadPurchaseReturnPdf(organizationId);
   const [createOpen, setCreateOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [pdfPendingId, setPdfPendingId] = useState<string | null>(null);
 
   const returnable = order.lines.some((line) => line.quantityReceived - line.quantityReturned > 0);
   const items: PurchaseReturnSummary[] = returns.data?.items ?? [];
@@ -358,6 +362,20 @@ export function PurchaseReturnsSection({
       setNotice(`Return ${result.number} cancelled.`);
     } catch (error) {
       setActionError(errorMessage(error, 'The return could not be cancelled.'));
+    }
+  };
+
+  const download = async (item: PurchaseReturnSummary) => {
+    setActionError(null);
+    setPdfPendingId(item.id);
+    try {
+      const file = await downloadPdf(order.id, item.id);
+      saveBlob(file.blob, file.filename);
+      setNotice(`Downloaded ${file.filename}`);
+    } catch (error) {
+      setActionError(errorMessage(error, 'The return note could not be generated.'));
+    } finally {
+      setPdfPendingId(null);
     }
   };
 
@@ -424,27 +442,35 @@ export function PurchaseReturnsSection({
                   <td className="px-3 py-2 text-right text-slate-700">{item.totalQuantity}</td>
                   <td className="px-3 py-2 text-slate-600">{item.reason}</td>
                   <td className="px-3 py-2">
-                    {canWrite && item.status === 'draft' ? (
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          disabled={postMutation.isPending}
-                          onClick={() => void post(item.id)}
-                        >
-                          Post return
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={cancelMutation.isPending}
-                          onClick={() => void cancel(item.id)}
-                        >
-                          Cancel return
-                        </Button>
-                      </div>
-                    ) : (
-                      <span className="block text-right text-xs text-slate-400">—</span>
-                    )}
+                    <div className="flex justify-end gap-2">
+                      {canWrite && item.status === 'draft' && (
+                        <>
+                          <Button
+                            size="sm"
+                            disabled={postMutation.isPending}
+                            onClick={() => void post(item.id)}
+                          >
+                            Post return
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={cancelMutation.isPending}
+                            onClick={() => void cancel(item.id)}
+                          >
+                            Cancel return
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={pdfPendingId === item.id}
+                        onClick={() => void download(item)}
+                      >
+                        {pdfPendingId === item.id ? 'Preparing…' : 'Download PDF'}
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}

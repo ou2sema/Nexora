@@ -4,7 +4,7 @@ Inventory management platform for electronics and technology products: multi-war
 stock, an immutable stock ledger, serialized-device traceability, barcode workflows,
 and organization-scoped reporting.
 
-> Status: Phase 7 (returns and supplier performance) implemented and verified locally. Phase 2 proved
+> Status: Phase 8 (purchasing documents) implemented and verified locally. Phase 2 proved
 > schema, RLS, demo seed, sign-in token → API → tenant-scoped queries. Phase 3 added the
 > immutable stock ledger, atomic posting functions, balance projections, reservations,
 > serialized-device traceability, idempotent mutations, and reconciliation repair, and was
@@ -24,8 +24,10 @@ and organization-scoped reporting.
 > disposal of serialized devices), sales returns that restock the order location, post-time
 > over-return revalidation, and an on-demand supplier performance report; it is verified
 > locally, and on 2026-10-31 its migration was pushed to the hosted project, where a signed-in
-> pass posted a purchase return and a sales return with matching ledger movements. Nothing is
-> production-ready yet.
+> pass posted a purchase return and a sales return with matching ledger movements. Phase 8
+> renders purchase orders and purchase return notes as server-side PDFs, with ledger-matched
+> totals, DRAFT/CANCELLED watermarks, and browser downloads from the purchasing screens; it is
+> verified locally and needs no schema change. Nothing is production-ready yet.
 
 ## Stack
 
@@ -53,7 +55,8 @@ authorized realtime are specified in
 orders are specified in
 [ADR-0008](docs/adr/0008-operational-workflows.md). Purchase returns, sales returns, and
 supplier performance are specified in
-[ADR-0009](docs/adr/0009-returns-and-supplier-performance.md).
+[ADR-0009](docs/adr/0009-returns-and-supplier-performance.md). Purchase document rendering is
+specified in [ADR-0010](docs/adr/0010-purchasing-documents.md).
 
 ## Layout
 
@@ -129,6 +132,7 @@ query inside a transaction that holds the caller's identity, so RLS applies.
 | POST   | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/order`       | owner, admin, manager  |
 | POST   | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/receipts`    | owner, admin, manager  |
 | POST   | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/cancel`      | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/purchase-orders/:purchaseOrderId/pdf`         | any member             |
 | GET    | `/api/v1/organizations/:id/sales-orders`                                 | any member             |
 | POST   | `/api/v1/organizations/:id/sales-orders`                                 | owner, admin, manager  |
 | GET    | `/api/v1/organizations/:id/sales-orders/:salesOrderId`                   | any member             |
@@ -140,6 +144,7 @@ query inside a transaction that holds the caller's identity, so RLS applies.
 | GET    | `/api/v1/organizations/:id/purchase-orders/:id/returns/:returnId`        | any member             |
 | POST   | `/api/v1/organizations/:id/purchase-orders/:id/returns/:returnId/post`   | owner, admin, manager  |
 | POST   | `/api/v1/organizations/:id/purchase-orders/:id/returns/:returnId/cancel` | owner, admin, manager  |
+| GET    | `/api/v1/organizations/:id/purchase-orders/:id/returns/:returnId/pdf`    | any member             |
 | GET    | `/api/v1/organizations/:id/sales-orders/:id/returns`                     | any member             |
 | POST   | `/api/v1/organizations/:id/sales-orders/:id/returns`                     | owner, admin, manager  |
 | GET    | `/api/v1/organizations/:id/sales-orders/:id/returns/:returnId`           | any member             |
@@ -218,6 +223,17 @@ so overlapping drafts can never exceed what was received or fulfilled. `GET
 .../reports/supplier-performance` computes, over a default 90-day window, orders created and
 received, ordered and received value, on-time rate against expected dates, average lead time,
 and the posted-return rate; rates are `null` when their denominator is empty.
+
+Purchase documents are rendered on demand from the tenant-scoped rows: `GET
+.../purchase-orders/:id/pdf` and `GET .../purchase-orders/:id/returns/:returnId/pdf` return an
+A4 PDF named `mystock-<number>.pdf` as an attachment. Line amounts are `quantity × unit cost`
+rounded per line and summed; a line without a cost is excluded from the total and flagged in a
+printed note. Draft and cancelled documents carry a watermark, every page carries a UTC
+generation timestamp and `Page x of y`, and any member — viewers included — may download,
+while a non-member receives `404`. Text is normalized to the PDF standard fonts' ASCII range,
+so non-Latin scripts degrade to `?` (see
+[ADR-0010](docs/adr/0010-purchasing-documents.md)). Nothing is stored: the PDF always reflects
+the current rows.
 
 ## Prerequisites
 

@@ -364,6 +364,45 @@ database is up to date”, confirming hosted carries the full Phase 7 schema.
 
 Both posted returns and their movements remain in that tenant.
 
+## Purchasing document verification
+
+The Phase 8 suites run without a hosted project and need no database:
+
+```powershell
+npm run test --workspace @mystock/api -- test/documents/purchase-document-model.test.ts test/api/purchase-documents.test.ts
+```
+
+Expected: 6 passing tests (4 model, 2 API). The model tests assert per-line rounding and summing
+(`2 × 4,500` + `1 × 1,800`, with a cost-less line excluded and counted), the `DRAFT` watermark,
+status label, meta rows and file name, the return note with sorted serials, and the ASCII
+formatters (millimes grouping, diacritic transliteration, non-Latin replacement). The API tests
+request both PDFs through supertest and assert `200`, `application/pdf`, the exact
+`attachment; filename="mystock-PO-…pdf"` header, the `%PDF-` magic bytes and byte length, a
+pdf-lib parse with the expected title, viewer access, `404 organization_not_found` for a
+non-member, and `404 purchase_order_not_found` / `purchase_return_not_found` for unknown ids;
+they also download a purchase return as a draft and again after posting.
+
+The headed run drives real downloads through the browser. With the local stack up (same
+commands as the Phase 6 section):
+
+```powershell
+npm run build:apps
+cd apps/web
+npx playwright test --config playwright.local-stack.config.ts --headed
+```
+
+Expected: 18 passing checks (9 tests × desktop/mobile). The purchase-documents test creates a
+supplier, receives a purchase order, posts a one-unit purchase return, opens the order in
+`/purchasing`, downloads the purchase-order PDF, then downloads the return note from its row;
+both downloads are asserted by suggested file name (`mystock-PO-YYYY-NNNN.pdf`,
+`mystock-PR-YYYY-NNNN.pdf`), size, and `%PDF-` header.
+
+Full gates on 2026-10-31 for Phase 8: `format:check`, `lint`, `typecheck`, and `build` clean;
+226 Vitest tests across the workspaces (177 API across 23 files, 33 domain, 8 contracts, 8
+config); the headed run above passed 18/18 with Allure served at http://127.0.0.1:5053 for this
+run. Phase 8 adds no migration: documents are rendered from the existing tables, so hosted
+carries the required schema already.
+
 ## Quality gates
 
 ```powershell
@@ -484,13 +523,13 @@ npm run test --workspace @mystock/api -- test/db
 
 ## Test suites
 
-| Command                                                         | What it runs                                                                                                                                                           |
-| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run test`                                                  | 220 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, API shell, env, contracts, domain |
-| `npm run test:e2e`                                              | Playwright against the API and dev server (16 checks: 8 tests × desktop/mobile)                                                                                        |
-| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                       |
-| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                            |
-| `npx playwright test --config playwright.local-stack.config.ts` | Phase 7 flows on the self-contained stack (16 checks: 8 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                        |
+| Command                                                         | What it runs                                                                                                                                                                               |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run test`                                                  | 226 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, API shell, env, contracts, domain |
+| `npm run test:e2e`                                              | Playwright against the API and dev server (16 checks: 8 tests × desktop/mobile)                                                                                                            |
+| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                           |
+| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                |
+| `npx playwright test --config playwright.local-stack.config.ts` | Phase 6–8 flows on the self-contained stack (18 checks: 9 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                          |
 
 The API suites (`apps/api/test/api`) run the real migrations on PGlite, sign JWTs with
 locally generated ES256 keys, and serve the trusted public key from a temporary JWKS

@@ -32,7 +32,7 @@ import type {
 } from '@mystock/contracts';
 
 import { useAccessToken } from '@/features/auth/auth-provider';
-import { apiRequest, newIdempotencyKey } from '@/lib/api-client';
+import { apiDownload, apiRequest, newIdempotencyKey } from '@/lib/api-client';
 
 export interface SupplierFilters {
   search: string;
@@ -348,6 +348,21 @@ export function useCancelPurchaseReturn(organizationId: string) {
       { method: 'POST', token, body: input, headers: idempotencyHeaders() },
     ),
   );
+}
+
+export function useDownloadPurchaseOrderPdf(organizationId: string) {
+  const token = useAccessToken();
+  return (purchaseOrderId: string) =>
+    apiDownload(`/organizations/${organizationId}/purchase-orders/${purchaseOrderId}/pdf`, token);
+}
+
+export function useDownloadPurchaseReturnPdf(organizationId: string) {
+  const token = useAccessToken();
+  return (purchaseOrderId: string, returnId: string) =>
+    apiDownload(
+      `/organizations/${organizationId}/purchase-orders/${purchaseOrderId}/returns/${returnId}/pdf`,
+      token,
+    );
 }
 
 export function useSalesReturns(organizationId: string | null, salesOrderId: string | null) {

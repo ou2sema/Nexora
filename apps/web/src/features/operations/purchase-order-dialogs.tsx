@@ -19,10 +19,12 @@ import {
 import { WarehouseLocationFields } from '@/components/ui/warehouse-location-fields';
 import { ApiError } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
+import { saveBlob } from '@/lib/download';
 import { fieldClass } from '@/lib/form-field';
 import {
   useCreatePurchaseOrder,
   useCancelPurchaseOrder,
+  useDownloadPurchaseOrderPdf,
   useOrderPurchaseOrder,
   usePurchaseOrder,
   useReceivePurchaseOrder,
@@ -401,15 +403,19 @@ export function PurchaseOrderDetailDialog({
   const orderMutation = useOrderPurchaseOrder(organizationId);
   const receiveMutation = useReceivePurchaseOrder(organizationId);
   const cancelMutation = useCancelPurchaseOrder(organizationId);
+  const downloadPdf = useDownloadPurchaseOrderPdf(organizationId);
 
   const [receipt, setReceipt] = useState<Record<string, ReceiptState>>({});
   const [reason, setReason] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
+  const [pdfPending, setPdfPending] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   useEffect(() => {
     setReceipt({});
     setReason('');
     setNotice(null);
+    setPdfError(null);
   }, [purchaseOrderId]);
 
   const data = order.data;
@@ -421,6 +427,20 @@ export function PurchaseOrderDetailDialog({
   const receiveError = dialogError(receiveMutation.error, 'The receipt could not be posted.');
   const cancelError = dialogError(cancelMutation.error, 'The order could not be cancelled.');
   const orderError = dialogError(orderMutation.error, 'The order could not be advanced.');
+
+  const downloadOrderPdf = async (orderId: string) => {
+    setPdfError(null);
+    setPdfPending(true);
+    try {
+      const file = await downloadPdf(orderId);
+      saveBlob(file.blob, file.filename);
+      setNotice(`Downloaded ${file.filename}`);
+    } catch (error) {
+      setPdfError(error instanceof ApiError ? error.message : 'The PDF could not be generated.');
+    } finally {
+      setPdfPending(false);
+    }
+  };
 
   const submitReceipt = async () => {
     if (!data) return;
@@ -475,6 +495,23 @@ export function PurchaseOrderDetailDialog({
           </p>
         ) : data ? (
           <div className="mt-5 space-y-6">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={pdfPending}
+                onClick={() => void downloadOrderPdf(data.id)}
+              >
+                {pdfPending ? 'Preparing PDF…' : 'Download purchase order PDF'}
+              </Button>
+            </div>
+
+            {pdfError && (
+              <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                {pdfError}
+              </p>
+            )}
+
             <dl className="grid gap-3 rounded-lg bg-slate-50 p-4 text-sm sm:grid-cols-3">
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">

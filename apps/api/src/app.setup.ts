@@ -11,5 +11,7 @@ export function configureApp(app: INestApplication, env: ServerEnv): void {
     origin: env.WEB_ORIGIN,
     credentials: false,
     maxAge: 600,
+    // Downloads name themselves from this header, which browsers hide cross-origin by default.
+    exposedHeaders: ['content-disposition'],
   });
 }
