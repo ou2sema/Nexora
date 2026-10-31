@@ -10,8 +10,8 @@ import {
   Tag,
   Wallet,
 } from 'lucide-react';
-import { useState } from 'react';
-import { Link } from 'react-router';
+import { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router';
 
 import { formatTnd } from '@mystock/domain';
 
@@ -80,6 +80,15 @@ export function DashboardPage() {
   const realtime = useStockRealtime(organizationId);
   const exportLevels = useExportStockLevels(organizationId);
   const exportMovements = useExportMovements(organizationId);
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.hash !== '#low-stock') {
+      return;
+    }
+
+    document.getElementById('low-stock')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [location.hash, location.key]);
 
   const data = overview.data;
   const lowStockTotal = lowStock.data?.total ?? 0;
