@@ -25,7 +25,7 @@ export interface TestDatabase {
   asUser<T>(
     userId: string | null,
     fn: (client: PGlite) => Promise<T>,
-    options?: { commit?: boolean },
+    options?: { commit?: boolean; email?: string },
   ): Promise<T>;
 }
 
@@ -48,13 +48,19 @@ export async function createTestDatabase(): Promise<TestDatabase> {
   async function asUser<T>(
     userId: string | null,
     fn: (client: PGlite) => Promise<T>,
-    options: { commit?: boolean } = {},
+    options: { commit?: boolean; email?: string } = {},
   ): Promise<T> {
     await client.exec('begin');
     try {
       await client.exec('set local role authenticated');
       await client.query("select set_config('request.jwt.claims', $1, true)", [
-        userId ? JSON.stringify({ sub: userId, role: 'authenticated' }) : '',
+        userId
+          ? JSON.stringify({
+              sub: userId,
+              role: 'authenticated',
+              ...(options.email ? { email: options.email } : {}),
+            })
+          : '',
       ]);
 
       const result = await fn(client);

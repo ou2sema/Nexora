@@ -14,8 +14,16 @@ import type { AppTransaction, DatabaseHandle } from './database.types';
 export class TenantDatabase {
   constructor(@Inject(DATABASE) private readonly handle: DatabaseHandle) {}
 
-  async asUser<T>(userId: string, fn: (tx: AppTransaction) => Promise<T>): Promise<T> {
-    const claims = JSON.stringify({ sub: userId, role: 'authenticated' });
+  async asUser<T>(
+    userId: string,
+    fn: (tx: AppTransaction) => Promise<T>,
+    options: { email?: string | null } = {},
+  ): Promise<T> {
+    const claims = JSON.stringify({
+      sub: userId,
+      role: 'authenticated',
+      ...(options.email ? { email: options.email } : {}),
+    });
 
     return this.handle.db.transaction(async (tx) => {
       await tx.execute(sql`set local role authenticated`);

@@ -11,6 +11,7 @@ import {
   Send,
   Smartphone,
   Tags,
+  Users,
   Warehouse,
   type LucideIcon,
 } from 'lucide-react';
@@ -36,4 +37,5 @@ export const navItems: NavItem[] = [
   { to: '/stock/reconciliation', label: 'Reconciliation', icon: Scale },
   { to: '/warehouses', label: 'Warehouses', icon: Warehouse },
   { to: '/catalog', label: 'Catalog settings', icon: Tags },
+  { to: '/team', label: 'Team', icon: Users },
 ];

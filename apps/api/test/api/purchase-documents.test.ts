@@ -2,6 +2,7 @@ import { constants, inflateSync } from 'node:zlib';
 
 import { PDFDocument } from 'pdf-lib';
 import request from 'supertest';
+import type { Response } from 'superagent';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { LOCATIONS, ORGS, PRODUCTS, USERS, WAREHOUSES } from '../db/fixtures';
@@ -10,7 +11,7 @@ import { createTestContext, type TestContext } from './test-app';
 const YEAR = new Date().getFullYear();
 
 function pdfParser(
-  response: NodeJS.ReadableStream,
+  response: Response,
   callback: (error: Error | null, body?: Buffer) => void,
 ): void {
   const chunks: Buffer[] = [];
@@ -41,7 +42,7 @@ function pdfText(pdf: Buffer): string {
   const runs = /<([0-9A-Fa-f]+)>\s*Tj/g;
   let run: RegExpExecArray | null;
   while ((run = runs.exec(content)) !== null) {
-    text += `${Buffer.from(run[1], 'hex').toString('latin1')}\n`;
+    text += `${Buffer.from(run[1] ?? '', 'hex').toString('latin1')}\n`;
   }
   return text;
 }

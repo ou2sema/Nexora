@@ -25,6 +25,10 @@ const USERS = {
     id: '00000000-0000-4000-8000-00000000000d',
     role: 'viewer',
   },
+  'carol@example.com': {
+    id: '00000000-0000-4000-8000-00000000000c',
+    role: 'viewer',
+  },
 };
 
 const AUTH_SHIM = `
@@ -40,7 +44,8 @@ create role authenticated nologin;
 const FIXTURES = `
 insert into auth.users (id, email) values
   ('00000000-0000-4000-8000-00000000000a', 'alice@example.com'),
-  ('00000000-0000-4000-8000-00000000000d', 'dave@example.com');
+  ('00000000-0000-4000-8000-00000000000d', 'dave@example.com'),
+  ('00000000-0000-4000-8000-00000000000c', 'carol@example.com');
 
 insert into public.organizations (id, name, slug) values
   ('10000000-0000-4000-8000-00000000000a', 'Org A', 'org-a');

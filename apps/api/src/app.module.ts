@@ -20,6 +20,7 @@ import { OperationsModule } from './operations/operations.module';
 import { ReportsModule } from './reports/reports.module';
 import { ScanningModule } from './scanning/scanning.module';
 import { StockModule } from './stock/stock.module';
+import { TeamModule } from './team/team.module';
 import { TenancyModule } from './tenancy/tenancy.module';
 
 @Module({
@@ -68,6 +69,7 @@ import { TenancyModule } from './tenancy/tenancy.module';
     ScanningModule,
     ReportsModule,
     OperationsModule,
+    TeamModule,
     HealthModule,
   ],
   providers: [

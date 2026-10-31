@@ -44,6 +44,28 @@ export {
 } from './catalog';
 export { errorEnvelopeSchema, type ErrorEnvelope } from './error-envelope';
 export {
+  type ChangeMemberRoleInput,
+  changeMemberRoleSchema,
+  type CreateInvitationInput,
+  createInvitationSchema,
+  type InvitationListResponse,
+  invitationListResponseSchema,
+  type InvitationRole,
+  invitationRoleSchema,
+  type InvitationStatus,
+  invitationStatusSchema,
+  type InvitationSummary,
+  invitationSummarySchema,
+  type PendingInvitation,
+  type PendingInvitationsResponse,
+  pendingInvitationSchema,
+  pendingInvitationsResponseSchema,
+  type TeamMemberSummary,
+  type TeamMembersResponse,
+  teamMemberSchema,
+  teamMembersResponseSchema,
+} from './team';
+export {
   type BarcodeAssignmentResult,
   barcodeAssignmentResultSchema,
   type LabelRequest,

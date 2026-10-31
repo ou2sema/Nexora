@@ -64,6 +64,9 @@ const VALIDATION_MESSAGES: Record<string, string> = {
   return_reason_required: 'Explain why the goods are being returned (at least 3 characters).',
   return_line_invalid: 'Each return line needs an order line and a positive quantity.',
   duplicate_device: 'Each device may appear only once.',
+  invalid_invitation_email: 'Enter a valid email address for the invitation.',
+  invitation_role_owner:
+    'Ownership is transferred by changing an existing member, not by invitation.',
 };
 
 const NOT_FOUND_MESSAGES: Record<string, string> = {
@@ -80,6 +83,8 @@ const NOT_FOUND_MESSAGES: Record<string, string> = {
   sales_order_line_not_found: 'Outgoing order line not found.',
   purchase_return_not_found: 'Purchase return not found.',
   sales_return_not_found: 'Sales return not found.',
+  member_not_found: 'Team member not found.',
+  invitation_not_found: 'Invitation not found.',
 };
 
 /**
@@ -121,6 +126,20 @@ export function toDatabaseErrorDescriptor(error: unknown): ErrorDescriptor | nul
           message: 'A supplier with this name already exists.',
         };
       }
+      if (rawMessage === 'invitation_already_pending') {
+        return {
+          status: 409,
+          code: 'invitation_already_pending',
+          message: 'An invitation is already pending for this email.',
+        };
+      }
+      if (rawMessage === 'already_member') {
+        return {
+          status: 409,
+          code: 'already_member',
+          message: 'This person is already a member of the organization.',
+        };
+      }
       if (constraint === 'devices_org_serial_key') {
         return {
           status: 409,
@@ -149,6 +168,27 @@ export function toDatabaseErrorDescriptor(error: unknown): ErrorDescriptor | nul
         details,
       };
     case '23514':
+      if (rawMessage === 'invitation_not_pending') {
+        return {
+          status: 409,
+          code: 'invitation_not_pending',
+          message: 'This invitation is no longer pending.',
+        };
+      }
+      if (rawMessage === 'invitation_expired') {
+        return {
+          status: 409,
+          code: 'invitation_expired',
+          message: 'This invitation has expired. Ask an owner or admin to send a new one.',
+        };
+      }
+      if (rawMessage === 'invitation_role_owner') {
+        return {
+          status: 400,
+          code: 'invitation_role_owner',
+          message: VALIDATION_MESSAGES[rawMessage] ?? 'Ownership cannot be granted by invitation.',
+        };
+      }
       return {
         status: 400,
         code: 'constraint_violation',
@@ -163,6 +203,27 @@ export function toDatabaseErrorDescriptor(error: unknown): ErrorDescriptor | nul
         details,
       };
     case '42501':
+      if (rawMessage === 'owner_required') {
+        return {
+          status: 403,
+          code: 'owner_required',
+          message: 'Only an owner can manage owners.',
+        };
+      }
+      if (rawMessage === 'invitation_email_mismatch') {
+        return {
+          status: 403,
+          code: 'invitation_email_mismatch',
+          message: 'This invitation was sent to a different email address.',
+        };
+      }
+      if (rawMessage === 'invitation_email_required') {
+        return {
+          status: 403,
+          code: 'invitation_email_required',
+          message: 'Your account needs an email address to accept invitations.',
+        };
+      }
       return {
         status: 403,
         code: 'forbidden',

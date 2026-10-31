@@ -238,8 +238,9 @@ cancellation release, and rejection of serialized lines.
 The signed-in UI runs against a self-contained stack with no hosted project and no
 credentials. `apps/api/scripts/local-e2e-stack.mjs` boots embedded PostgreSQL 18, applies the
 real migrations, serves a local JWKS plus password-grant endpoint on 4200, seeds an owner
-(`alice@example.com`) and a viewer (`dave@example.com`) in one organization, and starts the
-built API on 4101. Playwright adds Vite on 5174:
+(`alice@example.com`), a viewer (`dave@example.com`), and an unaffiliated account
+(`carol@example.com`) that the Phase 9 invitation flow joins, and starts the built API on 4101.
+Playwright adds Vite on 5174:
 
 ```powershell
 npm run build:apps
@@ -403,6 +404,55 @@ config); the headed run above passed 18/18 with Allure served at http://127.0.0.
 run. Phase 8 adds no migration: documents are rendered from the existing tables, so hosted
 carries the required schema already.
 
+## Team access verification
+
+The Phase 9 suites run without a hosted project:
+
+```powershell
+npm run test --workspace @mystock/api -- test/db/team-access.test.ts test/api/team.test.ts
+```
+
+Expected: 22 passing tests (13 database, 9 API). The database suite covers the `profiles`
+projection and email sync, invitation email normalization, expiry and reissue, duplicate and
+already-member rejection, owner-role rejection, viewer RLS denial, the pending list's email
+gate, acceptance and idempotent replay, mismatched-email rejection, and the tightened
+membership policies: an admin cannot demote, promote, or remove an owner, cannot promote
+itself or insert an owner, and the last-owner trigger still blocks removing or demoting the
+final owner. The API suite covers member listing, `404 organization_not_found` for
+non-members, viewer `403`s, invitation creation and duplicate rejection, admin-only invitation
+history, the pending-invitation contract, acceptance reflected in `/me`, `owner_required`
+errors, role changes, last-owner refusal, removal, and revocation including a second revoke
+returning `409`.
+
+The headed run uses the same local stack, which now seeds a third account,
+`carol@example.com`, with no membership:
+
+```powershell
+npm run build:apps
+cd apps/web
+npx playwright test --config playwright.local-stack.config.ts --headed
+```
+
+Expected: 22 passing checks (11 tests × desktop/mobile). The team test signs in as the owner,
+invites carol, confirms the pending row and the duplicate-invitation error, signs in as carol,
+accepts from the pending banner, confirms her new member row, then changes her role to manager
+and removes her. A second test confirms a viewer sees the team read-only, with no invite
+button, role select, or remove button.
+
+To exercise it by hand, start both apps against a project with the Phase 9 migration applied,
+open **Team** as an owner, and invite an email that belongs to an existing account. MyStock
+sends no email: sign in with that account in another browser profile and accept the banner
+above the page. The invitation also appears before the account has any organization.
+
+Full gates on 2026-10-31 for Phase 9: `format:check`, `lint`, `typecheck`, and `build` clean;
+248 Vitest tests across the workspaces (199 API across 25 files, 33 domain, 8 contracts, 8
+config); the headed local-stack run passed 22/22 with Allure served at
+http://127.0.0.1:5054 for this run; the shell regression suite passed 16/16.
+
+The hosted project does not yet carry the Phase 9 migration (`20261031140000_team_access.sql`).
+The Team page requires it, so the verification above is local only; applying that migration to
+the hosted project is the project owner's step.
+
 ## Quality gates
 
 ```powershell
@@ -421,16 +471,17 @@ alphabetically, so `@mystock/api` would otherwise build against a stale or missi
 
 The schema is plain SQL in `supabase/migrations`, applied in filename order:
 
-| Migration                                             | Contents                                                                    |
-| ----------------------------------------------------- | --------------------------------------------------------------------------- |
-| `20261029120000_tenancy.sql`                          | organizations, memberships, helper functions, base RLS                      |
-| `20261029121000_catalog.sql`                          | products, categories, brands, warehouses, storage locations                 |
-| `20261029130000_stock_ledger.sql`                     | ledger, balances, reservations, idempotency, reconciliation RPCs            |
-| `20261029140000_serialized_devices.sql`               | devices, device events, lifecycle transitions                               |
-| `20261030100000_barcode_workflows.sql`                | GTIN checks, barcode assignment, stock counts and posting RPCs              |
-| `20261030120000_reporting_realtime.sql`               | guarded realtime publication for balances, movements, reservations, devices |
-| `20261030140000_operational_workflows.sql`            | suppliers, purchase orders, outgoing orders, numbering and lifecycle RPCs   |
-| `20261031120000_returns_and_supplier_performance.sql` | purchase and sales returns, return numbering and lifecycle RPCs             |
+| Migration                                             | Contents                                                                     |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `20261029120000_tenancy.sql`                          | organizations, memberships, helper functions, base RLS                       |
+| `20261029121000_catalog.sql`                          | products, categories, brands, warehouses, storage locations                  |
+| `20261029130000_stock_ledger.sql`                     | ledger, balances, reservations, idempotency, reconciliation RPCs             |
+| `20261029140000_serialized_devices.sql`               | devices, device events, lifecycle transitions                                |
+| `20261030100000_barcode_workflows.sql`                | GTIN checks, barcode assignment, stock counts and posting RPCs               |
+| `20261030120000_reporting_realtime.sql`               | guarded realtime publication for balances, movements, reservations, devices  |
+| `20261030140000_operational_workflows.sql`            | suppliers, purchase orders, outgoing orders, numbering and lifecycle RPCs    |
+| `20261031120000_returns_and_supplier_performance.sql` | purchase and sales returns, return numbering and lifecycle RPCs              |
+| `20261031140000_team_access.sql`                      | profiles projection, email-keyed invitations, membership and invitation RPCs |
 
 Demo data lives in `supabase/seed.sql` and requires at least one signed-up user (it raises
 `seed_requires_auth_user` otherwise).
@@ -453,6 +504,9 @@ and no hosted credentials.
 | admin   | yes                             | yes           | yes  |
 | manager | no                              | yes           | yes  |
 | viewer  | no                              | no            | yes  |
+
+Admins manage non-owner members and invitations; only owners can change, remove, or promote to
+owner, and the last-owner trigger prevents losing the final owner.
 
 Applying migrations to the hosted project (needs your access token and database password):
 
@@ -481,7 +535,9 @@ enabled on every table, and the demo seed has run against the first signed-up us
 owner of “SBS VISION” with 7 products and 2 warehouses. A Phase 2 hosted end-to-end check
 passed: a real Supabase password grant produced a token the API accepted, the callers'
 organizations were isolated, and a foreign organization returned `404`. The temporary
-verification account was removed; only the owner remains.
+verification account was removed; only the owner remains. Phase 8 added no schema. The Phase 9
+team migration (`20261031140000_team_access.sql`) has not been applied, so Team is verified on
+the local stack only until the project owner pushes it.
 
 The Phase 3 migrations (`20261029130000_stock_ledger.sql` and
 `20261029140000_serialized_devices.sql`) were pushed to the hosted project on 2026-10-29 with
@@ -523,13 +579,13 @@ npm run test --workspace @mystock/api -- test/db
 
 ## Test suites
 
-| Command                                                         | What it runs                                                                                                                                                                               |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `npm run test`                                                  | 226 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, API shell, env, contracts, domain |
-| `npm run test:e2e`                                              | Playwright against the API and dev server (16 checks: 8 tests × desktop/mobile)                                                                                                            |
-| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                           |
-| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                |
-| `npx playwright test --config playwright.local-stack.config.ts` | Phase 6–8 flows on the self-contained stack (18 checks: 9 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                          |
+| Command                                                         | What it runs                                                                                                                                                                                            |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run test`                                                  | 248 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, team access, API shell, env, contracts, domain |
+| `npm run test:e2e`                                              | Playwright against the API and dev server (16 checks: 8 tests × desktop/mobile)                                                                                                                         |
+| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                        |
+| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                             |
+| `npx playwright test --config playwright.local-stack.config.ts` | Phase 6–9 flows on the self-contained stack (22 checks: 11 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                      |
 
 The API suites (`apps/api/test/api`) run the real migrations on PGlite, sign JWTs with
 locally generated ES256 keys, and serve the trusted public key from a temporary JWKS

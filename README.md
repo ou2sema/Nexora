@@ -27,7 +27,11 @@ and organization-scoped reporting.
 > pass posted a purchase return and a sales return with matching ledger movements. Phase 8
 > renders purchase orders and purchase return notes as server-side PDFs, with ledger-matched
 > totals, DRAFT/CANCELLED watermarks, and browser downloads from the purchasing screens; it is
-> verified locally and needs no schema change. Nothing is production-ready yet.
+> verified locally and needs no schema change. Phase 9 adds organization team management: a
+> member list with role changes and removal, plus email-keyed invitations that the invited
+> person accepts after signing in, with owner-only control over owners. It is verified locally
+> on the self-contained stack; the new migration still has to be applied to the hosted
+> project before Team works there. Nothing is production-ready yet.
 
 ## Stack
 
@@ -56,7 +60,8 @@ orders are specified in
 [ADR-0008](docs/adr/0008-operational-workflows.md). Purchase returns, sales returns, and
 supplier performance are specified in
 [ADR-0009](docs/adr/0009-returns-and-supplier-performance.md). Purchase document rendering is
-specified in [ADR-0010](docs/adr/0010-purchasing-documents.md).
+specified in [ADR-0010](docs/adr/0010-purchasing-documents.md). Team roles and invitations are
+specified in [ADR-0011](docs/adr/0011-team-access.md).
 
 ## Layout
 
@@ -151,6 +156,14 @@ query inside a transaction that holds the caller's identity, so RLS applies.
 | POST   | `/api/v1/organizations/:id/sales-orders/:id/returns/:returnId/post`      | owner, admin, manager  |
 | POST   | `/api/v1/organizations/:id/sales-orders/:id/returns/:returnId/cancel`    | owner, admin, manager  |
 | GET    | `/api/v1/organizations/:id/reports/supplier-performance`                 | any member             |
+| GET    | `/api/v1/organizations/:id/members`                                      | any member             |
+| PATCH  | `/api/v1/organizations/:id/members/:userId`                              | owner, admin           |
+| DELETE | `/api/v1/organizations/:id/members/:userId`                              | owner, admin           |
+| GET    | `/api/v1/organizations/:id/invitations`                                  | owner, admin           |
+| POST   | `/api/v1/organizations/:id/invitations`                                  | owner, admin           |
+| POST   | `/api/v1/organizations/:id/invitations/:invitationId/revocation`         | owner, admin           |
+| GET    | `/api/v1/me/invitations`                                                 | any authenticated user |
+| POST   | `/api/v1/me/invitations/:invitationId/acceptance`                        | any authenticated user |
 
 Errors use `{ "error": { "code", "message", "details?", "requestId" } }` and repeat the
 `x-request-id` response header. Database constraint failures map to `409` or `400`; an
@@ -234,6 +247,17 @@ while a non-member receives `404`. Text is normalized to the PDF standard fonts'
 so non-Latin scripts degrade to `?` (see
 [ADR-0010](docs/adr/0010-purchasing-documents.md)). Nothing is stored: the PDF always reflects
 the current rows.
+
+Team access is managed from `/team`. Every member can see the member list; owners and admins
+change roles, remove members, and manage invitations. Owners may touch owner rows; an admin can
+only manage non-owner members, and the last-owner trigger still blocks removing or demoting the
+final owner. Invitations are rows keyed by the lowercased email, not emails sent by the
+platform: MyStock sends no outbound mail, so the invited person signs in with that address and
+sees a pending banner that accepts the invitation. Acceptance requires the verified `email`
+claim in the caller's token, expires after 14 days, and can only grant admin, manager, or
+viewer — ownership is transferred by changing an existing member. A background projection of
+`auth.users` emails into `public.profiles` backs the member list without granting the API access
+to the auth schema. See [ADR-0011](docs/adr/0011-team-access.md).
 
 ## Prerequisites
 

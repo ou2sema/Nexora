@@ -39,6 +39,24 @@ export const memberships = pgTable('memberships', {
   ...timestamps,
 });
 
+export const profiles = pgTable('profiles', {
+  id: uuid('id').primaryKey(),
+  email: text('email'),
+  ...timestamps,
+});
+
+export const organizationInvitations = pgTable('organization_invitations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull(),
+  email: text('email').notNull(),
+  role: text('role').$type<MemberRole>().notNull(),
+  invitedBy: uuid('invited_by'),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  ...timestamps,
+});
+
 export const categories = pgTable('categories', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizationId: uuid('organization_id').notNull(),
@@ -184,6 +202,8 @@ export const salesOrderLines = pgTable('sales_order_lines', {
 
 export type Organization = typeof organizations.$inferSelect;
 export type Membership = typeof memberships.$inferSelect;
+export type Profile = typeof profiles.$inferSelect;
+export type OrganizationInvitation = typeof organizationInvitations.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type Brand = typeof brands.$inferSelect;
 export type Product = typeof products.$inferSelect;

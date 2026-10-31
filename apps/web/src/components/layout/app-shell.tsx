@@ -11,6 +11,7 @@ import {
 import { MobileNav } from '@/components/layout/mobile-nav';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
+import { PendingInvitations } from '@/features/team/pending-invitations';
 import { OrganizationOnboardingPage } from '@/routes/organization-onboarding-page';
 
 export function AppShell() {
@@ -79,6 +80,7 @@ function AuthenticatedShell() {
       <div className="lg:pl-64">
         <Topbar onOpenNav={() => setMobileNavOpen(true)} />
         <main id="main-content" className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <PendingInvitations />
           {memberships.length === 0 ? <OrganizationOnboardingPage /> : <Outlet />}
         </main>
       </div>

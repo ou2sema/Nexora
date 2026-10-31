@@ -15,6 +15,7 @@ import { SignInPage } from '@/routes/sign-in-page';
 import { StockLevelsPage } from '@/routes/stock-levels-page';
 import { StockMovementsPage } from '@/routes/stock-movements-page';
 import { SuppliersPage } from '@/routes/suppliers-page';
+import { TeamPage } from '@/routes/team-page';
 import { WarehousesPage } from '@/routes/warehouses-page';
 
 export const router = createBrowserRouter([
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
       { path: 'orders', element: <SalesOrdersPage /> },
       { path: 'warehouses', element: <WarehousesPage /> },
       { path: 'catalog', element: <CatalogSettingsPage /> },
+      { path: 'team', element: <TeamPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
