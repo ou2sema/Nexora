@@ -881,8 +881,9 @@ and applies every `supabase/migrations/*.sql` in filename order before Playwrigh
 because the API's boot-time schema guard refuses to listen on an unmigrated database. The
 `e2e-local` job boots embedded PostgreSQL, the fake auth/JWKS server, the built API, and
 Vite, so it needs no Supabase project; it runs the same 40 checks as the headed local run.
-`e2e-local` and `quality` have run green on GitHub Actions; the `e2e` job was fixed the same
-day after a CI-style local repro exposed two stale `shell.spec.ts` assertions.
+All three jobs ran green on GitHub Actions on 2026-11-01 (run #6, commit `38c94db`); the
+`e2e` job had never been green before — it needed the Postgres service above, and the
+`shell.spec.ts` fixes for the Nexora sign-in copy and the lazy-route mount timing.
 
 To reproduce the `quality` job locally, run the gates above in the same order after a
 clean `npm ci`. To reproduce the `e2e` job locally, stop any running dev servers first — CI mode never
