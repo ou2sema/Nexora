@@ -59,6 +59,25 @@ test.describe('api contract', () => {
     expect(body.service).toBe('mystock-api');
   });
 
+  test('probe endpoints separate liveness from database readiness', async ({ request }) => {
+    const live = await request.get('http://localhost:4100/health/live');
+    expect(live.ok()).toBe(true);
+    const liveBody = (await live.json()) as { status: string; uptimeSeconds: number };
+    expect(liveBody.status).toBe('ok');
+    expect(typeof liveBody.uptimeSeconds).toBe('number');
+
+    const ready = await request.get('http://localhost:4100/health/ready');
+    expect(ready.status()).toBe(200);
+    const readyBody = (await ready.json()) as {
+      database: { status: string; latencyMs: number };
+    };
+    expect(readyBody.database.status).toBe('up');
+    expect(typeof readyBody.database.latencyMs).toBe('number');
+
+    const prefixed = await request.get('http://localhost:4100/api/v1/health/ready');
+    expect(prefixed.status()).toBe(404);
+  });
+
   test('rejects requests without a bearer token', async ({ request }) => {
     const response = await request.get('http://localhost:4100/api/v1/me');
 

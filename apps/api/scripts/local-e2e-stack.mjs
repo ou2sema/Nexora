@@ -262,7 +262,7 @@ process.on('SIGTERM', () => void stop());
 async function waitForHealth(maxAttempts = 60) {
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
-      const response = await fetch(`http://localhost:${API_PORT}/health`);
+      const response = await fetch(`http://localhost:${API_PORT}/health/ready`);
       if (response.ok) return;
     } catch {
       // API still booting.
@@ -270,7 +270,7 @@ async function waitForHealth(maxAttempts = 60) {
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 1000));
   }
 
-  throw new Error('The local API did not become healthy in time.');
+  throw new Error('The local API did not become ready in time.');
 }
 
 await authServer.listen(AUTH_PORT, '127.0.0.1');

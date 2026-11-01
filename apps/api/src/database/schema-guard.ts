@@ -62,7 +62,7 @@ function errorMessage(error: unknown): string {
  * health checks and local shell tests work without Postgres. A reachable database
  * with missing objects is a deployment ordering bug and stops the process.
  */
-function isUnreachable(error: unknown): boolean {
+export function isDatabaseUnreachable(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
 
   const code = (error as { code?: unknown }).code;
@@ -77,7 +77,7 @@ function isUnreachable(error: unknown): boolean {
 
   if (error.name === 'AggregateError') {
     const nested = (error as { errors?: unknown[] }).errors ?? [];
-    return nested.length > 0 && nested.every((item) => isUnreachable(item));
+    return nested.length > 0 && nested.every((item) => isDatabaseUnreachable(item));
   }
 
   return /ECONNREFUSED|ENOTFOUND|ETIMEDOUT|EHOSTUNREACH|CONNECT_TIMEOUT/.test(error.message);
@@ -92,7 +92,7 @@ export async function assertSchemaCompatible(
   try {
     missing = await findMissingSchemaObjects(handle);
   } catch (error) {
-    if (isUnreachable(error)) {
+    if (isDatabaseUnreachable(error)) {
       logger.warn(
         `Database schema check skipped: database unreachable (${errorMessage(error)}). ` +
           'The API will start; requests fail until the database is available.',

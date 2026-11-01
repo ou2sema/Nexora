@@ -84,9 +84,45 @@ directly, so both processes must be running. CORS on the API allows `WEB_ORIGIN`
 Port 4100 is a deliberate choice: 3000 is commonly occupied by other local Node
 processes, which silently produces HTML 404s instead of API responses.
 
+## Health probes
+
+Three public GET routes answer without a bearer token and skip the rate limiter, so infrastructure
+polling does not spend the budget that belongs to users:
+
+| Route               | Meaning                                             | Needs the database |
+| ------------------- | --------------------------------------------------- | ------------------ |
+| `GET /health`       | process is up (kept as the dashboard status source) | no                 |
+| `GET /health/live`  | liveness: the event loop answers                    | no                 |
+| `GET /health/ready` | readiness: `select 1` went through the pool         | yes                |
+
+`/health/ready` returns `200` with
+`database: { "status": "up", "latencyMs": <number>, "timeoutMs": 2000 }`, or `503`
+`service_unavailable` whose `error.details.database` is `unreachable`, `timeout`, or `error` when
+the pool cannot answer within 2 seconds. The failure body carries only that classification, never
+the driver message, so no host, port, or credential can leak. All three routes live outside the
+`api/v1` prefix (`/api/v1/health/live` and `/api/v1/health/ready` are 404), and the local E2E stack
+now waits on `/health/ready` before it declares itself usable.
+
+The boot-time schema guard remains the authority on migrations: a process that started is a process
+whose schema was complete, so readiness proves connectivity rather than re-running the guard.
+
+Verification (2026-11-01): 10 new Vitest tests cover the probe contract — 5 service-level cases
+(`up`, `unreachable`, `timeout` on a stuck pool with a 25 ms deadline, `error`, and the default
+deadline) and 5 HTTP cases against an app whose database is PGlite (liveness shape, readiness latency,
+both probes 404 under `api/v1`, all three probes reachable without a token, and a `503` whose body
+reports `unreachable` without leaking the driver message). The headed shell suite gained a probe test
+and passed 18/18 (9 tests × desktop/mobile); the headed local-stack suite still passes 40/40 and now
+starts only after `/health/ready` answers. Probes were also exercised against the hosted project over
+the session pooler: `/health/live` returned `200`, `/health/ready` returned `200` with
+`database.status = "up"`, and `/api/v1/health/ready` returned `404`. From this machine the hosted
+pool round trip measured 718 ms cold and 772 ms warm, so the reported latency is dominated by the
+network distance to `aws-0-eu-west-1` rather than by connection setup; the 2-second deadline leaves
+about 1.2 seconds of headroom from here, and a probe running inside the same region will measure
+materially less.
+
 ## API authentication
 
-Every route except `/health` requires `Authorization: Bearer <supabase-access-token>`. The
+Every route except the health probes requires `Authorization: Bearer <supabase-access-token>`. The
 API verifies signature, issuer, audience, and expiry against the project JWKS, then opens a
 transaction that sets the `authenticated` role and the caller's claims before touching data.
 RLS therefore evaluates for the real user even though the process connects as the project
@@ -648,6 +684,11 @@ remediation: 290 Vitest tests (242 API, 33 domain, 8 contracts, 7 config) and th
 local-stack suite 40/40 (20 tests × desktop/mobile) with Allure served at
 http://127.0.0.1:5058; `format:check`, `lint`, `typecheck`, and `build` clean.
 
+Re-run on 2026-11-01 for the health probes: 300 Vitest tests (252 API across 33 files, 33 domain,
+8 contracts, 7 config), the headed shell suite 18/18 (9 tests × desktop/mobile) against the
+hosted-facing API, and the headed local-stack suite 40/40, with Allure served at
+http://127.0.0.1:5059; `format:check`, `lint`, `typecheck`, and `build` clean.
+
 The French timestamp uses a 24-hour clock: CLDR's `fr-TN` default is a 12-hour clock with
 an English “PM”, so the provider forces `hourCycle: 'h23'` for French. Money keeps three
 decimals in every locale (`0,000 DT`, `TND 0.000`, `0,000 د.ت.`).
@@ -833,14 +874,14 @@ npm run test --workspace @mystock/api -- test/db
 
 ## Test suites
 
-| Command                                                         | What it runs                                                                                                                                                                                                                                                                            |
-| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run test`                                                  | 290 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, team access, platform administration, admin audit, membership write hardening, schema guard, API shell, env, contracts, domain |
-| `npm run test:e2e`                                              | Playwright against the API and dev server (16 checks: 8 tests × desktop/mobile)                                                                                                                                                                                                         |
-| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                                                        |
-| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                                             |
-| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–12 flows on the self-contained stack (40 checks: 20 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                                                                                                     |
-| `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                                                       |
+| Command                                                         | What it runs                                                                                                                                                                                                                                                                                           |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run test`                                                  | 300 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, team access, platform administration, admin audit, membership write hardening, health probes, schema guard, API shell, env, contracts, domain |
+| `npm run test:e2e`                                              | Playwright against the API and dev server (18 checks: 9 tests × desktop/mobile)                                                                                                                                                                                                                        |
+| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                                                                       |
+| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                                                            |
+| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–12 flows on the self-contained stack (40 checks: 20 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                                                                                                                    |
+| `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                                                                      |
 
 The API suites (`apps/api/test/api`) run the real migrations on PGlite, sign JWTs with
 locally generated ES256 keys, and serve the trusted public key from a temporary JWKS

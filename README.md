@@ -85,7 +85,8 @@ The Phase 11 hardening measures — audit trail, boot-time schema probe, integri
 coverage, and route splitting — are specified in
 [ADR-0013](docs/adr/0013-operational-hardening.md). Interface localization, typed catalogs,
 plurals, RTL, and error translation are specified in
-[ADR-0014](docs/adr/0014-interface-localization.md).
+[ADR-0014](docs/adr/0014-interface-localization.md). Liveness and readiness probes are
+specified in [ADR-0015](docs/adr/0015-health-probe-endpoints.md).
 
 ## Layout
 
@@ -315,6 +316,12 @@ owner/admin's claims, and exits non-zero on any drift, so it can run unattended.
 [ADR-0013](docs/adr/0013-operational-hardening.md) and
 [`docs/runbooks/restore-drill.md`](docs/runbooks/restore-drill.md) for the operator
 procedures.
+
+Three public routes answer infrastructure polling without a token and outside the rate limit:
+`/health` (the dashboard status source), `/health/live` (process only), and `/health/ready`
+(`select 1` through the pool, `503 service_unavailable` with `unreachable`, `timeout`, or `error`
+when the database cannot answer within 2 seconds — never the driver message). See
+[ADR-0015](docs/adr/0015-health-probe-endpoints.md).
 
 ## Prerequisites
 

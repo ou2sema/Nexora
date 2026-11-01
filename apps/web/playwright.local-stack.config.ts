@@ -44,7 +44,7 @@ export default defineConfig({
     {
       command: 'node scripts/local-e2e-stack.mjs',
       cwd: '../api',
-      url: `${API_ORIGIN}/health`,
+      url: `${API_ORIGIN}/health/ready`,
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,
       stdout: 'pipe',
