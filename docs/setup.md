@@ -981,8 +981,10 @@ databases, the script rejects any `DATABASE_URL` whose host is not `localhost` o
 throwaway embedded PostgreSQL 18 cluster: 12 migrations applied, seeded rows
 `1/1/7/7/7/2/3` (organizations/memberships/products/categories/brands/warehouses/locations),
 readiness `ok` with a 54–78 ms database probe, and the negative run exiting `1` with
-`Database schema is out of date; missing public.admin_audit_events`. Its first remote run on
-GitHub Actions is still unverified.
+`Database schema is out of date; missing public.admin_audit_events`. First remote run:
+Actions run #10 on 2026-11-01 (commit `62db120`), where the `database` job passed on
+`postgres:16` — its "Run the virgin-database drill" step finished in about 64 seconds and the
+whole run concluded `success` across all four jobs.
 
 To reproduce the `quality` job locally, run the gates above in the same order after a
 clean `npm ci`. To reproduce the `e2e` job locally, stop any running dev servers first — CI mode never
