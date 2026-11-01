@@ -90,7 +90,7 @@ export class ScanningController {
     const date = new Date().toISOString().slice(0, 10);
     return new StreamableFile(pdf, {
       type: 'application/pdf',
-      disposition: `attachment; filename="mystock-labels-${date}.pdf"`,
+      disposition: `attachment; filename="nexora-labels-${date}.pdf"`,
       length: pdf.byteLength,
     });
   }

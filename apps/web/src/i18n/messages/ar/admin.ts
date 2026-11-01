@@ -42,7 +42,7 @@ export const admin: AdminMessages = {
   'adminTeam.organizationFallback': 'هذه المؤسسة',
   'adminInvite.title': 'دعوة عضو',
   'adminInvite.description':
-    'اختر المؤسسة والدور. لا يرسل MyStock رسائل بريد إلكتروني، لذا شارك الدعوة المعلّقة مع الشخص؛ وستظهر بعد تسجيل الدخول بهذا العنوان.',
+    'اختر المؤسسة والدور. لا يرسل Nexora رسائل بريد إلكتروني، لذا شارك الدعوة المعلّقة مع الشخص؛ وستظهر بعد تسجيل الدخول بهذا العنوان.',
   'adminInvite.organizationRequired': 'اختر مؤسسة',
   'adminInvite.emailRequired': 'أدخل عنوان بريد إلكتروني',
   'adminInvite.emailInvalid': 'أدخل عنوان بريد إلكتروني صالحاً',

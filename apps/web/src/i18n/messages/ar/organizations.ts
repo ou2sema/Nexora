@@ -11,7 +11,7 @@ export const organizations: OrganizationsMessages = {
   'organizations.onboarding.body':
     'ينشئ مسؤول المنصة المؤسسات ويحدد المدير الأول. إذا تمت دعوتك، اطلب منه إرسال الدعوة إلى عنوان البريد هذا؛ وستظهر في شريط الدعوات المعلّقة بعد تسجيل الدخول.',
   'organizations.onboarding.note':
-    'لا يرسل MyStock رسائل دعوة بالبريد. سيشاركك الشخص الذي دعاك الدعوة مباشرة.',
+    'لا يرسل Nexora رسائل دعوة بالبريد. سيشاركك الشخص الذي دعاك الدعوة مباشرة.',
   'organizations.form.name': 'اسم المؤسسة',
   'organizations.form.nameRequired': 'أدخل اسم المؤسسة',
   'organizations.form.slugHint': 'يُشتق معرّف متوافق مع الروابط من الاسم.',

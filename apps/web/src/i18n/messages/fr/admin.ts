@@ -43,7 +43,7 @@ export const admin: AdminMessages = {
   'adminTeam.organizationFallback': 'cette organisation',
   'adminInvite.title': 'Inviter un membre',
   'adminInvite.description':
-    'Choisissez l’organisation et le rôle. MyStock n’envoie pas d’e-mail ; partagez l’invitation en attente avec la personne ; elle apparaîtra après sa connexion avec cette adresse.',
+    'Choisissez l’organisation et le rôle. Nexora n’envoie pas d’e-mail ; partagez l’invitation en attente avec la personne ; elle apparaîtra après sa connexion avec cette adresse.',
   'adminInvite.organizationRequired': 'Choisissez une organisation',
   'adminInvite.emailRequired': 'Saisissez une adresse e-mail',
   'adminInvite.emailInvalid': 'Saisissez une adresse e-mail valide',

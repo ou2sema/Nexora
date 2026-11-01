@@ -7,7 +7,7 @@ export const common: CommonMessages = {
   'common.openNavigation': 'فتح التنقل',
   'common.closeNavigation': 'إغلاق التنقل',
   'common.navigationTitle': 'التنقل',
-  'common.navigationDescription': 'الأقسام الرئيسية لتطبيق Mystock.',
+  'common.navigationDescription': 'الأقسام الرئيسية لتطبيق Nexora.',
   'common.skipToContent': 'الانتقال إلى المحتوى',
   'common.retry': 'إعادة المحاولة',
   'common.refresh': 'تحديث',

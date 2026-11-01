@@ -450,7 +450,7 @@ describe('reports API', () => {
     expect(response.status).toBe(200);
     expect(response.headers['content-type']).toContain('text/csv');
     expect(response.headers['content-disposition']).toContain(
-      'attachment; filename="mystock-stock-levels-',
+      'attachment; filename="nexora-stock-levels-',
     );
 
     const lines = (response.body as string).trim().split('\r\n');
@@ -475,7 +475,7 @@ describe('reports API', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers['content-disposition']).toContain(
-      'attachment; filename="mystock-stock-movements-',
+      'attachment; filename="nexora-stock-movements-',
     );
 
     const lines = (response.body as string).trim().split('\r\n');

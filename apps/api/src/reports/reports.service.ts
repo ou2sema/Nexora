@@ -699,7 +699,7 @@ export class ReportsService {
       }
 
       return {
-        filename: `mystock-stock-levels-${fileDate()}.csv`,
+        filename: `nexora-stock-levels-${fileDate()}.csv`,
         body: csvDocument(
           [
             'sku',
@@ -779,7 +779,7 @@ export class ReportsService {
       }
 
       return {
-        filename: `mystock-stock-movements-${fileDate()}.csv`,
+        filename: `nexora-stock-movements-${fileDate()}.csv`,
         body: csvDocument(
           [
             'created_at',

@@ -37,7 +37,7 @@ test('clears export feedback and filters when switching organization', async ({ 
   await page.getByRole('button', { name: 'Stock levels CSV' }).click();
   const notice = page
     .getByRole('status')
-    .filter({ hasText: /^Downloaded mystock-stock-levels-\d{4}-\d{2}-\d{2}\.csv$/ });
+    .filter({ hasText: /^Downloaded nexora-stock-levels-\d{4}-\d{2}-\d{2}\.csv$/ });
   await expect(notice).toBeVisible();
 
   await page.getByRole('combobox', { name: 'Organization' }).selectOption({ label: 'Org B' });

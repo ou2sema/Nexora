@@ -37,12 +37,15 @@ test.describe('French locale', () => {
 
     await expect(await documentLanguage(page)).toEqual({ lang: 'fr', dir: 'ltr' });
     await expect(page.getByRole('heading', { name: 'Connexion', exact: true })).toBeVisible();
+    await expect(page.getByRole('img', { name: 'Nexora' })).toBeVisible();
+    await expect(page).toHaveTitle('Nexora');
 
     await page.getByLabel('E-mail', { exact: true }).fill('alice@example.com');
     await page.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await page.getByRole('button', { name: 'Se connecter' }).click();
 
     await expect(dashboardHeading(page, 'Tableau de bord')).toBeVisible();
+    await expect(page.locator('img[alt="Nexora"]').first()).toBeAttached();
     await expect(page.getByLabel('Langue')).toHaveValue('fr');
     await expect(await documentLanguage(page)).toEqual({ lang: 'fr', dir: 'ltr' });
 

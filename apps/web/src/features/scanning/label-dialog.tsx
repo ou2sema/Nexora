@@ -76,7 +76,7 @@ export function LabelDialog({ organizationId, targets, open, onOpenChange }: Lab
       { items },
       {
         onSuccess: (blob) => {
-          saveBlob(blob, `mystock-labels-${new Date().toISOString().slice(0, 10)}.pdf`);
+          saveBlob(blob, `nexora-labels-${new Date().toISOString().slice(0, 10)}.pdf`);
           onOpenChange(false);
         },
         onError: (cause) => {

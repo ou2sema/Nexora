@@ -41,7 +41,7 @@ export const admin = {
   'adminTeam.organizationFallback': 'this organization',
   'adminInvite.title': 'Invite a member',
   'adminInvite.description':
-    'Choose the organization and role. MyStock does not send email, so share the pending invitation with the person; it appears after they sign in with this address.',
+    'Choose the organization and role. Nexora does not send email, so share the pending invitation with the person; it appears after they sign in with this address.',
   'adminInvite.organizationRequired': 'Choose an organization',
   'adminInvite.emailRequired': 'Enter an email address',
   'adminInvite.emailInvalid': 'Enter a valid email address',

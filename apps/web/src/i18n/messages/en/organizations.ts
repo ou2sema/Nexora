@@ -10,7 +10,7 @@ export const organizations = {
   'organizations.onboarding.body':
     'A platform administrator creates organizations and assigns the first manager. If you were invited, ask them to send the invitation to this email address; it appears in the pending-invitation banner after you sign in.',
   'organizations.onboarding.note':
-    'MyStock does not send invitation email. The person who invited you will share it with you directly.',
+    'Nexora does not send invitation email. The person who invited you will share it with you directly.',
   'organizations.form.name': 'Organization name',
   'organizations.form.nameRequired': 'Enter an organization name',
   'organizations.form.slugHint': 'A URL-friendly slug is derived from the name.',

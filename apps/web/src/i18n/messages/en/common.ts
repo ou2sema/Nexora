@@ -5,7 +5,7 @@ export const common = {
   'common.openNavigation': 'Open navigation',
   'common.closeNavigation': 'Close navigation',
   'common.navigationTitle': 'Navigation',
-  'common.navigationDescription': 'Main sections of the Mystock application.',
+  'common.navigationDescription': 'Main sections of the Nexora application.',
   'common.skipToContent': 'Skip to content',
   'common.retry': 'Try again',
   'common.refresh': 'Refresh',

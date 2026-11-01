@@ -227,7 +227,7 @@ export function buildPurchaseOrderDocument(input: PurchaseOrderDocumentInput): P
     totals: buildTotals(lines),
     note: order.notes ? { title: 'Notes', body: order.notes } : null,
     serials: [],
-    fileName: `mystock-${sanitizeFileName(order.number)}.pdf`,
+    fileName: `nexora-${sanitizeFileName(order.number)}.pdf`,
   };
 }
 
@@ -297,6 +297,6 @@ export function buildPurchaseReturnDocument(input: PurchaseReturnDocumentInput):
     totals: buildTotals(lines),
     note: { title: 'Return reason', body: purchaseReturn.reason },
     serials: buildSerials(lines),
-    fileName: `mystock-${sanitizeFileName(purchaseReturn.number)}.pdf`,
+    fileName: `nexora-${sanitizeFileName(purchaseReturn.number)}.pdf`,
   };
 }

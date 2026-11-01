@@ -1,6 +1,6 @@
-import { Boxes } from 'lucide-react';
 import { NavLink } from 'react-router';
 
+import { BrandMark } from '@/components/brand-mark';
 import { navItems } from '@/components/layout/nav-items';
 import { useOrganization } from '@/features/organizations/organization-provider';
 import { useI18n } from '@/i18n/provider';
@@ -24,10 +24,7 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
   return (
     <div className={cn('flex h-full flex-col bg-ink-950 text-slate-300', className)}>
       <div className="flex h-16 items-center gap-3 px-5">
-        <span className="grid size-9 place-items-center rounded-xl bg-indigo-500 text-white">
-          <Boxes aria-hidden="true" className="size-5" />
-        </span>
-        <span className="text-base font-semibold tracking-tight text-white">Mystock</span>
+        <BrandMark textClassName="text-base text-white" />
       </div>
 
       <nav aria-label={t('nav.main')} className="flex-1 px-3 py-4">

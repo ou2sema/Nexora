@@ -29,7 +29,7 @@ export const team: TeamMessages = {
   'team.invitationsHeading': 'Invitations',
   'team.expireAfter': 'Expire après 14 jours',
   'team.invitationsHelp':
-    'MyStock n’envoie pas d’e-mail. Partagez l’invitation avec la personne ; elle lui apparaîtra après sa connexion avec l’adresse invitée.',
+    'Nexora n’envoie pas d’e-mail. Partagez l’invitation avec la personne ; elle lui apparaîtra après sa connexion avec l’adresse invitée.',
   'team.invitationsLoadFailed': 'Le chargement des invitations a échoué.',
   'team.loadingInvitations': 'Chargement des invitations',
   'team.noInvitationsTitle': 'Aucune invitation pour le moment',
@@ -48,7 +48,7 @@ export const team: TeamMessages = {
   'team.administrationLink': 'Administration →',
   'invite.title': 'Inviter un membre de l’équipe',
   'invite.description':
-    'L’invitation apparaîtra pour cette adresse e-mail après la connexion. MyStock n’envoie pas d’e-mail ; demandez à la personne de rechercher l’invitation en attente.',
+    'L’invitation apparaîtra pour cette adresse e-mail après la connexion. Nexora n’envoie pas d’e-mail ; demandez à la personne de rechercher l’invitation en attente.',
   'invite.emailRequired': 'Saisissez une adresse e-mail',
   'invite.emailInvalid': 'Saisissez une adresse e-mail valide',
   'invite.managersViewersOnly': 'Les gestionnaires peuvent uniquement inviter des lecteurs.',

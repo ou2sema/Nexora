@@ -1,10 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Boxes, Loader2, LockKeyhole, ScrollText } from 'lucide-react';
+import { Loader2, LockKeyhole, ScrollText } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Navigate, useLocation, useNavigate } from 'react-router';
 import { z } from 'zod';
 
+import { BrandMark } from '@/components/brand-mark';
 import { LanguageSwitcher } from '@/components/layout/language-switcher';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/features/auth/auth-provider';
@@ -77,10 +78,7 @@ export function SignInPage() {
 
       <aside className="relative hidden flex-col justify-between overflow-hidden bg-ink-950 p-10 text-slate-300 lg:flex">
         <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-xl bg-indigo-500 text-white">
-            <Boxes aria-hidden="true" className="size-5" />
-          </span>
-          <span className="text-lg font-semibold tracking-tight text-white">Mystock</span>
+          <BrandMark logoClassName="size-10" textClassName="text-lg text-white" />
         </div>
 
         <div className="max-w-md">
@@ -106,10 +104,7 @@ export function SignInPage() {
         <div className="w-full max-w-sm">
           <div className="mb-8 flex items-center gap-3">
             <div className="flex items-center gap-3 lg:hidden">
-              <span className="grid size-10 place-items-center rounded-xl bg-indigo-600 text-white">
-                <Boxes aria-hidden="true" className="size-5" />
-              </span>
-              <span className="text-lg font-semibold tracking-tight text-slate-900">Mystock</span>
+              <BrandMark logoClassName="size-10" textClassName="text-lg text-slate-900" />
             </div>
             <div className="ms-auto">
               <LanguageSwitcher />

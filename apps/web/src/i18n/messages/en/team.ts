@@ -27,7 +27,7 @@ export const team = {
   'team.invitationsHeading': 'Invitations',
   'team.expireAfter': 'Expire after 14 days',
   'team.invitationsHelp':
-    'MyStock does not send email. Share the invitation with the person; it appears for them after they sign in with the invited address.',
+    'Nexora does not send email. Share the invitation with the person; it appears for them after they sign in with the invited address.',
   'team.invitationsLoadFailed': 'Invitations failed to load.',
   'team.loadingInvitations': 'Loading invitations',
   'team.noInvitationsTitle': 'No invitations yet',
@@ -46,7 +46,7 @@ export const team = {
   'team.administrationLink': 'Administration →',
   'invite.title': 'Invite a team member',
   'invite.description':
-    'The invitation appears for this email after they sign in. MyStock does not send email, so tell them to look for the pending invitation.',
+    'The invitation appears for this email after they sign in. Nexora does not send email, so tell them to look for the pending invitation.',
   'invite.emailRequired': 'Enter an email address',
   'invite.emailInvalid': 'Enter a valid email address',
   'invite.managersViewersOnly': 'Managers can invite viewers only.',

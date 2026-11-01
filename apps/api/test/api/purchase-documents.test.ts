@@ -131,7 +131,7 @@ describe('purchase document PDFs', () => {
     expect(response.status).toBe(200);
     expect(response.headers['content-type']).toContain('application/pdf');
     expect(response.headers['content-disposition']).toBe(
-      `attachment; filename="mystock-${order.number}.pdf"`,
+      `attachment; filename="nexora-${order.number}.pdf"`,
     );
 
     const pdf = response.body as Buffer;
@@ -208,7 +208,7 @@ describe('purchase document PDFs', () => {
     );
     expect(draftPdf.status).toBe(200);
     expect(draftPdf.headers['content-disposition']).toBe(
-      `attachment; filename="mystock-PR-${YEAR}-0001.pdf"`,
+      `attachment; filename="nexora-PR-${YEAR}-0001.pdf"`,
     );
 
     const posted = await request(ctx.app.getHttpServer())

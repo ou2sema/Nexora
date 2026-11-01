@@ -12,7 +12,7 @@ export const organizations: OrganizationsMessages = {
   'organizations.onboarding.body':
     'Un administrateur de la plateforme crée les organisations et désigne le premier gestionnaire. Si vous avez été invité, demandez-lui d’envoyer l’invitation à cette adresse e-mail ; elle apparaît dans la bannière des invitations en attente après votre connexion.',
   'organizations.onboarding.note':
-    'MyStock n’envoie pas d’e-mail d’invitation. La personne qui vous a invité vous la transmettra directement.',
+    'Nexora n’envoie pas d’e-mail d’invitation. La personne qui vous a invité vous la transmettra directement.',
   'organizations.form.name': 'Nom de l’organisation',
   'organizations.form.nameRequired': 'Saisissez le nom d’une organisation',
   'organizations.form.slugHint': 'Un identifiant compatible avec les URL est dérivé du nom.',

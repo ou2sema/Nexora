@@ -69,7 +69,7 @@ describe('purchase document model', () => {
     expect(document.number).toBe('PO-2026-0001');
     expect(document.statusLabel).toBe('Draft');
     expect(document.watermark).toBe('DRAFT');
-    expect(document.fileName).toBe('mystock-PO-2026-0001.pdf');
+    expect(document.fileName).toBe('nexora-PO-2026-0001.pdf');
     expect(document.meta).toEqual([
       { label: 'Order date', value: '2026-10-31' },
       { label: 'Expected', value: '2026-11-15' },
@@ -139,7 +139,7 @@ describe('purchase document model', () => {
     expect(document.title).toBe('Purchase return note');
     expect(document.watermark).toBeNull();
     expect(document.statusLabel).toBe('Posted');
-    expect(document.fileName).toBe('mystock-PR-2026-0001.pdf');
+    expect(document.fileName).toBe('nexora-PR-2026-0001.pdf');
     expect(document.meta).toEqual([
       { label: 'Return date', value: '2026-10-31' },
       { label: 'Source order', value: 'PO-2026-0001' },

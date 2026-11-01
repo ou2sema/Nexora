@@ -29,7 +29,7 @@ export const team: TeamMessages = {
   'team.invitationsHeading': 'الدعوات',
   'team.expireAfter': 'تنتهي بعد 14 يوماً',
   'team.invitationsHelp':
-    'لا يرسل MyStock رسائل بريد إلكتروني. شارك الدعوة مع الشخص؛ وستظهر له بعد تسجيل الدخول بالعنوان المدعو.',
+    'لا يرسل Nexora رسائل بريد إلكتروني. شارك الدعوة مع الشخص؛ وستظهر له بعد تسجيل الدخول بالعنوان المدعو.',
   'team.invitationsLoadFailed': 'تعذّر تحميل الدعوات.',
   'team.loadingInvitations': 'جارٍ تحميل الدعوات',
   'team.noInvitationsTitle': 'لا توجد دعوات بعد',
@@ -46,7 +46,7 @@ export const team: TeamMessages = {
   'team.administrationLink': 'الإدارة ←',
   'invite.title': 'دعوة عضو إلى الفريق',
   'invite.description':
-    'تظهر الدعوة لهذا البريد الإلكتروني بعد تسجيل الدخول. لا يرسل MyStock رسائل بريد إلكتروني، لذا اطلب من الشخص البحث عن الدعوة المعلّقة.',
+    'تظهر الدعوة لهذا البريد الإلكتروني بعد تسجيل الدخول. لا يرسل Nexora رسائل بريد إلكتروني، لذا اطلب من الشخص البحث عن الدعوة المعلّقة.',
   'invite.emailRequired': 'أدخل عنوان بريد إلكتروني',
   'invite.emailInvalid': 'أدخل عنوان بريد إلكتروني صالحاً',
   'invite.managersViewersOnly': 'يمكن للمديرين دعوة المشاهدين فقط.',

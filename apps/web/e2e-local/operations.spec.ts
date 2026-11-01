@@ -394,7 +394,7 @@ test.describe('purchase orders', () => {
     await expectPdfDownload(
       page,
       () => dialog.getByRole('button', { name: 'Download purchase order PDF' }).click(),
-      /^mystock-PO-\d{4}-\d{4}\.pdf$/,
+      /^nexora-PO-\d{4}-\d{4}\.pdf$/,
     );
 
     const returnRow = dialog.getByRole('row', { name: /PR-/ });
@@ -402,7 +402,7 @@ test.describe('purchase orders', () => {
     await expectPdfDownload(
       page,
       () => returnRow.getByRole('button', { name: 'Download PDF' }).click(),
-      /^mystock-PR-\d{4}-\d{4}\.pdf$/,
+      /^nexora-PR-\d{4}-\d{4}\.pdf$/,
     );
 
     await page.keyboard.press('Escape');
