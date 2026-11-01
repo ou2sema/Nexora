@@ -45,6 +45,20 @@ jobs:
   e2e:
     name: Playwright E2E
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: pw
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -58,6 +72,23 @@ jobs:
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
+
+      - name: Bootstrap and migrate PostgreSQL
+        env:
+          PGPASSWORD: pw
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 <<'EOSQL'
+          create schema auth;
+          create table auth.users (
+            id uuid primary key,
+            email text not null unique,
+            created_at timestamptz not null default now()
+          );
+          create role authenticated nologin;
+          EOSQL
+          for file in $(ls supabase/migrations/*.sql | sort); do
+            psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f "$file"
+          done
 
       - name: Write web test environment
         run: |
