@@ -21,7 +21,7 @@ test.describe('authentication gate', () => {
 
   test('switches to account creation', async ({ page }) => {
     await page.goto('/sign-in');
-    await page.getByRole('button', { name: 'Create one' }).click();
+    await page.getByRole('button', { name: 'New account?' }).click();
 
     await expect(
       page.getByRole('heading', { name: 'Create your account', level: 2 }),
@@ -31,6 +31,10 @@ test.describe('authentication gate', () => {
 
   test('offers a skip link as the first focusable element', async ({ page }) => {
     await page.goto('/sign-in');
+    // The route mounts only after lazy loading and the auth-status settle;
+    // pressing Tab earlier focuses the still-empty document body.
+    await expect(page.getByRole('link', { name: 'Skip to sign-in form' })).toBeAttached();
+
     await page.keyboard.press('Tab');
 
     await expect(page.getByRole('link', { name: 'Skip to sign-in form' })).toBeFocused();

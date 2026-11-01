@@ -868,17 +868,21 @@ first, so the report always reflects exactly one run. `allure-results/` and
 `.github/workflows/ci.yml` runs three jobs on `ubuntu-latest` for every push to `main`
 and every pull request:
 
-| Job         | Steps                                                                                        |
-| ----------- | -------------------------------------------------------------------------------------------- |
-| `quality`   | `npm ci` → format check → lint → typecheck → unit tests → build                              |
-| `e2e`       | `npm ci` → install Chromium → write test `.env.local` → build → Playwright → artifact upload |
-| `e2e-local` | `npm ci` → install Chromium → build → full local-stack Playwright suite → artifact upload    |
+| Job         | Steps                                                                                                               |
+| ----------- | ------------------------------------------------------------------------------------------------------------------- |
+| `quality`   | `npm ci` → format check → lint → typecheck → unit tests → build                                                     |
+| `e2e`       | `npm ci` → install Chromium → Postgres service + migrations → write test `.env.local` → build → Playwright → upload |
+| `e2e-local` | `npm ci` → install Chromium → build → full local-stack Playwright suite → artifact upload                           |
 
 The `e2e` job writes placeholder `VITE_` values (no real project, no real secrets) and
-uploads `test-results/` plus `allure-results/` only when the run fails. The `e2e-local` job
-boots embedded PostgreSQL, the fake auth/JWKS server, the built API, and Vite, so it needs
-no Supabase project; it runs the same 40 checks as the headed local run. The `e2e-local` job
-has not yet run on GitHub Actions; it was validated by running the same command locally.
+uploads `test-results/` plus `allure-results/` only when the run fails. It also runs a
+`postgres:16` service container, creates the `auth.users` shim and the `authenticated` role,
+and applies every `supabase/migrations/*.sql` in filename order before Playwright starts,
+because the API's boot-time schema guard refuses to listen on an unmigrated database. The
+`e2e-local` job boots embedded PostgreSQL, the fake auth/JWKS server, the built API, and
+Vite, so it needs no Supabase project; it runs the same 40 checks as the headed local run.
+`e2e-local` and `quality` have run green on GitHub Actions; the `e2e` job was fixed the same
+day after a CI-style local repro exposed two stale `shell.spec.ts` assertions.
 
 To reproduce the `quality` job locally, run the gates above in the same order after a
 clean `npm ci`. To reproduce the `e2e` job locally, stop any running dev servers first — CI mode never
