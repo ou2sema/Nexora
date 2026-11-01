@@ -315,7 +315,9 @@ check:integrity` sweeps every organization, calls `app.stock_reconciliation` und
 owner/admin's claims, and exits non-zero on any drift, so it can run unattended. See
 [ADR-0013](docs/adr/0013-operational-hardening.md) and
 [`docs/runbooks/restore-drill.md`](docs/runbooks/restore-drill.md) for the operator
-procedures.
+procedures, with
+[`docs/runbooks/deploy-rollback.md`](docs/runbooks/deploy-rollback.md) covering which layer a
+release rolls back and how to verify it.
 
 Three public routes answer infrastructure polling without a token and outside the rate limit:
 `/health` (the dashboard status source), `/health/live` (process only), and `/health/ready`

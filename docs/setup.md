@@ -32,9 +32,15 @@ SUPABASE_URL=https://<project-ref>.supabase.co
 SUPABASE_ANON_KEY=<anon-key>
 SUPABASE_JWT_ISSUER=https://<project-ref>.supabase.co/auth/v1
 SUPABASE_JWT_AUDIENCE=authenticated
-DATABASE_URL=postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres
+# Session pooler (port 5432), which works on an IPv4-only network. The direct host
+# db.<project-ref>.supabase.co is IPv6-only for this project.
+DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-0-eu-west-1.pooler.supabase.com:5432/postgres
 DATABASE_SSL=true
 ```
+
+`.env.example` is the reference for every variable: the value each one accepts, which are
+validated at API boot, why `DATABASE_SSL` must stay `true` in production, why the 6543
+transaction pooler must not be used, and the order `.env` files are loaded in.
 
 `SUPABASE_SERVICE_ROLE_KEY` is not required by, or used in, the API runtime; do not put it in
 the API environment. If a separate operator tool requires a service-role key, provide it only
@@ -735,6 +741,16 @@ PostgreSQL you are allowed to create and drop databases on; anything else is ref
 connection is opened, so a hosted URL can never be damaged by it. It leaves no database
 behind: each run creates `drill_*` databases and drops them, including on failure. See
 “Continuous integration” for what it asserts.
+
+### Rolling back a release
+
+[`runbooks/deploy-rollback.md`](runbooks/deploy-rollback.md) covers the three layers that can
+move independently (web build, API build, database), the decision table for the common
+symptoms, and the verification checklist. Migrations are forward-only, so a bad schema
+change is fixed by a corrective migration proven with the virgin-database drill, or by a
+restore — never by editing an applied migration. Backup retention and RPO for the hosted
+project are **not recorded yet**; capture them during the restore drill and add them to that
+runbook.
 
 ### Restore drill
 
