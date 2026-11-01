@@ -599,7 +599,7 @@ cd apps/web
 npx playwright test --config playwright.local-stack.config.ts --headed
 ```
 
-Expected: 38 checks (19 tests × desktop/mobile). The four `e2e-local/i18n.spec.ts` tests
+Expected: 40 checks (20 tests × desktop/mobile). The four `e2e-local/i18n.spec.ts` tests
 cover:
 
 - French pre-auth copy, the sign-in form, dashboard copy, `fr-TN` money and date output,
@@ -614,7 +614,10 @@ cover:
 The local stack also seeds a second organization, `Org B`, with no catalog data so
 organization switching can be exercised. A `dashboard.spec.ts` regression test exports the
 stock-levels CSV, switches organization, and asserts that the download notice and the
-warehouse filter are cleared rather than leaking across tenants.
+warehouse filter are cleared rather than leaking across tenants. A second regression test
+holds the network open while switching and asserts that product rows never carry across the
+organization boundary while still using placeholder data for filter changes inside one
+organization.
 
 The English assertions in `admin`, `dashboard`, `operations`, and `team` were not edited
 and still pass, confirming the conversion produced byte-identical English copy.
@@ -629,6 +632,11 @@ and other forms carry it.
 Full gates on 2026-10-31 for Phase 12: `format:check`, `lint`, `typecheck`, and `build`
 clean; `npm test` still runs 277 Vitest tests across the workspaces; the headed local-stack
 run passed 38/38 in 4.3 minutes with Allure served at http://127.0.0.1:5058.
+
+Re-run on 2026-11-01 after the Nexora rebrand, the login redesign, and the repository-audit
+remediation: 290 Vitest tests (242 API, 33 domain, 8 contracts, 7 config) and the headed
+local-stack suite 40/40 (20 tests × desktop/mobile) with Allure served at
+http://127.0.0.1:5058; `format:check`, `lint`, `typecheck`, and `build` clean.
 
 The French timestamp uses a 24-hour clock: CLDR's `fr-TN` default is a 12-hour clock with
 an English “PM”, so the provider forces `hourCycle: 'h23'` for French. Money keeps three
@@ -815,14 +823,14 @@ npm run test --workspace @mystock/api -- test/db
 
 ## Test suites
 
-| Command                                                         | What it runs                                                                                                                                                                                                                                                |
-| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run test`                                                  | 277 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, team access, platform administration, admin audit, schema guard, API shell, env, contracts, domain |
-| `npm run test:e2e`                                              | Playwright against the API and dev server (16 checks: 8 tests × desktop/mobile)                                                                                                                                                                             |
-| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                            |
-| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                 |
-| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–12 flows on the self-contained stack (38 checks: 19 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                                                                         |
-| `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                           |
+| Command                                                         | What it runs                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run test`                                                  | 290 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, team access, platform administration, admin audit, membership write hardening, schema guard, API shell, env, contracts, domain |
+| `npm run test:e2e`                                              | Playwright against the API and dev server (16 checks: 8 tests × desktop/mobile)                                                                                                                                                                                                         |
+| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                                                        |
+| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                                             |
+| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–12 flows on the self-contained stack (40 checks: 20 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                                                                                                     |
+| `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                                                       |
 
 The API suites (`apps/api/test/api`) run the real migrations on PGlite, sign JWTs with
 locally generated ES256 keys, and serve the trusted public key from a temporary JWKS
@@ -869,7 +877,7 @@ and every pull request:
 The `e2e` job writes placeholder `VITE_` values (no real project, no real secrets) and
 uploads `test-results/` plus `allure-results/` only when the run fails. The `e2e-local` job
 boots embedded PostgreSQL, the fake auth/JWKS server, the built API, and Vite, so it needs
-no Supabase project; it runs the same 38 checks as the headed local run. The `e2e-local` job
+no Supabase project; it runs the same 40 checks as the headed local run. The `e2e-local` job
 has not yet run on GitHub Actions; it was validated by running the same command locally.
 
 To reproduce the `quality` job locally, run the gates above in the same order after a
