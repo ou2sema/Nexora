@@ -589,6 +589,16 @@ locally running API on `:4100` was left on the previous build, so the app stayed
 The restore drill in [`runbooks/restore-drill.md`](runbooks/restore-drill.md) is documented but
 has not been executed.
 
+Update on 2026-11-01: `20261031180000_admin_audit.sql` and
+`20261101144800_membership_write_hardening.sql` were applied to the hosted project with
+`npx supabase db push --db-url "$env:DATABASE_URL"` (dry-run first, no `--include-seed`, over
+the session pooler). A read-only check afterwards confirmed `public.admin_audit_events`,
+`app.log_admin_action(p_action, p_organization, p_target_user, p_target_email, p_detail)`, the
+lock-taking `app.protect_last_owner` body, the single `memberships_select_member` policy, and
+that `authenticated` no longer holds INSERT/UPDATE/DELETE on `memberships`. The production API
+build then booted against hosted past the schema guard, and `npm run check:integrity` reported
+OK for all six organizations.
+
 ## Interface localization verification
 
 Phase 12 changes no schema and no API contract. The existing suites remain the regression
@@ -777,9 +787,9 @@ are still unexercised (see “Team access verification”). Phase 10
 (`20261031160000_platform_administration.sql`) was applied on 2026-10-31; hosted organization
 creation is now platform-admin-only, and the bootstrap flag for `ou3sema@gmail.com` is
 verified in `profiles`. The signed-in hosted Phase 10 UI flows remain to be exercised. Phase 11
-(`20261031180000_admin_audit.sql`) is **not** applied to the hosted project yet; it must be
-applied before this API version is deployed there, because the boot-time schema guard refuses
-to start without `public.admin_audit_events` and `app.log_admin_action`.
+(`20261031180000_admin_audit.sql`) was applied on 2026-11-01 together with the remediation
+migration `20261101144800_membership_write_hardening.sql`, after which the schema guard let the
+current API build boot against hosted.
 
 The Phase 3 migrations (`20261029130000_stock_ledger.sql` and
 `20261029140000_serialized_devices.sql`) were pushed to the hosted project on 2026-10-29 after
