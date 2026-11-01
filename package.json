@@ -24,6 +24,7 @@
     "test": "npm run build:packages && npm run test --workspaces --if-present",
     "test:e2e": "npm run test:e2e --workspace @mystock/web",
     "check:integrity": "npm run check:integrity --workspace @mystock/api",
+    "drill:virgin-database": "npm run drill:virgin-database --workspace @mystock/api",
     "report:allure": "npm run allure:serve --workspace @mystock/web"
   },
   "devDependencies": {

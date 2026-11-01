@@ -343,14 +343,15 @@ npm run build
 
 ## Scripts
 
-| Script                    | Purpose                                                                |
-| ------------------------- | ---------------------------------------------------------------------- |
-| `npm run lint`            | ESLint across the workspace                                            |
-| `npm run format`          | Prettier write                                                         |
-| `npm run format:check`    | Prettier check without writing                                         |
-| `npm run typecheck`       | TypeScript project checks per workspace                                |
-| `npm run test`            | Unit/integration tests per workspace                                   |
-| `npm run test:e2e`        | Playwright end-to-end suite                                            |
-| `npm run check:integrity` | Read-only stock/ledger sweep for every organization (exits 1 on drift) |
-| `npm run report:allure`   | Serve the Allure report from the last E2E run                          |
-| `npm run build`           | Build every workspace package                                          |
+| Script                          | Purpose                                                                                                        |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `npm run lint`                  | ESLint across the workspace                                                                                    |
+| `npm run format`                | Prettier write                                                                                                 |
+| `npm run format:check`          | Prettier check without writing                                                                                 |
+| `npm run typecheck`             | TypeScript project checks per workspace                                                                        |
+| `npm run test`                  | Unit/integration tests per workspace                                                                           |
+| `npm run test:e2e`              | Playwright end-to-end suite                                                                                    |
+| `npm run check:integrity`       | Read-only stock/ledger sweep for every organization (exits 1 on drift)                                         |
+| `npm run drill:virgin-database` | Rebuild a virgin local database from migrations + seed and prove both schema-guard boot paths (localhost only) |
+| `npm run report:allure`         | Serve the Allure report from the last E2E run                                                                  |
+| `npm run build`                 | Build every workspace package                                                                                  |

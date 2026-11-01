@@ -622,6 +622,8 @@ against hosted on 2026-10-31 by booting the production build with the root `.env
 refused to start with `Database schema is out of date; missing public.admin_audit_events.
 Apply supabase/migrations before starting the API.` No hosted schema change was made, and the
 locally running API on `:4100` was left on the previous build, so the app stayed available.
+Since 2026-11-01 the same refusal is exercised automatically on every push by the CI
+`database` job (“Virgin-database drill”), so it no longer needs a manual hosted probe.
 The restore drill in [`runbooks/restore-drill.md`](runbooks/restore-drill.md) is documented but
 has not been executed.
 
@@ -724,6 +726,16 @@ operator's own console). It is idempotent, refuses an email with no profile (the
 have signed in at least once), never prints the connection string, and writes a
 `platform_admin_granted` audit row with a `null` actor. There is still no HTTP grant path.
 
+### Virgin-database drill
+
+`npm run drill:virgin-database --workspace @mystock/api` rebuilds the schema from nothing the
+way a first deployment does and checks both halves of the boot-time schema guard. It needs
+`npm run build` first (it starts `dist/main.js`) and a `DATABASE_URL` pointing at a local
+PostgreSQL you are allowed to create and drop databases on; anything else is refused before a
+connection is opened, so a hosted URL can never be damaged by it. It leaves no database
+behind: each run creates `drill_*` databases and drops them, including on failure. See
+“Continuous integration” for what it asserts.
+
 ### Restore drill
 
 Follow [`runbooks/restore-drill.md`](runbooks/restore-drill.md). It targets a scratch
@@ -760,6 +772,7 @@ The schema is plain SQL in `supabase/migrations`, applied in filename order:
 | `20261031140000_team_access.sql`                      | profiles projection, email-keyed invitations, membership and invitation RPCs                                           |
 | `20261031160000_platform_administration.sql`          | platform-admin flag, restricted organization creation, cross-organization team access, manager viewer-only invitations |
 | `20261031180000_admin_audit.sql`                      | operator audit table, `app.log_admin_action`, logged organization/invitation/membership RPCs                           |
+| `20261101144800_membership_write_hardening.sql`       | tightened membership write policies and re-recorded audit RPCs                                                         |
 
 Demo data lives in `supabase/seed.sql` and requires at least one signed-up user (it raises
 `seed_requires_auth_user` otherwise). The seed inserts demo inventory into the first signed-up
@@ -882,6 +895,7 @@ npm run test --workspace @mystock/api -- test/db
 | `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                                                            |
 | `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–12 flows on the self-contained stack (40 checks: 20 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                                                                                                                    |
 | `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                                                                      |
+| `npm run drill:virgin-database --workspace @mystock/api`        | Migrations + seed onto virgin local databases and both schema-guard boot paths (needs `npm run build` and a localhost `DATABASE_URL`)                                                                                                                                                                  |
 
 The API suites (`apps/api/test/api`) run the real migrations on PGlite, sign JWTs with
 locally generated ES256 keys, and serve the trusted public key from a temporary JWKS
@@ -916,12 +930,13 @@ first, so the report always reflects exactly one run. `allure-results/` and
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs three jobs on `ubuntu-latest` for every push to `main`
+`.github/workflows/ci.yml` runs four jobs on `ubuntu-latest` for every push to `main`
 and every pull request:
 
 | Job         | Steps                                                                                                               |
 | ----------- | ------------------------------------------------------------------------------------------------------------------- |
 | `quality`   | `npm ci` → format check → lint → typecheck → unit tests → build                                                     |
+| `database`  | `npm ci` → build → Postgres service → virgin-database drill (migrations, seed, schema guard)                        |
 | `e2e`       | `npm ci` → install Chromium → Postgres service + migrations → write test `.env.local` → build → Playwright → upload |
 | `e2e-local` | `npm ci` → install Chromium → build → full local-stack Playwright suite → artifact upload                           |
 
@@ -935,6 +950,23 @@ Vite, so it needs no Supabase project; it runs the same 40 checks as the headed 
 All three jobs ran green on GitHub Actions on 2026-11-01 (run #6, commit `38c94db`); the
 `e2e` job had never been green before — it needed the Postgres service above, and the
 `shell.spec.ts` fixes for the Nexora sign-in copy and the lazy-route mount timing.
+
+The `database` job added on 2026-11-01 runs `npm run drill:virgin-database --workspace
+@mystock/api` (`apps/api/scripts/virgin-db-drill.mjs`) against a `postgres:16` service
+container. It creates throwaway databases, applies the `auth.users` shim, every
+`supabase/migrations/*.sql` in filename order, and `supabase/seed.sql`, then starts the
+built API twice: once on a complete schema, where `/health/ready` must answer and the boot
+log must contain `Database schema verified`, and once after dropping
+`public.admin_audit_events`, where the schema guard must stop the process with a non-zero
+exit naming that table. The seed halves additionally prove a virgin database refuses
+`seed_requires_auth_user` and that re-running the seed is idempotent. Because it drops
+databases, the script rejects any `DATABASE_URL` whose host is not `localhost` or
+`127.0.0.1`, so it cannot reach a hosted project. Verified locally on 2026-11-01 against a
+throwaway embedded PostgreSQL 18 cluster: 12 migrations applied, seeded rows
+`1/1/7/7/7/2/3` (organizations/memberships/products/categories/brands/warehouses/locations),
+readiness `ok` with a 54–78 ms database probe, and the negative run exiting `1` with
+`Database schema is out of date; missing public.admin_audit_events`. Its first remote run on
+GitHub Actions is still unverified.
 
 To reproduce the `quality` job locally, run the gates above in the same order after a
 clean `npm ci`. To reproduce the `e2e` job locally, stop any running dev servers first — CI mode never
