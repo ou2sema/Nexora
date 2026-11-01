@@ -86,7 +86,7 @@ describe('organization bootstrap and owner protection', () => {
     ).rejects.toThrow(/duplicate key|unique/i);
   });
 
-  it('does not allow removing the last owner', async () => {
+  it('refuses direct writes even when an owner tries to change the last owner', async () => {
     await expect(
       database.asUser(USERS.alice, (client) =>
         client.query(
@@ -94,7 +94,7 @@ describe('organization bootstrap and owner protection', () => {
           [ORGS.a, USERS.alice],
         ),
       ),
-    ).rejects.toThrow(/organization_requires_owner/);
+    ).rejects.toThrow(/permission denied for table memberships/i);
 
     await expect(
       database.asUser(USERS.alice, (client) =>
@@ -103,18 +103,23 @@ describe('organization bootstrap and owner protection', () => {
           USERS.alice,
         ]),
       ),
-    ).rejects.toThrow(/organization_requires_owner/);
+    ).rejects.toThrow(/permission denied for table memberships/i);
   });
 
-  it('lets an owner add a member, who then gains read access', async () => {
-    await database.asUser(
+  it('lets an owner invite a member through the RPC, who then gains read access', async () => {
+    const invitation = await database.asUser(
       USERS.alice,
       (client) =>
-        client.query(
-          "insert into public.memberships (organization_id, user_id, role) values ($1, $2, 'viewer')",
-          [ORGS.a, USERS.carol],
+        client.query<{ id: string }>(
+          "select app.create_organization_invitation($1, 'carol@example.com', 'viewer') as id",
+          [ORGS.a],
         ),
       { commit: true },
+    );
+    await database.asUser(
+      USERS.carol,
+      (client) => client.query('select app.accept_invitation($1)', [invitation.rows[0]?.id]),
+      { email: 'carol@example.com', commit: true },
     );
 
     const products = await database.asUser(USERS.carol, (client) =>

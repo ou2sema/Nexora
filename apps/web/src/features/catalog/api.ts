@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type {
   BrandCreateInput,
@@ -16,6 +16,7 @@ import type {
   WarehouseSummary,
 } from '@mystock/contracts';
 
+import { keepPreviousDataForOrganization } from '@/lib/organization-query-placeholder';
 import { useAccessToken } from '@/features/auth/auth-provider';
 import { apiRequest } from '@/lib/api-client';
 
@@ -49,7 +50,7 @@ export function useProducts(organizationId: string | null, filters: ProductFilte
         { token },
       ),
     enabled: Boolean(organizationId),
-    placeholderData: keepPreviousData,
+    placeholderData: keepPreviousDataForOrganization(organizationId),
   });
 }
 

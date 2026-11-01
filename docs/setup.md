@@ -36,9 +36,10 @@ DATABASE_URL=postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/
 DATABASE_SSL=true
 ```
 
-Keep `SUPABASE_SERVICE_ROLE_KEY` server-side only — it never appears in a `VITE_` variable,
-and the request path does not use it. The API verifies tokens against the project's public
-JWKS (`/auth/v1/.well-known/jwks.json`), so no JWT secret is needed.
+`SUPABASE_SERVICE_ROLE_KEY` is not required by, or used in, the API runtime; do not put it in
+the API environment. If a separate operator tool requires a service-role key, provide it only
+to that tool and never expose it through a `VITE_` variable. The API verifies tokens against
+the project's public JWKS (`/auth/v1/.well-known/jwks.json`), so no JWT secret is needed.
 
 The web app validates its own environment at startup and reads a git-ignored file:
 
@@ -108,9 +109,11 @@ Reconciliation is restricted to owner and admin; all reads require membership.
 
 Serialized-device writes follow a fixed status graph and append a `device_events` row for
 every change. Products must have `isSerialized = true` before a device can be registered
-against them. Serialized products are kept out of quantity postings: a unit enters through
-`register_device`, which records identity and lifecycle without posting a ledger receipt, and
-quantity-tracked products use the stock RPCs. Combining both in one transaction is future work.
+against them. Standalone `register_device` records the device identity and its initial lifecycle
+event but does not post a quantity movement. For serialized products received against a purchase
+order, `receive_purchase_order` registers the devices and their `registered` events inline in the
+same transaction as the receipt; it posts no quantity movement for those lines. Quantity-tracked
+products use the stock RPCs.
 
 Scan lookups (`GET .../scan?code=`) are available to every member and resolve a device serial
 or IMEI before a product barcode, SKU, or internal code. Barcode assignment and every count
@@ -700,7 +703,8 @@ The schema is plain SQL in `supabase/migrations`, applied in filename order:
 | `20261031180000_admin_audit.sql`                      | operator audit table, `app.log_admin_action`, logged organization/invitation/membership RPCs                           |
 
 Demo data lives in `supabase/seed.sql` and requires at least one signed-up user (it raises
-`seed_requires_auth_user` otherwise).
+`seed_requires_auth_user` otherwise). The seed inserts demo inventory into the first signed-up
+user's organization; never run it against production or a hosted project containing real data.
 
 Tenant isolation is enforced by Postgres RLS: tables carry `organization_id`, roles come from
 `memberships.role`, and every policy calls the `app.*` helpers. The isolation suite runs
@@ -732,16 +736,19 @@ Applying migrations to the hosted project (needs your access token and database 
 
 ```powershell
 npx supabase link --project-ref <project-ref>
-npx supabase db push --include-seed
+npx supabase db push
 ```
 
 Without linking, push directly with the connection string from `.env` (the CLI expects it
 percent-encoded):
 
 ```powershell
-npx supabase db push --db-url $env:DATABASE_URL --include-seed
+npx supabase db push --db-url "$env:DATABASE_URL"
 ```
 
+These commands apply migrations only. Do not add `--include-seed` for production: it injects
+demo data from `supabase/seed.sql` and is intended only for a disposable development/test
+database.
 The direct database host (`db.<project-ref>.supabase.co`) is IPv6-only for this project. On a
 network without an IPv6 route, use the session pooler instead: host
 `aws-0-eu-west-1.pooler.supabase.com`, port `5432`, user `postgres.<project-ref>`, database
@@ -767,9 +774,10 @@ applied before this API version is deployed there, because the boot-time schema 
 to start without `public.admin_audit_events` and `app.log_admin_action`.
 
 The Phase 3 migrations (`20261029130000_stock_ledger.sql` and
-`20261029140000_serialized_devices.sql`) were pushed to the hosted project on 2026-10-29 with
-`npx supabase db push --db-url "$env:DATABASE_URL" --include-seed`, after the local suites and
-a read-only check of the hosted schema. A manual hosted UI pass in a second tenant then posted
+`20261029140000_serialized_devices.sql`) were pushed to the hosted project on 2026-10-29 after
+the local suites and a read-only check of the hosted schema. The historical deployment also
+used `--include-seed` and intentionally populated demo data; do not repeat that option in
+production. A manual hosted UI pass in a second tenant then posted
 every movement type — receipt, issue, reservation, reservation fulfilment, transfer out/in,
 and an adjustment — and the balance projection matched the ledger with zero reconciliation
 drift. The same pass registered a serialized device, moved it, and walked its status graph
@@ -792,8 +800,9 @@ reported 1 line and 0 adjustments. Hosted rows afterwards showed the count `post
 at `9.0000`, balances 9 + 2 = 11, and zero `inventory_count` movements. No defects surfaced;
 the receipt, barcode, and posted count remain in that tenant.
 
-Re-running the command above seeds idempotently. The seed raises `seed_requires_auth_user`
-when no account exists.
+For a disposable development/test database only, the seed can be run deliberately with
+`--include-seed`; it raises `seed_requires_auth_user` when no account exists. Hosted production
+migration commands above omit seed data.
 
 An easy way to sign up for local use is the sign-in page's "Create one" link. With
 `mailer_autoconfirm = false` (the project default), confirm the email before signing in.

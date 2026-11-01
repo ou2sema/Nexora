@@ -149,6 +149,24 @@ function fileDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function validateOverviewWindow(from: Date, to: Date): void {
+  if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime())) {
+    throw new AppError('validation_error', 'Request validation failed', 400, [
+      { path: 'from', message: 'The reporting window must contain valid dates.' },
+    ]);
+  }
+  if (from.getTime() > to.getTime()) {
+    throw new AppError('validation_error', 'Request validation failed', 400, [
+      { path: 'to', message: 'The start of the window must not be after its end.' },
+    ]);
+  }
+  if (to.getTime() - from.getTime() > 366 * DAY_MS) {
+    throw new AppError('validation_error', 'Request validation failed', 400, [
+      { path: 'from', message: 'The reporting window cannot exceed 366 days.' },
+    ]);
+  }
+}
+
 @Injectable()
 export class ReportsService {
   constructor(private readonly access: TenantAccessService) {}
@@ -162,6 +180,7 @@ export class ReportsService {
     const from = query.from
       ? new Date(query.from)
       : new Date(to.getTime() - (DEFAULT_WINDOW_DAYS - 1) * DAY_MS);
+    validateOverviewWindow(from, to);
     const fromDate = from.toISOString().slice(0, 10);
     const toDate = to.toISOString().slice(0, 10);
 

@@ -119,7 +119,7 @@ describe('tenant isolation under RLS', () => {
     expect(bobMembers.rows.map((row) => row.organization_id)).toEqual([ORGS.b]);
   });
 
-  it('rejects membership changes across the tenant boundary', async () => {
+  it('denies direct membership writes regardless of tenant boundary', async () => {
     await expect(
       database.asUser(USERS.alice, (client) =>
         client.query(
@@ -127,14 +127,15 @@ describe('tenant isolation under RLS', () => {
           [ORGS.b, USERS.alice],
         ),
       ),
-    ).rejects.toThrow(/row-level security/);
+    ).rejects.toThrow(/permission denied for table memberships/i);
 
-    const removal = await database.asUser(USERS.bob, (client) =>
-      client.query('delete from public.memberships where organization_id = $1 returning id', [
-        ORGS.a,
-      ]),
-    );
-    expect(removal.rows).toHaveLength(0);
+    await expect(
+      database.asUser(USERS.bob, (client) =>
+        client.query('delete from public.memberships where organization_id = $1 returning id', [
+          ORGS.a,
+        ]),
+      ),
+    ).rejects.toThrow(/permission denied for table memberships/i);
   });
 
   it('isolates warehouses and storage locations', async () => {

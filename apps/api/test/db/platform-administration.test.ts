@@ -126,14 +126,11 @@ describe('platform administrator visibility', () => {
     );
     expect(invitedVisibleToOwner.rows).toHaveLength(1);
 
+    const invitation = await createInvitation(PAT, ORGS.a, 'carol@example.com', 'viewer');
     await database.asUser(
-      PAT,
-      (client) =>
-        client.query(
-          "insert into public.memberships (organization_id, user_id, role) values ($1, $2, 'viewer')",
-          [ORGS.a, USERS.carol],
-        ),
-      { commit: true },
+      USERS.carol,
+      (client) => client.query('select app.accept_invitation($1)', [invitation.rows[0]?.id]),
+      { email: 'carol@example.com', commit: true },
     );
     await database.asUser(
       PAT,
@@ -171,7 +168,8 @@ describe('manager access', () => {
 
     const invitations = await database.asUser(GINA, (client) =>
       client.query<{ email: string }>(
-        'select email from public.organization_invitations where organization_id = $1',
+        `select email from public.organization_invitations
+         where organization_id = $1 and email = 'manager-viewer@example.com'`,
         [ORGS.a],
       ),
     );

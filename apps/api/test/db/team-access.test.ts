@@ -246,31 +246,15 @@ describe('invitation acceptance', () => {
 });
 
 describe('member management', () => {
-  it('tightens direct membership writes to the owner hierarchy', async () => {
-    const demoteOwner = await database.asUser(ERIN, (client) =>
-      client.query(
-        "update public.memberships set role = 'viewer' where organization_id = $1 and user_id = $2",
-        [ORGS.a, USERS.alice],
-      ),
-    );
-    expect(demoteOwner.rows).toHaveLength(0);
-
+  it('denies direct membership writes even to organization admins', async () => {
     await expect(
       database.asUser(ERIN, (client) =>
         client.query(
-          "update public.memberships set role = 'owner' where organization_id = $1 and user_id = $2",
-          [ORGS.a, USERS.dave],
+          "update public.memberships set role = 'viewer' where organization_id = $1 and user_id = $2",
+          [ORGS.a, USERS.alice],
         ),
       ),
-    ).rejects.toThrow(/row-level security/);
-
-    const selfPromotion = await database.asUser(USERS.dave, (client) =>
-      client.query(
-        "update public.memberships set role = 'owner' where organization_id = $1 and user_id = $2",
-        [ORGS.a, USERS.dave],
-      ),
-    );
-    expect(selfPromotion.rows).toHaveLength(0);
+    ).rejects.toThrow(/permission denied for table memberships/i);
 
     await expect(
       database.asUser(ERIN, (client) =>
@@ -279,7 +263,16 @@ describe('member management', () => {
           [ORGS.a, FRANK],
         ),
       ),
-    ).rejects.toThrow(/row-level security/);
+    ).rejects.toThrow(/permission denied for table memberships/i);
+
+    await expect(
+      database.asUser(ERIN, (client) =>
+        client.query('delete from public.memberships where organization_id = $1 and user_id = $2', [
+          ORGS.a,
+          USERS.dave,
+        ]),
+      ),
+    ).rejects.toThrow(/permission denied for table memberships/i);
   });
 
   it('only lets an owner manage owners', async () => {

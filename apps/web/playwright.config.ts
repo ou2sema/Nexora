@@ -13,12 +13,10 @@ const apiEnv = {
   LOG_LEVEL: 'warn',
   SUPABASE_URL: 'https://testsupabase.supabase.co',
   SUPABASE_ANON_KEY: 'a'.repeat(40),
-  SUPABASE_SERVICE_ROLE_KEY: 'b'.repeat(40),
   SUPABASE_JWT_ISSUER: 'https://testsupabase.supabase.co/auth/v1',
   SUPABASE_JWT_AUDIENCE: 'authenticated',
   DATABASE_URL: 'postgresql://postgres:pw@localhost:5432/postgres',
   DATABASE_SSL: 'false',
-  SUPABASE_STORAGE_BUCKET: 'mystock-test',
 };
 
 export default defineConfig({

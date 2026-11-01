@@ -8,12 +8,10 @@ const validEnv = {
   WEB_ORIGIN: 'http://localhost:5173',
   SUPABASE_URL: 'https://abcdefgh.supabase.co',
   SUPABASE_ANON_KEY: 'a'.repeat(40),
-  SUPABASE_SERVICE_ROLE_KEY: 'b'.repeat(40),
   SUPABASE_JWT_ISSUER: 'https://abcdefgh.supabase.co/auth/v1',
   SUPABASE_JWT_AUDIENCE: 'authenticated',
   DATABASE_URL: 'postgresql://postgres:pw@db.abcdefgh.supabase.co:5432/postgres',
   DATABASE_SSL: 'true',
-  SUPABASE_STORAGE_BUCKET: 'mystock-private',
 } satisfies NodeJS.ProcessEnv;
 
 describe('parseServerEnv', () => {
@@ -22,10 +20,9 @@ describe('parseServerEnv', () => {
 
     expect(env.API_PORT).toBe(4100);
     expect(env.DATABASE_SSL).toBe(true);
-    expect(env.ALLOW_NEGATIVE_STOCK).toBe(false);
-    expect(env.IDEMPOTENCY_KEY_TTL_HOURS).toBe(24);
     expect(env.SUPABASE_JWT_AUDIENCE).toBe('authenticated');
-    expect(env.RECONCILIATION_CRON).toBe('0 2 * * *');
+    expect(env.RATE_LIMIT_TTL_SECONDS).toBe(60);
+    expect(env.RATE_LIMIT_LIMIT).toBe(120);
   });
 
   it('coerces numeric and boolean strings', () => {
@@ -33,14 +30,14 @@ describe('parseServerEnv', () => {
       ...validEnv,
       API_PORT: '8080',
       DATABASE_SSL: 'false',
-      ALLOW_NEGATIVE_STOCK: 'true',
-      MAX_UPLOAD_BYTES: '2048',
+      RATE_LIMIT_TTL_SECONDS: '30',
+      RATE_LIMIT_LIMIT: '200',
     });
 
     expect(env.API_PORT).toBe(8080);
     expect(env.DATABASE_SSL).toBe(false);
-    expect(env.ALLOW_NEGATIVE_STOCK).toBe(true);
-    expect(env.MAX_UPLOAD_BYTES).toBe(2048);
+    expect(env.RATE_LIMIT_TTL_SECONDS).toBe(30);
+    expect(env.RATE_LIMIT_LIMIT).toBe(200);
   });
 
   it('rejects a missing required value and names the field', () => {
@@ -67,24 +64,22 @@ describe('parseServerEnv', () => {
     );
   });
 
-  it('requires the service role key and TLS in production', () => {
-    const { SUPABASE_SERVICE_ROLE_KEY: _omitted, ...withoutServiceRole } = validEnv;
-
+  it('does not require a service role key in production but requires TLS', () => {
     const production = serverEnvSchema.safeParse({
-      ...withoutServiceRole,
+      ...validEnv,
+      NODE_ENV: 'production',
+      DATABASE_SSL: 'true',
+    });
+
+    expect(production.success).toBe(true);
+
+    const insecureProduction = serverEnvSchema.safeParse({
+      ...validEnv,
       NODE_ENV: 'production',
       DATABASE_SSL: 'false',
     });
-
-    expect(production.success).toBe(false);
-    const paths = production.error?.issues.map((issue) => issue.path.join('.')) ?? [];
-    expect(paths).toContain('SUPABASE_SERVICE_ROLE_KEY');
+    expect(insecureProduction.success).toBe(false);
+    const paths = insecureProduction.error?.issues.map((issue) => issue.path.join('.')) ?? [];
     expect(paths).toContain('DATABASE_SSL');
-  });
-
-  it('rejects a malformed cron expression', () => {
-    expect(() => parseServerEnv({ ...validEnv, RECONCILIATION_CRON: 'every night' })).toThrowError(
-      /RECONCILIATION_CRON/,
-    );
   });
 });

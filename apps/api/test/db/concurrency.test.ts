@@ -166,13 +166,13 @@ describe('real PostgreSQL concurrency', () => {
     }
   }, 60_000);
 
-  async function asOwner<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
+  async function asUser<T>(userId: string, fn: (client: PoolClient) => Promise<T>): Promise<T> {
     const client = await pool.connect();
     try {
       await client.query('begin');
       await client.query('set local role authenticated');
       await client.query("select set_config('request.jwt.claims', $1, true)", [
-        JSON.stringify({ sub: OWNER_ID, role: 'authenticated' }),
+        JSON.stringify({ sub: userId, role: 'authenticated' }),
       ]);
       const value = await fn(client);
       await client.query('commit');
@@ -185,12 +185,23 @@ describe('real PostgreSQL concurrency', () => {
     }
   }
 
-  async function capture<T>(fn: (client: PoolClient) => Promise<T>): Promise<RpcOutcome> {
+  async function asOwner<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
+    return asUser(OWNER_ID, fn);
+  }
+
+  async function captureAs<T>(
+    userId: string,
+    fn: (client: PoolClient) => Promise<T>,
+  ): Promise<RpcOutcome> {
     try {
-      return { ok: true, result: (await asOwner(fn)) as Record<string, unknown> };
+      return { ok: true, result: (await asUser(userId, fn)) as Record<string, unknown> };
     } catch (error) {
       return failure(error);
     }
+  }
+
+  async function capture<T>(fn: (client: PoolClient) => Promise<T>): Promise<RpcOutcome> {
+    return captureAs(OWNER_ID, fn);
   }
 
   async function createProduct(): Promise<string> {
@@ -499,5 +510,64 @@ describe('real PostgreSQL concurrency', () => {
     for (const row of result.rows) {
       expect(Number(row.difference)).toBe(0);
     }
+  }, 30_000);
+
+  it('serializes concurrent removals of both owners so one owner always remains', async () => {
+    const organizationId = randomUUID();
+    const firstOwner = randomUUID();
+    const secondOwner = randomUUID();
+    const suffix = organizationId.slice(0, 8);
+    await admin.query('insert into auth.users (id, email) values ($1, $2), ($3, $4)', [
+      firstOwner,
+      `race-first-${suffix}@example.test`,
+      secondOwner,
+      `race-second-${suffix}@example.test`,
+    ]);
+    await admin.query(
+      "insert into public.organizations (id, name, slug) values ($1, 'Owner race', $2)",
+      [organizationId, `owner-race-${suffix}`],
+    );
+    await admin.query(
+      `insert into public.memberships (organization_id, user_id, role)
+       values ($1, $2, 'owner'), ($1, $3, 'owner')`,
+      [organizationId, firstOwner, secondOwner],
+    );
+
+    // Both RPCs calculate their owner authorization before deleting. This test-only
+    // pause gives both independent transactions time to reach the owner guard so
+    // the race exercises its shared organization-row lock, not merely permissions.
+    await admin.query(`
+      create function app.test_pause_membership_delete()
+      returns trigger
+      language plpgsql
+      as $$ begin perform pg_sleep(0.5); return old; end $$;
+
+      create trigger memberships_a_test_pause_before_delete
+      before delete on public.memberships
+      for each row execute function app.test_pause_membership_delete();
+    `);
+
+    const removeSelf = (userId: string) =>
+      captureAs(userId, (client) =>
+        client.query('select app.remove_organization_member($1, $2)', [organizationId, userId]),
+      );
+    let outcomes: RpcOutcome[];
+    try {
+      outcomes = await Promise.all([removeSelf(firstOwner), removeSelf(secondOwner)]);
+    } finally {
+      await admin.query(`
+        drop trigger memberships_a_test_pause_before_delete on public.memberships;
+        drop function app.test_pause_membership_delete();
+      `);
+    }
+
+    expect(outcomes.filter((outcome) => outcome.ok)).toHaveLength(1);
+    const rejected = outcomes.find((outcome) => !outcome.ok);
+    expect(rejected && !rejected.ok ? rejected.message : '').toMatch(/organization_requires_owner/);
+    const remaining = await admin.query<{ count: number }>(
+      "select count(*)::int as count from public.memberships where organization_id = $1 and role = 'owner'",
+      [organizationId],
+    );
+    expect(remaining.rows[0]?.count).toBe(1);
   }, 30_000);
 });

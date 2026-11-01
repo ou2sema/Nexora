@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 import type {
   LowStockResponse,
@@ -6,6 +6,7 @@ import type {
   SupplierPerformanceResponse,
 } from '@mystock/contracts';
 
+import { keepPreviousDataForOrganization } from '@/lib/organization-query-placeholder';
 import { useAccessToken } from '@/features/auth/auth-provider';
 import { apiDownload, apiRequest, type DownloadedFile } from '@/lib/api-client';
 
@@ -44,7 +45,7 @@ export function useReportOverview(organizationId: string | null, filters: Report
       );
     },
     enabled: Boolean(organizationId),
-    placeholderData: keepPreviousData,
+    placeholderData: keepPreviousDataForOrganization(organizationId),
   });
 }
 
@@ -67,7 +68,7 @@ export function useLowStock(organizationId: string | null, filters: LowStockFilt
       );
     },
     enabled: Boolean(organizationId),
-    placeholderData: keepPreviousData,
+    placeholderData: keepPreviousDataForOrganization(organizationId),
   });
 }
 
@@ -98,7 +99,7 @@ export function useSupplierPerformance(
       );
     },
     enabled: Boolean(organizationId),
-    placeholderData: keepPreviousData,
+    placeholderData: keepPreviousDataForOrganization(organizationId),
   });
 }
 

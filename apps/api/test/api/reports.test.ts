@@ -346,6 +346,40 @@ describe('reports API', () => {
       .set('authorization', auth(aliceToken));
     expect(oversized.status).toBe(400);
     expect(oversized.body.error.code).toBe('validation_error');
+
+    const fromOnlyAncient = await request(ctx.app.getHttpServer())
+      .get(`${base}/reports/overview`)
+      .query({ from: '2000-01-01T00:00:00.000Z' })
+      .set('authorization', auth(aliceToken));
+    expect(fromOnlyAncient.status).toBe(400);
+    expect(fromOnlyAncient.body.error.code).toBe('validation_error');
+
+    const fromOnlyExtremePast = await request(ctx.app.getHttpServer())
+      .get(`${base}/reports/overview`)
+      .query({ from: '0001-01-01T00:00:00.000Z' })
+      .set('authorization', auth(aliceToken));
+    expect(fromOnlyExtremePast.status).toBe(400);
+    expect(fromOnlyExtremePast.body.error.code).toBe('validation_error');
+
+    const fromOnlyExtremeFuture = await request(ctx.app.getHttpServer())
+      .get(`${base}/reports/overview`)
+      .query({ from: '9999-12-31T23:59:59.999Z' })
+      .set('authorization', auth(aliceToken));
+    expect(fromOnlyExtremeFuture.status).toBe(400);
+    expect(fromOnlyExtremeFuture.body.error.code).toBe('validation_error');
+
+    const extremeRange = await request(ctx.app.getHttpServer())
+      .get(`${base}/reports/overview`)
+      .query({ from: '0001-01-01T00:00:00.000Z', to: '9999-12-31T23:59:59.999Z' })
+      .set('authorization', auth(aliceToken));
+    expect(extremeRange.status).toBe(400);
+    expect(extremeRange.body.error.code).toBe('validation_error');
+
+    const maximumWindow = await request(ctx.app.getHttpServer())
+      .get(`${base}/reports/overview`)
+      .query({ from: '2025-01-01T00:00:00.000Z', to: '2026-01-02T00:00:00.000Z' })
+      .set('authorization', auth(aliceToken));
+    expect(maximumWindow.status).toBe(200);
   });
 
   it('lists low-stock products by shortfall for ledger and serialized stock', async () => {

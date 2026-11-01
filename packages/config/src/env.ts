@@ -9,11 +9,6 @@ const databaseUrl = z
     message: 'must be a postgresql:// connection string',
   });
 
-const cronExpression = z
-  .string()
-  .trim()
-  .regex(/^(\S+\s+){4}\S+$/, { message: 'must be a 5-field cron expression' });
-
 export const serverEnvSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -24,23 +19,11 @@ export const serverEnvSchema = z
 
     SUPABASE_URL: z.url(),
     SUPABASE_ANON_KEY: z.string().min(20),
-    SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
     SUPABASE_JWT_ISSUER: z.url(),
     SUPABASE_JWT_AUDIENCE: z.string().min(1).default('authenticated'),
 
     DATABASE_URL: databaseUrl,
     DATABASE_SSL: booleanish.default(true),
-
-    ALLOW_NEGATIVE_STOCK: booleanish.default(false),
-    IDEMPOTENCY_KEY_TTL_HOURS: z.coerce.number().int().positive().default(24),
-    RECONCILIATION_CRON: cronExpression.default('0 2 * * *'),
-
-    SUPABASE_STORAGE_BUCKET: z.string().min(3),
-    MAX_UPLOAD_BYTES: z.coerce
-      .number()
-      .int()
-      .positive()
-      .default(10 * 1024 * 1024),
 
     RATE_LIMIT_TTL_SECONDS: z.coerce.number().int().positive().default(60),
     RATE_LIMIT_LIMIT: z.coerce.number().int().positive().default(120),
@@ -48,13 +31,6 @@ export const serverEnvSchema = z
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') {
       return;
-    }
-    if (!env.SUPABASE_SERVICE_ROLE_KEY) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['SUPABASE_SERVICE_ROLE_KEY'],
-        message: 'is required in production',
-      });
     }
     if (!env.DATABASE_SSL) {
       ctx.addIssue({

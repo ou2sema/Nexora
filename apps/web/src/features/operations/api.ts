@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type {
   OrderCancelInput,
@@ -31,6 +31,7 @@ import type {
   SupplierUpdateInput,
 } from '@mystock/contracts';
 
+import { keepPreviousDataForOrganization } from '@/lib/organization-query-placeholder';
 import { useAccessToken } from '@/features/auth/auth-provider';
 import { apiDownload, apiRequest, newIdempotencyKey } from '@/lib/api-client';
 
@@ -79,7 +80,7 @@ export function useSuppliers(organizationId: string | null, filters: SupplierFil
       );
     },
     enabled: Boolean(organizationId),
-    placeholderData: keepPreviousData,
+    placeholderData: keepPreviousDataForOrganization(organizationId),
   });
 }
 
@@ -103,7 +104,7 @@ export function usePurchaseOrders(organizationId: string | null, filters: Purcha
       );
     },
     enabled: Boolean(organizationId),
-    placeholderData: keepPreviousData,
+    placeholderData: keepPreviousDataForOrganization(organizationId),
   });
 }
 
@@ -140,7 +141,7 @@ export function useSalesOrders(organizationId: string | null, filters: SalesOrde
       );
     },
     enabled: Boolean(organizationId),
-    placeholderData: keepPreviousData,
+    placeholderData: keepPreviousDataForOrganization(organizationId),
   });
 }
 

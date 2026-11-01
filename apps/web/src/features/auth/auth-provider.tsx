@@ -6,9 +6,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
+import { queryClient } from '@/lib/query-client';
 import { supabase } from '@/lib/supabase';
 
 type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
@@ -26,21 +28,29 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [initializing, setInitializing] = useState(true);
+  const userId = useRef<string | null>(null);
 
   useEffect(() => {
     let active = true;
+    const updateSession = (nextSession: Session | null) => {
+      if (!active) return;
+      const nextUserId = nextSession?.user.id ?? null;
+      if (userId.current !== nextUserId) {
+        queryClient.clear();
+        userId.current = nextUserId;
+      }
+      setSession(nextSession);
+      setInitializing(false);
+    };
 
     void supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      setSession(data.session);
-      setInitializing(false);
+      updateSession(data.session);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      setInitializing(false);
+      updateSession(nextSession);
     });
 
     return () => {

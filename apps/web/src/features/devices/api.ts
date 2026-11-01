@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type {
   DeviceEventSummary,
@@ -13,6 +13,7 @@ import type {
   DeviceSummary,
 } from '@mystock/contracts';
 
+import { keepPreviousDataForOrganization } from '@/lib/organization-query-placeholder';
 import { useAccessToken } from '@/features/auth/auth-provider';
 import { apiRequest, newIdempotencyKey } from '@/lib/api-client';
 
@@ -49,7 +50,7 @@ export function useDevices(organizationId: string | null, filters: DeviceFilters
       );
     },
     enabled: Boolean(organizationId),
-    placeholderData: keepPreviousData,
+    placeholderData: keepPreviousDataForOrganization(organizationId),
   });
 }
 

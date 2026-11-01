@@ -305,7 +305,6 @@ apiProcess = spawn(process.execPath, ['dist/main.js'], {
     SUPABASE_JWT_AUDIENCE: 'authenticated',
     DATABASE_URL: `postgresql://postgres:postgres@127.0.0.1:${PG_PORT}/postgres`,
     DATABASE_SSL: 'false',
-    SUPABASE_STORAGE_BUCKET: 'mystock-test',
   },
   stdio: 'inherit',
 });

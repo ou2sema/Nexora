@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type {
   ReservationStatus,
@@ -18,6 +18,7 @@ import type {
   StockTransferResult,
 } from '@mystock/contracts';
 
+import { keepPreviousDataForOrganization } from '@/lib/organization-query-placeholder';
 import { useAccessToken } from '@/features/auth/auth-provider';
 import { apiRequest, newIdempotencyKey } from '@/lib/api-client';
 
@@ -65,7 +66,7 @@ export function useStockLevels(organizationId: string | null, filters: StockLeve
       );
     },
     enabled: Boolean(organizationId),
-    placeholderData: keepPreviousData,
+    placeholderData: keepPreviousDataForOrganization(organizationId),
   });
 }
 
@@ -99,7 +100,7 @@ export function useStockMovements(organizationId: string | null, filters: StockM
       );
     },
     enabled: Boolean(organizationId),
-    placeholderData: keepPreviousData,
+    placeholderData: keepPreviousDataForOrganization(organizationId),
   });
 }
 
@@ -125,7 +126,7 @@ export function useStockReservations(
       );
     },
     enabled: Boolean(organizationId) && enabled,
-    placeholderData: keepPreviousData,
+    placeholderData: keepPreviousDataForOrganization(organizationId),
   });
 }
 
