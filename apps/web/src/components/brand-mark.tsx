@@ -10,9 +10,9 @@ export function BrandMark({ className, logoClassName, textClassName }: BrandMark
   return (
     <span className={cn('inline-flex items-center gap-3', className)}>
       <img
-        src="/logo.png"
+        src="/logo-icon.png"
         alt="Nexora"
-        className={cn('size-9 rounded-xl bg-white object-contain p-1', logoClassName)}
+        className={cn('h-9 w-auto object-contain', logoClassName)}
       />
       <span className={cn('text-lg font-semibold tracking-tight', textClassName)}>Nexora</span>
     </span>
