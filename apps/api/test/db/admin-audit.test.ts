@@ -174,3 +174,100 @@ describe('platform administrator audit trail', () => {
     ).rejects.toThrow(/permission denied|row-level security/i);
   });
 });
+
+describe('operator audit retention', () => {
+  async function prune(retentionDays: number | null): Promise<number> {
+    const result = await database.asPostgres((client) =>
+      client.query<{ deleted: number }>('select app.prune_admin_audit_events($1) as deleted', [
+        retentionDays,
+      ]),
+    );
+    return result.rows[0]?.deleted ?? -1;
+  }
+
+  async function insertProbe(action: string, ageDays: number): Promise<void> {
+    await database.asPostgres((client) =>
+      client.query(
+        `insert into public.admin_audit_events (action, created_at)
+         values ($1, now() - make_interval(days => $2))`,
+        [action, ageDays],
+      ),
+    );
+  }
+
+  async function countOlderThan(retentionDays: number): Promise<number> {
+    const result = await database.asPostgres((client) =>
+      client.query<{ count: number }>(
+        `select count(*)::int as count
+         from public.admin_audit_events
+         where created_at < now() - make_interval(days => $1)`,
+        [retentionDays],
+      ),
+    );
+    return result.rows[0]?.count ?? -1;
+  }
+
+  async function countByAction(action: string): Promise<number> {
+    const result = await database.asPostgres((client) =>
+      client.query<{ count: number }>(
+        'select count(*)::int as count from public.admin_audit_events where action = $1',
+        [action],
+      ),
+    );
+    return result.rows[0]?.count ?? -1;
+  }
+
+  it('deletes rows past the window, keeps newer ones, and reports the count', async () => {
+    await insertProbe('retention_expired_400', 400);
+    await insertProbe('retention_expired_181', 181);
+    await insertProbe('retention_kept_179', 179);
+    await insertProbe('retention_kept_1', 1);
+
+    const expired = await countOlderThan(180);
+    expect(expired).toBeGreaterThanOrEqual(2);
+    expect(await prune(180)).toBe(expired);
+
+    expect(await countByAction('retention_expired_400')).toBe(0);
+    expect(await countByAction('retention_expired_181')).toBe(0);
+    expect(await countByAction('retention_kept_179')).toBe(1);
+    expect(await countByAction('retention_kept_1')).toBe(1);
+    expect(await countOlderThan(180)).toBe(0);
+  });
+
+  it('applies a shorter window on the next run', async () => {
+    await insertProbe('retention_expired_31', 31);
+    await insertProbe('retention_kept_29', 29);
+
+    // The 179-day row is inside the previous window but expired for a 30-day policy.
+    const expired = await countOlderThan(30);
+    expect(expired).toBeGreaterThanOrEqual(2);
+    expect(await prune(30)).toBe(expired);
+
+    expect(await countByAction('retention_expired_31')).toBe(0);
+    expect(await countByAction('retention_expired_400')).toBe(0);
+    expect(await countByAction('retention_kept_29')).toBe(1);
+    expect(await countByAction('retention_kept_1')).toBe(1);
+    expect(await countOlderThan(30)).toBe(0);
+  });
+
+  it('refuses a window that could empty the trail', async () => {
+    for (const retentionDays of [null, 0, 29, 3651]) {
+      await expect(prune(retentionDays)).rejects.toThrow(/invalid_retention_window/);
+    }
+
+    expect(await countByAction('retention_kept_29')).toBe(1);
+    expect(await countByAction('retention_kept_1')).toBe(1);
+  });
+
+  it('denies execute to signed-in members, platform admins included', async () => {
+    for (const userId of [PAT, USERS.alice]) {
+      await expect(
+        database.asUser(userId, (client) =>
+          client.query('select app.prune_admin_audit_events(180)'),
+        ),
+      ).rejects.toThrow(/permission denied/i);
+    }
+
+    expect(await countByAction('retention_kept_29')).toBe(1);
+  });
+});

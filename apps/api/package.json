@@ -9,6 +9,7 @@
     "check:integrity": "node scripts/integrity-check.mjs",
     "drill:virgin-database": "node scripts/virgin-db-drill.mjs",
     "grant:platform-admin": "node scripts/grant-platform-admin.mjs",
+    "prune:admin-audit": "node scripts/prune-admin-audit.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },

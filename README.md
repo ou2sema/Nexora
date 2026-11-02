@@ -42,8 +42,8 @@ and organization-scoped reporting.
 > (`/admin` shows recent operator activity), a schema capability probe that stops the API from
 > booting against an out-of-date database, a read-only integrity CLI
 > (`npm run check:integrity`), an idempotent operator script for granting the platform flag, the
-> full local-stack Playwright suite in CI, and route-level code splitting. It is verified
-> locally; its migration has not yet been applied to the hosted project, and the documented
+> full local-stack Playwright suite in CI, and route-level code splitting. Its migration was applied
+> to the hosted project on 2026-11-01; the documented
 > restore drill has not been executed. Phase 12 localizes the interface into French and
 > Arabic: typed message catalogs with compile-time key parity, CLDR plural categories, a
 > per-device language switch with browser detection, right-to-left layout, locale-aware
@@ -308,6 +308,14 @@ admins only. The table is RLS-protected and has no client write grant. Granting 
 platform flag is still a database operation, now available as an idempotent operator
 script that records its own audit row.
 
+The trail has a bounded lifetime. `app.prune_admin_audit_events(retention_days)` deletes rows older
+than the window the operator passes, refuses a window under 30 days or above 10 years, and is
+executable by the table owner only — no route, contract, or UI action calls it.
+`npm run prune:admin-audit --workspace @mystock/api` (180 days by default; `-- --dry-run` inspects
+without deleting) is built for an external scheduler, and its arguments must be passed through the
+workspace form because a root-level alias would swallow them.
+See [ADR-0016](docs/adr/0016-operator-audit-retention.md).
+
 The API probes the schema at boot (`to_regclass`/`to_regprocedure`) and refuses to start
 when a reachable database is missing objects it needs, naming them; an unreachable database
 only logs a warning so health checks and the shell test suite still run. `npm run
@@ -345,15 +353,16 @@ npm run build
 
 ## Scripts
 
-| Script                          | Purpose                                                                                                        |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `npm run lint`                  | ESLint across the workspace                                                                                    |
-| `npm run format`                | Prettier write                                                                                                 |
-| `npm run format:check`          | Prettier check without writing                                                                                 |
-| `npm run typecheck`             | TypeScript project checks per workspace                                                                        |
-| `npm run test`                  | Unit/integration tests per workspace                                                                           |
-| `npm run test:e2e`              | Playwright end-to-end suite                                                                                    |
-| `npm run check:integrity`       | Read-only stock/ledger sweep for every organization (exits 1 on drift)                                         |
-| `npm run drill:virgin-database` | Rebuild a virgin local database from migrations + seed and prove both schema-guard boot paths (localhost only) |
-| `npm run report:allure`         | Serve the Allure report from the last E2E run                                                                  |
-| `npm run build`                 | Build every workspace package                                                                                  |
+| Script                                               | Purpose                                                                                                         |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `npm run lint`                                       | ESLint across the workspace                                                                                     |
+| `npm run format`                                     | Prettier write                                                                                                  |
+| `npm run format:check`                               | Prettier check without writing                                                                                  |
+| `npm run typecheck`                                  | TypeScript project checks per workspace                                                                         |
+| `npm run test`                                       | Unit/integration tests per workspace                                                                            |
+| `npm run test:e2e`                                   | Playwright end-to-end suite                                                                                     |
+| `npm run check:integrity`                            | Read-only stock/ledger sweep for every organization (exits 1 on drift)                                          |
+| `npm run drill:virgin-database`                      | Rebuild a virgin local database from migrations + seed and prove both schema-guard boot paths (localhost only)  |
+| `npm run prune:admin-audit --workspace @mystock/api` | Delete operator audit rows past a retention window; add `-- --dry-run` to inspect first (owner-role connection) |
+| `npm run report:allure`                              | Serve the Allure report from the last E2E run                                                                   |
+| `npm run build`                                      | Build every workspace package                                                                                   |

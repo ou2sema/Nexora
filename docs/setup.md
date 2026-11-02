@@ -587,11 +587,15 @@ The Phase 11 suites run without a hosted project:
 npm run test --workspace @mystock/api -- test/db/admin-audit.test.ts test/api/admin.test.ts test/schema-guard.test.ts
 ```
 
-Expected: 17 passing tests (4 audit database, 8 administration API, 5 schema guard). The
+Expected: 21 passing tests (8 audit database, 8 administration API, 5 schema guard). The
 audit suite proves that platform-admin organization, invitation, role, and removal actions
 write rows with the right actor, target, and detail; that the same actions performed by an
 organization owner are not logged; that non-platform users read zero rows and cannot insert
 directly; and that `member_role_changed` and `member_removed` record before/after state.
+Four of them cover retention: the function deletes exactly the rows older than the window and
+returns that count, a shorter window on the next run expires what the first window kept,
+`null`/`0`/`29`/`3651` raise `invalid_retention_window` and delete nothing, and `authenticated`
+— platform admin included — is refused `EXECUTE`.
 The administration API suite adds the `/admin/audit` endpoint: 403 for an ordinary owner,
 row contents for the operator, no entry for a manager-created invitation, a `limit` cap, and
 `400 validation_error` for `limit=0`. The schema-guard suite runs every migration on PGlite,
@@ -599,10 +603,11 @@ asserts the full schema passes, lists objects when only early migrations are app
 refuses an out-of-date schema, and distinguishes an unreachable database (warn and continue)
 from a server-side error (stop).
 
-The headed run uses the same local stack and now runs 28 checks (14 tests × desktop/mobile);
-the extra test is the top-bar bell regression added after Phase 10. The administration test now
-also asserts the Operator activity table on `/admin` lists the created organization and the
-invitation, including the target email and actor.
+The headed run used the same local stack and ran 28 checks (14 tests × desktop/mobile) at
+Phase 11; the suite is 40 checks today (see “Test suites”). The test added after Phase 10 is
+the top-bar bell regression; the administration test also asserts the Operator activity table
+on `/admin` lists the created organization and the invitation, including the target email and
+actor.
 
 The integrity CLI was exercised against the local stack on 2026-10-31:
 
@@ -642,6 +647,17 @@ lock-taking `app.protect_last_owner` body, the single `memberships_select_member
 that `authenticated` no longer holds INSERT/UPDATE/DELETE on `memberships`. The production API
 build then booted against hosted past the schema guard, and `npm run check:integrity` reported
 OK for all six organizations.
+
+Re-run on 2026-11-02 for the audit retention migration and its operator script: `format:check`,
+`lint`, `typecheck`, and `build` clean; 304 Vitest tests across the workspaces (256 API across 33
+files, 33 domain, 8 contracts, 7 config); the headed local-stack suite 40/40 in 5.3 minutes with
+Allure served at http://127.0.0.1:5059; and the virgin-database drill on a throwaway embedded
+PostgreSQL 18 cluster, which applied 13 migrations plus the seed, reported readiness with a 153 ms
+database probe, and still stopped the boot when `public.admin_audit_events` was dropped. The
+script guards were run directly: `--retention-days=17` and an unknown argument each exit `1` with a
+one-line message before any environment file is read or connection opened. A `--dry-run` against
+the hosted project exits `1` and names `supabase/migrations/20261102120000_admin_audit_retention.sql`
+— correct, because that migration has not been applied there yet.
 
 ## Interface localization verification
 
@@ -732,6 +748,44 @@ operator's own console). It is idempotent, refuses an email with no profile (the
 have signed in at least once), never prints the connection string, and writes a
 `platform_admin_granted` audit row with a `null` actor. There is still no HTTP grant path.
 
+### Audit retention
+
+`npm run prune:admin-audit --workspace @mystock/api` deletes `public.admin_audit_events` rows older
+than the window it is given — 180 days unless `-- --retention-days=N` says otherwise. It reads the
+same `DATABASE_URL` and `DATABASE_SSL` as the other operator scripts and needs the table owner's
+rights: `app.prune_admin_audit_events` revokes `EXECUTE` from `public` and `authenticated`, so no
+signed-in role and no API route can shorten the trail. Always pass the arguments in the workspace
+form — a root-level npm alias swallows them, so a root `-- --dry-run` would silently run a real
+prune.
+
+`-- --dry-run` prints the cutoff and how many rows would go without deleting anything; that is the
+right first call on a table that has never been pruned. The window is clamped between 30 and 3650
+days inside the function, which raises `invalid_retention_window` otherwise, and the script checks
+the same bounds before it opens a connection. Keep the printed line (cutoff + count) as the record of
+the run — the prune is not written into the table it trims. If the retention migration is not applied
+yet, the script exits `1` and names the file to apply.
+
+Monthly is enough: the table is small and the delete is one indexed statement.
+
+- **Windows Task Scheduler / Linux cron** — run the dry form first, then
+  `npm.cmd run prune:admin-audit --workspace @mystock/api -- --retention-days=180` with
+  `DATABASE_URL` set for the task.
+- **A CI scheduled workflow** — needs the hosted `DATABASE_URL` in a repository secret, which is the
+  owner's credential decision, the same trade-off as the integrity sweep's CI option above.
+- **`pg_cron` inside the hosted project** — not usable today. The project runs PostgreSQL 17.11 and
+  lists `pg_cron` 1.6.4 as available but **not installed** (`pg_extension` has no `pg_cron`, and
+  `cron.job` does not exist), verified read-only on 2026-11-02. Installing an extension is a platform
+  change the owner makes first.
+
+Verified on 2026-11-02 against a throwaway embedded PostgreSQL 18 with all 13 migrations applied:
+dry-run reported `3 of 5` expired and deleted nothing, a real run deleted exactly the 3 expired rows
+and left the 2 recent ones, a re-run reported `0 of 2` and did nothing, `--retention-days=17` and an
+unknown flag both exited `1` before connecting, the missing-function path named
+`20261102120000_admin_audit_retention.sql`, and no output contained the connection string. Four DB
+tests in `admin-audit.test.ts` cover the same behavior plus the `authenticated` refusal. See
+[ADR-0016](adr/0016-operator-audit-retention.md) for why the window is global and why expired events
+are recoverable only from a restored backup.
+
 ### Virgin-database drill
 
 `npm run drill:virgin-database --workspace @mystock/api` rebuilds the schema from nothing the
@@ -817,6 +871,7 @@ The schema is plain SQL in `supabase/migrations`, applied in filename order:
 | `20261031160000_platform_administration.sql`          | platform-admin flag, restricted organization creation, cross-organization team access, manager viewer-only invitations |
 | `20261031180000_admin_audit.sql`                      | operator audit table, `app.log_admin_action`, logged organization/invitation/membership RPCs                           |
 | `20261101144800_membership_write_hardening.sql`       | tightened membership write policies and re-recorded audit RPCs                                                         |
+| `20261102120000_admin_audit_retention.sql`            | owner-only `app.prune_admin_audit_events(integer)` with a 30–3650 day window, `EXECUTE` revoked from `public`          |
 
 Demo data lives in `supabase/seed.sql` and requires at least one signed-up user (it raises
 `seed_requires_auth_user` otherwise). The seed inserts demo inventory into the first signed-up
@@ -931,15 +986,15 @@ npm run test --workspace @mystock/api -- test/db
 
 ## Test suites
 
-| Command                                                         | What it runs                                                                                                                                                                                                                                                                                           |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `npm run test`                                                  | 300 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, team access, platform administration, admin audit, membership write hardening, health probes, schema guard, API shell, env, contracts, domain |
-| `npm run test:e2e`                                              | Playwright against the API and dev server (18 checks: 9 tests × desktop/mobile)                                                                                                                                                                                                                        |
-| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                                                                       |
-| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                                                            |
-| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–12 flows on the self-contained stack (40 checks: 20 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                                                                                                                    |
-| `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                                                                      |
-| `npm run drill:virgin-database --workspace @mystock/api`        | Migrations + seed onto virgin local databases and both schema-guard boot paths (needs `npm run build` and a localhost `DATABASE_URL`)                                                                                                                                                                  |
+| Command                                                         | What it runs                                                                                                                                                                                                                                                                                                       |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run test`                                                  | 304 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, team access, platform administration, admin audit + retention, membership write hardening, health probes, schema guard, API shell, env, contracts, domain |
+| `npm run test:e2e`                                              | Playwright against the API and dev server (18 checks: 9 tests × desktop/mobile)                                                                                                                                                                                                                                    |
+| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                                                                                   |
+| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                                                                        |
+| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–12 flows on the self-contained stack (40 checks: 20 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                                                                                                                                |
+| `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                                                                                  |
+| `npm run drill:virgin-database --workspace @mystock/api`        | Migrations + seed onto virgin local databases and both schema-guard boot paths (needs `npm run build` and a localhost `DATABASE_URL`)                                                                                                                                                                              |
 
 The API suites (`apps/api/test/api`) run the real migrations on PGlite, sign JWTs with
 locally generated ES256 keys, and serve the trusted public key from a temporary JWKS
