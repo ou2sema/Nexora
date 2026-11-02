@@ -769,8 +769,11 @@ than the window it is given — 180 days unless `-- --retention-days=N` says oth
 same `DATABASE_URL` and `DATABASE_SSL` as the other operator scripts and needs the table owner's
 rights: `app.prune_admin_audit_events` revokes `EXECUTE` from `public` and `authenticated`, so no
 signed-in role and no API route can shorten the trail. Always pass the arguments in the workspace
-form — a root-level npm alias swallows them, so a root `-- --dry-run` would silently run a real
-prune.
+form: this script deliberately has **no root-level npm alias**, because an alias that shells out to
+the workspace swallows the appended arguments, so a root `-- --dry-run` would silently run a real
+prune with the default window. Root `npm run prune:admin-audit` therefore fails with `Missing script`
+before it connects — that is the guard, and it exists only because the function is unreachable from
+the root; do not add the alias back now that hosted has the function.
 
 `-- --dry-run` prints the cutoff and how many rows would go without deleting anything; that is the
 right first call on a table that has never been pruned. The window is clamped between 30 and 3650
