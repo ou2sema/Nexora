@@ -604,7 +604,7 @@ refuses an out-of-date schema, and distinguishes an unreachable database (warn a
 from a server-side error (stop).
 
 The headed run used the same local stack and ran 28 checks (14 tests × desktop/mobile) at
-Phase 11; the suite is 40 checks today (see “Test suites”). The test added after Phase 10 is
+Phase 11; the suite is 42 checks today (see “Test suites”). The test added after Phase 10 is
 the top-bar bell regression; the administration test also asserts the Operator activity table
 on `/admin` lists the created organization and the invitation, including the target email and
 actor.
@@ -659,6 +659,19 @@ one-line message before any environment file is read or connection opened. A `--
 the hosted project exits `1` and names `supabase/migrations/20261102120000_admin_audit_retention.sql`
 — correct, because that migration has not been applied there yet.
 
+Re-run on 2026-11-02 for the large-file split, which changes no schema, no API contract and no
+route: `format:check`, `lint`, `typecheck`, and `build` clean; 304 Vitest tests across the
+workspaces; and the headed local-stack suite 42/42 (21 tests × desktop/mobile) in 5.3 minutes with
+Allure served at http://127.0.0.1:5060. The suite is 42 checks rather than 40 because
+`apps/web/e2e-local/scanning.spec.ts` was written first, so the scanning console had an end-to-end
+guard before its page was split; the same spec is what proves the split preserved behavior. It
+drives one flow end to end on the seeded stack: look up `ms-a-0002`, receive three units into
+MAIN / A-01, start an inventory count at that location, record a `set` count of seven, post it,
+and re-read the stock row to confirm seven on hand. That run needed `E2E_PG_PORT=55440`, because
+the stack's default 55432 was still bound by an embedded PostgreSQL left over from an earlier
+session — the port is overridable for exactly this case, and the leftover process was left running
+rather than killed.
+
 ## Interface localization verification
 
 Phase 12 changes no schema and no API contract. The existing suites remain the regression
@@ -669,7 +682,7 @@ cd apps/web
 npx playwright test --config playwright.local-stack.config.ts --headed
 ```
 
-Expected: 40 checks (20 tests × desktop/mobile). The four `e2e-local/i18n.spec.ts` tests
+Expected: 42 checks (21 tests × desktop/mobile). The four `e2e-local/i18n.spec.ts` tests
 cover:
 
 - French pre-auth copy, the sign-in form, dashboard copy, `fr-TN` money and date output,
@@ -832,7 +845,7 @@ the dashboard` fails in both projects (the `Supplier performance` row for the ru
 never visible), and it reproduces in isolation, so it is not a parallelism flake. Bisecting the two web
 runtime bumps: `lucide-react` 1.66.0 alone passes, `react-query` 5.105.0 + `lucide-react` 1.66.0 passes
 40/40. `apps/web/package.json` therefore stays at 5.105.0; revisit 5.105.1 or later only with that test
-in the gate, and re-run `npm run test:e2e:local` (40 checks) after any web-runtime change.
+in the gate, and re-run `npm run test:e2e:local` (42 checks) after any web-runtime change.
 
 ### Restore drill
 
@@ -992,7 +1005,7 @@ npm run test --workspace @mystock/api -- test/db
 | `npm run test:e2e`                                              | Playwright against the API and dev server (18 checks: 9 tests × desktop/mobile)                                                                                                                                                                                                                                    |
 | `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                                                                                   |
 | `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                                                                        |
-| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–12 flows on the self-contained stack (40 checks: 20 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                                                                                                                                |
+| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–12 flows on the self-contained stack (42 checks: 21 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                                                                                                                                |
 | `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                                                                                  |
 | `npm run drill:virgin-database --workspace @mystock/api`        | Migrations + seed onto virgin local databases and both schema-guard boot paths (needs `npm run build` and a localhost `DATABASE_URL`)                                                                                                                                                                              |
 
@@ -1045,7 +1058,7 @@ uploads `test-results/` plus `allure-results/` only when the run fails. It also 
 and applies every `supabase/migrations/*.sql` in filename order before Playwright starts,
 because the API's boot-time schema guard refuses to listen on an unmigrated database. The
 `e2e-local` job boots embedded PostgreSQL, the fake auth/JWKS server, the built API, and
-Vite, so it needs no Supabase project; it runs the same 40 checks as the headed local run.
+Vite, so it needs no Supabase project; it runs the same 42 checks as the headed local run.
 All three jobs ran green on GitHub Actions on 2026-11-01 (run #6, commit `38c94db`); the
 `e2e` job had never been green before — it needed the Postgres service above, and the
 `shell.spec.ts` fixes for the Nexora sign-in copy and the lazy-route mount timing.
