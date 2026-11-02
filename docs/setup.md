@@ -761,7 +761,11 @@ runbook.
 to 9.39.5, and `typescript-eslint` to 8.36.0 — a broken toolchain. The controlled fix is the root
 `overrides` entry `"minimatch": "^11.0.3"`; `npm ls minimatch` then shows 11.0.3 for all four nodes and
 `npm audit` reports zero. The gates that prove the override is safe are `npm run lint` (config-array
-globbing), `npm run typecheck`, `npm run test`, `npm run build`, and the E2E suites.
+globbing), `npm run typecheck`, `npm run test`, `npm run build`, and the E2E suites. Actions run #11 on
+2026-11-02 (commit `8fab63b`) is the first remote run carrying that override: all four jobs concluded
+`success`, and the `database` drill passed again on `postgres:16`. The proof that CI gets the patched copy
+is the committed lockfile — it lists exactly one `minimatch` node, `node_modules/minimatch` at `11.0.3`,
+and `npm ci` installs only what the lockfile names.
 
 Deliberate pending majors, each its own verified change: `typescript` 6.0.3 → 7.x (build layer for six
 workspaces), `postgres` 3.4.9 → 4.0.0 (the API's driver), `@hookform/resolvers` 6.0.2 → 7.0.1 (form
