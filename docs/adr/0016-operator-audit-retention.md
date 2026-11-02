@@ -79,8 +79,11 @@ Re-running is a no-op, so an interrupted first pass is retried rather than tuned
   the window are gone from the live database and recoverable only from a backup restore — which is
   why the restore drill, not this policy, is the real data-loss boundary.
 - Hosted needs `20261102120000_admin_audit_retention.sql` applied before the script does anything;
-  verified read-only on 2026-11-02, where it exits `1` with that file named. Until then the hosted
-  table simply keeps growing, which is the same state as before this ADR.
+  read-only on 2026-11-02, before the push, it exited `1` with that file named. The migration was
+  applied to the hosted project the same day and the workspace-form dry run then reported
+  `0 of 0 row(s) are older than the cutoff` and deleted nothing, so the hosted trail is now bounded
+  by the window the operator chooses instead of growing without limit. `docs/setup.md` records the
+  confirmation checks.
 - The object is deliberately absent from the boot-time schema guard: the API never calls it, so a
   project without the migration still starts, and only the operator command notices the gap.
 - `stock_operations` idempotency keys remain unbounded. ADR-0005 keeps that as future work with a

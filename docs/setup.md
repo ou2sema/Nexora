@@ -656,8 +656,9 @@ PostgreSQL 18 cluster, which applied 13 migrations plus the seed, reported readi
 database probe, and still stopped the boot when `public.admin_audit_events` was dropped. The
 script guards were run directly: `--retention-days=17` and an unknown argument each exit `1` with a
 one-line message before any environment file is read or connection opened. A `--dry-run` against
-the hosted project exits `1` and names `supabase/migrations/20261102120000_admin_audit_retention.sql`
-— correct, because that migration has not been applied there yet.
+the hosted project exited `1` and named `supabase/migrations/20261102120000_admin_audit_retention.sql`
+— correct at that point, because that migration was not applied there yet; later the same day it was
+pushed and the identical command reported `0 of 0`, as recorded under “Audit retention”.
 
 Re-run on 2026-11-02 for the large-file split, which changes no schema, no API contract and no
 route: `format:check`, `lint`, `typecheck`, and `build` clean; 304 Vitest tests across the
@@ -799,6 +800,20 @@ tests in `admin-audit.test.ts` cover the same behavior plus the `authenticated` 
 [ADR-0016](adr/0016-operator-audit-retention.md) for why the window is global and why expired events
 are recoverable only from a restored backup.
 
+The migration was applied to the hosted project on 2026-11-02 with
+`npx supabase db push --db-url "$DATABASE_URL" --yes` after a dry run listed exactly that one
+migration. Read-only checks afterwards confirmed: `supabase_migrations.schema_migrations` holds the
+row `20261102120000` / `admin_audit_retention` and, compared file by file, all 13 local migrations
+are registered with matching names and none pending; `app.prune_admin_audit_events` is
+`SECURITY DEFINER`, owned by `postgres`, defined `SET search_path TO ''`, and its only grant is
+`EXECUTE` to `postgres`; a window outside 30–3650 raises `invalid_retention_window` (SQLSTATE 22023)
+there as well; and `public.admin_audit_events` held 0 rows.
+`npm run prune:admin-audit --workspace @mystock/api -- --dry-run` then connected through the session
+pooler as `postgres` — a role the read-only check confirmed can execute the function — and reported
+`0 of 0 row(s) are older than the cutoff` followed by `Dry run: nothing was deleted.`, so the
+operator path works against hosted. A real prune has not been run there; with the table empty it
+would delete nothing, and the choice of when to start pruning stays the owner's.
+
 ### Virgin-database drill
 
 `npm run drill:virgin-database --workspace @mystock/api` rebuilds the schema from nothing the
@@ -939,7 +954,7 @@ network without an IPv6 route, use the session pooler instead: host
 `postgres`, TLS required. The pooler URL is also shown in Dashboard → Connect → Session
 pooler. `migration list` and `db push` work through it.
 
-Current hosted state (project `kohrmjzwmtqnwrmkymez`, checked 2026-10-31): the Phase 1–7
+Current hosted state (project `kohrmjzwmtqnwrmkymez`, checked 2026-11-02): the Phase 1–7
 migrations (tenancy, catalog, stock ledger, serialized devices, barcode workflows, reporting
 and realtime, operational workflows, returns and supplier performance) are applied, RLS is
 enabled on every table, and the demo seed has run against the first signed-up user, who is
@@ -955,7 +970,9 @@ creation is now platform-admin-only, and the bootstrap flag for `ou3sema@gmail.c
 verified in `profiles`. The signed-in hosted Phase 10 UI flows remain to be exercised. Phase 11
 (`20261031180000_admin_audit.sql`) was applied on 2026-11-01 together with the remediation
 migration `20261101144800_membership_write_hardening.sql`, after which the schema guard let the
-current API build boot against hosted.
+current API build boot against hosted. The retention migration
+`20261102120000_admin_audit_retention.sql` was applied on 2026-11-02; `supabase_migrations.schema_migrations`
+then held all 13 local migrations with matching names and none pending.
 
 The Phase 3 migrations (`20261029130000_stock_ledger.sql` and
 `20261029140000_serialized_devices.sql`) were pushed to the hosted project on 2026-10-29 after
