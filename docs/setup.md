@@ -752,6 +752,30 @@ restore — never by editing an applied migration. Backup retention and RPO for 
 project are **not recorded yet**; capture them during the restore drill and add them to that
 runbook.
 
+### Dependency updates
+
+`npm audit` reported 13 moderate advisories on 2026-11-02, all rooted in one advisory: GHSA-g3hv-75wg-m249
+(`minimatch` DoS via glob-part amplification), vulnerable below 11.0.1, reached through `eslint`,
+`@eslint/config-array`, `@typescript-eslint/typescript-estree`, and `@nestjs/cli`, which all require
+`^10.2.5`. `npm audit fix --force` would have "fixed" it by downgrading `eslint` to 4.0.0, `@eslint/js`
+to 9.39.5, and `typescript-eslint` to 8.36.0 — a broken toolchain. The controlled fix is the root
+`overrides` entry `"minimatch": "^11.0.3"`; `npm ls minimatch` then shows 11.0.3 for all four nodes and
+`npm audit` reports zero. The gates that prove the override is safe are `npm run lint` (config-array
+globbing), `npm run typecheck`, `npm run test`, `npm run build`, and the E2E suites.
+
+Deliberate pending majors, each its own verified change: `typescript` 6.0.3 → 7.x (build layer for six
+workspaces), `postgres` 3.4.9 → 4.0.0 (the API's driver), `@hookform/resolvers` 6.0.2 → 7.0.1 (form
+validation), and `embedded-postgres` 18.4.0-beta.17 → 18.6.0-beta.19, which changes the PostgreSQL
+version the concurrency suite and the local stack run against.
+
+One patch release is pinned back on purpose: `@tanstack/react-query` **5.105.1 breaks the supplier
+performance card**. With 5.105.1 the local-stack test `supplier performance › shows delivery metrics on
+the dashboard` fails in both projects (the `Supplier performance` row for the run's random supplier is
+never visible), and it reproduces in isolation, so it is not a parallelism flake. Bisecting the two web
+runtime bumps: `lucide-react` 1.66.0 alone passes, `react-query` 5.105.0 + `lucide-react` 1.66.0 passes
+40/40. `apps/web/package.json` therefore stays at 5.105.0; revisit 5.105.1 or later only with that test
+in the gate, and re-run `npm run test:e2e:local` (40 checks) after any web-runtime change.
+
 ### Restore drill
 
 Follow [`runbooks/restore-drill.md`](runbooks/restore-drill.md). It targets a scratch
