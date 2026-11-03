@@ -96,5 +96,7 @@ but cannot read the server-chosen name. The web client saves the blob and uses t
 - Corrections are visible immediately and never need a re-issue step, at the cost of no
   immutable archive.
 - Supplier-facing text is limited to Latin script until a Unicode font is embedded.
-- Still out of scope: goods-received notes, sales documents, signed or archived copies,
-  e-invoicing, and any stored snapshot of a document as issued.
+- Still out of scope: goods-received notes, signed or archived copies,
+  e-invoicing, and any stored snapshot of a document as issued. Sales documents are no longer
+  out of scope — the invoice and the issue note specified in ADR-0017 are rendered by this same
+  three-layer architecture and add no storage.

@@ -24,6 +24,12 @@ export const router = createBrowserRouter([
         lazy: async () => ({ Component: (await import('@/routes/scanning-page')).ScanningPage }),
       },
       {
+        path: 'sale',
+        lazy: async () => ({
+          Component: (await import('@/routes/counter-sale-page')).CounterSalePage,
+        }),
+      },
+      {
         path: 'stock',
         lazy: async () => ({
           Component: (await import('@/routes/stock-levels-page')).StockLevelsPage,
@@ -66,6 +72,10 @@ export const router = createBrowserRouter([
         lazy: async () => ({
           Component: (await import('@/routes/sales-orders-page')).SalesOrdersPage,
         }),
+      },
+      {
+        path: 'customers',
+        lazy: async () => ({ Component: (await import('@/routes/customers-page')).CustomersPage }),
       },
       {
         path: 'warehouses',

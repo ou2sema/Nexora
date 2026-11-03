@@ -171,12 +171,13 @@ async function receivePurchaseOrder(
   );
   expect(detail.ok(), await detail.text()).toBeTruthy();
   const lines = (await detail.json()) as { lines: { id: string }[] };
+  expect(lines.lines).toHaveLength(1);
 
   const received = await request.post(
     `${API_BASE}/organizations/${ORGANIZATION_ID}/purchase-orders/${order.orderId}/receipts`,
     {
       headers: { ...authHeaders(), 'idempotency-key': crypto.randomUUID() },
-      data: { lines: [{ lineId: lines.lines[0].id, quantity }] },
+      data: { lines: [{ lineId: lines.lines[0]!.id, quantity }] },
     },
   );
   expect(received.ok(), await received.text()).toBeTruthy();

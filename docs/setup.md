@@ -604,7 +604,7 @@ refuses an out-of-date schema, and distinguishes an unreachable database (warn a
 from a server-side error (stop).
 
 The headed run used the same local stack and ran 28 checks (14 tests × desktop/mobile) at
-Phase 11; the suite is 42 checks today (see “Test suites”). The test added after Phase 10 is
+Phase 11; the suite is 50 checks today (see “Test suites”). The test added after Phase 10 is
 the top-bar bell regression; the administration test also asserts the Operator activity table
 on `/admin` lists the created organization and the invitation, including the target email and
 actor.
@@ -683,7 +683,7 @@ cd apps/web
 npx playwright test --config playwright.local-stack.config.ts --headed
 ```
 
-Expected: 42 checks (21 tests × desktop/mobile). The four `e2e-local/i18n.spec.ts` tests
+Expected: 50 checks (25 tests × desktop/mobile). The four `e2e-local/i18n.spec.ts` tests
 cover:
 
 - French pre-auth copy, the sign-in form, dashboard copy, `fr-TN` money and date output,
@@ -735,6 +735,74 @@ No hosted change is involved: the locale is a browser preference, there is no mi
 and PDFs, CSV exports, labels, and invitation emails remain English. If a local database
 already holds the stack's default PostgreSQL port, set `E2E_PG_PORT` to a free port before
 the run.
+
+## Counter sale verification
+
+Phase 13 is specified in [`adr/0017-counter-sales-and-invoices.md`](adr/0017-counter-sales-and-invoices.md).
+It adds one migration (`20261102180000_counter_sales_and_invoices.sql`: `customers`,
+`sales_invoices`, `sales_invoice_lines`, `sales_invoice_payments`, the `payment_status` and
+`payment_method` enums, the `sales_invoice` document kind with the `FI` prefix, the two new
+`stock_operations` operation values, and the `app.save_customer`, `app.set_customer_active`,
+`app.create_sales_invoice`, and `app.record_sales_invoice_payment` definer functions), ten routes,
+two server-rendered PDFs, the `/sale` and `/customers` screens, a keyboard-wedge scan layer, and
+English/French/Arabic copy.
+
+The database suite (`apps/api/test/db/sales-invoices.test.ts`, 14 tests) proves the parts that
+cannot be trusted to the client: the sale issues through the outgoing order with every amount
+computed in SQL; a caller-supplied unit price is honoured and a caller-supplied total is not; a
+replayed idempotency key moves stock exactly once and a reused key with a different payload is
+refused; a basket the stock cannot cover rolls back including the device claim; serialized units
+leave `in_stock → sold` with an `issued` event and no ledger movement; one physical unit cannot be
+sold twice in one invoice; a device outside the selling location is refused; a credit sale collects
+in parts and refuses to over-collect; the customer is snapshotted and a deactivated one blocks
+issuing; an invoice is numbered per organization and tenants never share a number; and
+`authenticated` still holds only SELECT on the four new tables. The embedded-PostgreSQL concurrency
+suite adds three counter-sale races (ADR-0017 decision 9): parallel sales cannot oversell the same
+balance, two sales cannot claim the same physical device, and one idempotency key submitted twice
+concurrently still creates one invoice. The API suite
+(`test/api/invoicing.test.ts`, 10 tests) drives the same rules over HTTP with a locally signed
+JWT, including tenant isolation of customers and invoices. `test/api/sales-documents.test.ts`
+(4) and `test/documents/sales-document-model.test.ts` (6) cover the printed artifacts: the invoice
+carries fiscal totals, payments and serials; the issue note carries quantities and no amounts; and
+the note is numbered after the order, or after the invoice when the sale only issued devices.
+`packages/domain` adds 5 invoice-rounding tests and 9 keyboard-wedge tests.
+
+The scan input layer is covered at both ends. `@mystock/domain` reduces keystrokes as pure logic
+(a burst is ≥ 3 characters with under 60 ms between keys; Enter and Tab terminate; non-character
+keys belong to the person typing). In the browser, the first counter-sale test types
+`ms-a-0002` at 8 ms per keystroke and presses Enter — no click anywhere — and asserts the code
+became a basket line, the field came back empty, and it kept focus, which is what proves a hardware
+scan cannot also submit the payment form. The second read of the same code is typed by hand, so the
+two paths merge into one line of two units.
+
+Gates on 2026-11-02/03 for this milestone: `format:check`, `lint`, `typecheck`, and `build` clean;
+361 Vitest tests (293 API across 37 files, 47 domain across 6 files, 14 contracts, 7 config); the
+headed local-stack suite 50/50 (25 tests × desktop/mobile) with the counter-sale spec downloading
+and byte-checking both real PDFs, and Allure served from that run; the virgin-database drill against
+a throwaway embedded PostgreSQL on `127.0.0.1:55494` on 2026-11-03, which applied all 14 migrations plus
+the seed (seeded `1/1/7/7/7/2/3`, readiness `ok` with a 69 ms database probe) and still stopped the
+boot with exit `1` when `public.admin_audit_events` was dropped; and `npm run check:integrity`
+read-only against hosted, `OK` for all six organizations.
+
+Two defects surfaced only under the headed run on the phone project, and both are now guarded:
+
+- The counter page laid itself out 658–690 CSS px wide inside a 412 px viewport. A CSS grid item
+  defaults to `min-width: auto`, so the basket's fixed-width inputs stretched the track, and Chrome
+  then grows the _layout viewport_ to that minimum even when the wide content sits in an
+  `overflow-x: auto` box — which pushed every `position: fixed` dialog partly off screen. Neither
+  `overflow-x: clip`, `table-layout: fixed`, narrower inputs nor hiding a column was enough on its
+  own. The fix is `min-w-0` on both sale-grid items plus `contain: paint` on the basket scroll
+  wrapper, so the box is bounded and the table scrolls inside it.
+- The device picker asserted an absolute “2 units in stock” count, which passed only in a fresh
+  database: the local stack reuses one embedded PostgreSQL across runs, so earlier specs leave
+  in-stock units behind. The spec now counts the units from `GET /devices` first and asserts
+  `stocked + 2`, which is order-independent.
+
+Not verified: hosted. The migration is not applied there (see “Current hosted state”), so the
+counter screen, the invoice routes and the two PDFs have never run against the hosted project, and
+the hosted `e2e/` suite was not run at all for this milestone because it would write to the shared
+database. A real USB/Bluetooth scanner has not been driven physically; the browser test emulates the
+same key-event shape. The PDFs and CSV exports stay English (ADR-0014 decision 4).
 
 ## Operator tasks
 
@@ -863,7 +931,7 @@ the dashboard` fails in both projects (the `Supplier performance` row for the ru
 never visible), and it reproduces in isolation, so it is not a parallelism flake. Bisecting the two web
 runtime bumps: `lucide-react` 1.66.0 alone passes, `react-query` 5.105.0 + `lucide-react` 1.66.0 passes
 40/40. `apps/web/package.json` therefore stays at 5.105.0; revisit 5.105.1 or later only with that test
-in the gate, and re-run `npm run test:e2e:local` (42 checks) after any web-runtime change.
+in the gate, and re-run `npm run test:e2e:local` (50 checks) after any web-runtime change.
 
 ### Restore drill
 
@@ -888,21 +956,22 @@ alphabetically, so `@mystock/api` would otherwise build against a stale or missi
 
 The schema is plain SQL in `supabase/migrations`, applied in filename order:
 
-| Migration                                             | Contents                                                                                                               |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `20261029120000_tenancy.sql`                          | organizations, memberships, helper functions, base RLS                                                                 |
-| `20261029121000_catalog.sql`                          | products, categories, brands, warehouses, storage locations                                                            |
-| `20261029130000_stock_ledger.sql`                     | ledger, balances, reservations, idempotency, reconciliation RPCs                                                       |
-| `20261029140000_serialized_devices.sql`               | devices, device events, lifecycle transitions                                                                          |
-| `20261030100000_barcode_workflows.sql`                | GTIN checks, barcode assignment, stock counts and posting RPCs                                                         |
-| `20261030120000_reporting_realtime.sql`               | guarded realtime publication for balances, movements, reservations, devices                                            |
-| `20261030140000_operational_workflows.sql`            | suppliers, purchase orders, outgoing orders, numbering and lifecycle RPCs                                              |
-| `20261031120000_returns_and_supplier_performance.sql` | purchase and sales returns, return numbering and lifecycle RPCs                                                        |
-| `20261031140000_team_access.sql`                      | profiles projection, email-keyed invitations, membership and invitation RPCs                                           |
-| `20261031160000_platform_administration.sql`          | platform-admin flag, restricted organization creation, cross-organization team access, manager viewer-only invitations |
-| `20261031180000_admin_audit.sql`                      | operator audit table, `app.log_admin_action`, logged organization/invitation/membership RPCs                           |
-| `20261101144800_membership_write_hardening.sql`       | tightened membership write policies and re-recorded audit RPCs                                                         |
-| `20261102120000_admin_audit_retention.sql`            | owner-only `app.prune_admin_audit_events(integer)` with a 30–3650 day window, `EXECUTE` revoked from `public`          |
+| Migration                                             | Contents                                                                                                                                               |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `20261029120000_tenancy.sql`                          | organizations, memberships, helper functions, base RLS                                                                                                 |
+| `20261029121000_catalog.sql`                          | products, categories, brands, warehouses, storage locations                                                                                            |
+| `20261029130000_stock_ledger.sql`                     | ledger, balances, reservations, idempotency, reconciliation RPCs                                                                                       |
+| `20261029140000_serialized_devices.sql`               | devices, device events, lifecycle transitions                                                                                                          |
+| `20261030100000_barcode_workflows.sql`                | GTIN checks, barcode assignment, stock counts and posting RPCs                                                                                         |
+| `20261030120000_reporting_realtime.sql`               | guarded realtime publication for balances, movements, reservations, devices                                                                            |
+| `20261030140000_operational_workflows.sql`            | suppliers, purchase orders, outgoing orders, numbering and lifecycle RPCs                                                                              |
+| `20261031120000_returns_and_supplier_performance.sql` | purchase and sales returns, return numbering and lifecycle RPCs                                                                                        |
+| `20261031140000_team_access.sql`                      | profiles projection, email-keyed invitations, membership and invitation RPCs                                                                           |
+| `20261031160000_platform_administration.sql`          | platform-admin flag, restricted organization creation, cross-organization team access, manager viewer-only invitations                                 |
+| `20261031180000_admin_audit.sql`                      | operator audit table, `app.log_admin_action`, logged organization/invitation/membership RPCs                                                           |
+| `20261101144800_membership_write_hardening.sql`       | tightened membership write policies and re-recorded audit RPCs                                                                                         |
+| `20261102120000_admin_audit_retention.sql`            | owner-only `app.prune_admin_audit_events(integer)` with a 30–3650 day window, `EXECUTE` revoked from `public`                                          |
+| `20261102180000_counter_sales_and_invoices.sql`       | customers, sales invoices with lines and payments, `app.save_customer`, `app.create_sales_invoice`, `app.record_sales_invoice_payment`, `FI` numbering |
 
 Demo data lives in `supabase/seed.sql` and requires at least one signed-up user (it raises
 `seed_requires_auth_user` otherwise). The seed inserts demo inventory into the first signed-up
@@ -977,6 +1046,12 @@ current API build boot against hosted. The retention migration
 `20261102120000_admin_audit_retention.sql` was applied on 2026-11-02; `supabase_migrations.schema_migrations`
 then held all 13 local migrations with matching names and none pending.
 
+**Awaiting the operator (checked 2026-11-03):** `supabase/migrations/20261102180000_counter_sales_and_invoices.sql`
+is the 14th local migration and is not applied to hosted. Until it is, the boot-time schema guard
+refuses to start a current API build there, because it probes `public.customers`,
+`public.sales_invoices`, `app.create_sales_invoice(...)`, and `app.record_sales_invoice_payment(...)`.
+That is the intended failure mode: no counter sale can half-work against an unmigrated database.
+
 The Phase 3 migrations (`20261029130000_stock_ledger.sql` and
 `20261029140000_serialized_devices.sql`) were pushed to the hosted project on 2026-10-29 after
 the local suites and a read-only check of the hosted schema. The historical deployment also
@@ -1019,15 +1094,15 @@ npm run test --workspace @mystock/api -- test/db
 
 ## Test suites
 
-| Command                                                         | What it runs                                                                                                                                                                                                                                                                                                       |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `npm run test`                                                  | 304 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, team access, platform administration, admin audit + retention, membership write hardening, health probes, schema guard, API shell, env, contracts, domain |
-| `npm run test:e2e`                                              | Playwright against the API and dev server (18 checks: 9 tests × desktop/mobile)                                                                                                                                                                                                                                    |
-| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                                                                                   |
-| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                                                                        |
-| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–12 flows on the self-contained stack (42 checks: 21 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                                                                                                                                |
-| `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                                                                                  |
-| `npm run drill:virgin-database --workspace @mystock/api`        | Migrations + seed onto virgin local databases and both schema-guard boot paths (needs `npm run build` and a localhost `DATABASE_URL`)                                                                                                                                                                              |
+| Command                                                         | What it runs                                                                                                                                                                                                                                                                                                                                                        |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run test`                                                  | 361 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, counter sales and invoices, sales document PDFs, team access, platform administration, admin audit + retention, membership write hardening, health probes, schema guard, API shell, env, contracts, domain |
+| `npm run test:e2e`                                              | Playwright against the API and dev server (18 checks: 9 tests × desktop/mobile)                                                                                                                                                                                                                                                                                     |
+| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                                                                                                                                    |
+| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                                                                                                                         |
+| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–13 flows on the self-contained stack (50 checks: 25 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                                                                                                                                                                                 |
+| `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                                                                                                                                   |
+| `npm run drill:virgin-database --workspace @mystock/api`        | Migrations + seed onto virgin local databases and both schema-guard boot paths (needs `npm run build` and a localhost `DATABASE_URL`)                                                                                                                                                                                                                               |
 
 The API suites (`apps/api/test/api`) run the real migrations on PGlite, sign JWTs with
 locally generated ES256 keys, and serve the trusted public key from a temporary JWKS
@@ -1078,7 +1153,7 @@ uploads `test-results/` plus `allure-results/` only when the run fails. It also 
 and applies every `supabase/migrations/*.sql` in filename order before Playwright starts,
 because the API's boot-time schema guard refuses to listen on an unmigrated database. The
 `e2e-local` job boots embedded PostgreSQL, the fake auth/JWKS server, the built API, and
-Vite, so it needs no Supabase project; it runs the same 42 checks as the headed local run.
+Vite, so it needs no Supabase project; it runs the same 50 checks as the headed local run.
 All three jobs ran green on GitHub Actions on 2026-11-01 (run #6, commit `38c94db`); the
 `e2e` job had never been green before — it needed the Postgres service above, and the
 `shell.spec.ts` fixes for the Nexora sign-in copy and the lazy-route mount timing.

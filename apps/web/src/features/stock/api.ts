@@ -25,6 +25,8 @@ import { apiRequest, newIdempotencyKey } from '@/lib/api-client';
 export interface StockLevelFilters {
   search: string;
   warehouseId: string;
+  locationId?: string;
+  productId?: string;
   page: number;
   pageSize: number;
 }
@@ -59,6 +61,8 @@ export function useStockLevels(organizationId: string | null, filters: StockLeve
       });
       if (filters.search.trim()) params.set('search', filters.search.trim());
       if (filters.warehouseId) params.set('warehouseId', filters.warehouseId);
+      if (filters.locationId) params.set('locationId', filters.locationId);
+      if (filters.productId) params.set('productId', filters.productId);
 
       return apiRequest<StockLevelListResponse>(
         `/organizations/${organizationId}/stock-levels?${params.toString()}`,

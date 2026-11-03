@@ -21,6 +21,7 @@ export interface DeviceFilters {
   search: string;
   status: DeviceStatus | '';
   productId?: string;
+  warehouseId?: string;
   page: number;
   pageSize: number;
 }
@@ -43,6 +44,7 @@ export function useDevices(organizationId: string | null, filters: DeviceFilters
       if (filters.search.trim()) params.set('search', filters.search.trim());
       if (filters.status) params.set('status', filters.status);
       if (filters.productId) params.set('productId', filters.productId);
+      if (filters.warehouseId) params.set('warehouseId', filters.warehouseId);
 
       return apiRequest<DeviceListResponse>(
         `/organizations/${organizationId}/devices?${params.toString()}`,

@@ -49,20 +49,28 @@ and organization-scoped reporting.
 > per-device language switch with browser detection, right-to-left layout, locale-aware
 > money/date/quantity formatting with Latin digits in Arabic, and translated API and
 > authentication errors. It needs no schema change; PDFs, CSV exports, and labels remain
-> English. Nothing is production-ready yet.
+> English. Phase 13 adds the counter sale: scan or search into a basket, name the buyer, take
+> payment, and post a numbered commercial invoice (`FI-2026-0001`) plus a goods issue note in one
+> idempotent transaction. A tenant-scoped customer directory backs the buyer; every amount,
+> including the per-line tax rate captured at the sale, is computed by the database, an issued
+> invoice is immutable, and a balance is settled by later payment rows. Serialized units leave
+> through the device graph with no ledger movement, bulk quantity through the existing outgoing
+> order and ledger, so reports, returns, and reconciliation cover counter sales unchanged. The
+> local-stack suite is headed-verified; the migration has **not** been pushed to the hosted
+> project, so the counter screen does not work there yet. Nothing is production-ready yet.
 
 ## Stack
 
-| Area      | Choice                                                                   |
-| --------- | ------------------------------------------------------------------------ |
-| Frontend  | React 19 + TypeScript, Vite 8, Tailwind CSS 4, TanStack Query, RHF + Zod |
-| Backend   | NestJS 12 REST API, Zod validation, JWKS-verified Supabase JWTs          |
-| Data      | Supabase PostgreSQL (RLS), Supabase Auth, Realtime, Storage              |
-| ORM       | Drizzle + `postgres`, SQL-first migrations in `supabase/`                |
-| Tests     | Vitest (PGlite + embedded PostgreSQL), Playwright, Allure                |
-| Scanning  | BarcodeDetector + ZXing fallback, `bwip-js` labels, `pdf-lib` PDFs       |
-| Money     | TND only, integer millimes, `formatTnd` (see ADR-0002)                   |
-| Interface | English, French, Arabic; per-device locale, RTL (see ADR-0014)           |
+| Area      | Choice                                                                          |
+| --------- | ------------------------------------------------------------------------------- |
+| Frontend  | React 19 + TypeScript, Vite 8, Tailwind CSS 4, TanStack Query, RHF + Zod        |
+| Backend   | NestJS 12 REST API, Zod validation, JWKS-verified Supabase JWTs                 |
+| Data      | Supabase PostgreSQL (RLS), Supabase Auth, Realtime, Storage                     |
+| ORM       | Drizzle + `postgres`, SQL-first migrations in `supabase/`                       |
+| Tests     | Vitest (PGlite + embedded PostgreSQL), Playwright, Allure                       |
+| Scanning  | BarcodeDetector + ZXing fallback, HID keyboard wedge, `bwip-js`, `pdf-lib` PDFs |
+| Money     | TND only, integer millimes, `formatTnd` (see ADR-0002)                          |
+| Interface | English, French, Arabic; per-device locale, RTL (see ADR-0014)                  |
 
 Architecture decisions live in [`docs/adr/`](docs/adr/). The Phase 0 assessment is summarized in
 [`docs/adr/0001-stack-and-platform-boundaries.md`](docs/adr/0001-stack-and-platform-boundaries.md).
@@ -86,7 +94,10 @@ coverage, and route splitting — are specified in
 [ADR-0013](docs/adr/0013-operational-hardening.md). Interface localization, typed catalogs,
 plurals, RTL, and error translation are specified in
 [ADR-0014](docs/adr/0014-interface-localization.md). Liveness and readiness probes are
-specified in [ADR-0015](docs/adr/0015-health-probe-endpoints.md).
+specified in [ADR-0015](docs/adr/0015-health-probe-endpoints.md), and audit-trail retention in
+[ADR-0016](docs/adr/0016-operator-audit-retention.md). Counter sales, commercial invoices, and
+the customer directory are specified in
+[ADR-0017](docs/adr/0017-counter-sales-and-invoices.md).
 
 ## Layout
 
@@ -182,6 +193,16 @@ query inside a transaction that holds the caller's identity, so RLS applies.
 | GET    | `/api/v1/organizations/:id/sales-orders/:id/returns/:returnId`           | any member                                          |
 | POST   | `/api/v1/organizations/:id/sales-orders/:id/returns/:returnId/post`      | owner, admin, manager                               |
 | POST   | `/api/v1/organizations/:id/sales-orders/:id/returns/:returnId/cancel`    | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/customers`                                    | any member                                          |
+| POST   | `/api/v1/organizations/:id/customers`                                    | owner, admin, manager                               |
+| PATCH  | `/api/v1/organizations/:id/customers/:customerId`                        | owner, admin, manager                               |
+| POST   | `/api/v1/organizations/:id/customers/:customerId/activation`             | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/sales-invoices`                               | any member                                          |
+| POST   | `/api/v1/organizations/:id/sales-invoices`                               | owner, admin, manager                               |
+| GET    | `/api/v1/organizations/:id/sales-invoices/:invoiceId`                    | any member                                          |
+| GET    | `/api/v1/organizations/:id/sales-invoices/:invoiceId/pdf`                | any member                                          |
+| GET    | `/api/v1/organizations/:id/sales-invoices/:invoiceId/issue-note/pdf`     | any member                                          |
+| POST   | `/api/v1/organizations/:id/sales-invoices/:invoiceId/payments`           | owner, admin, manager                               |
 | GET    | `/api/v1/organizations/:id/reports/supplier-performance`                 | any member                                          |
 | GET    | `/api/v1/organizations/:id/members`                                      | any member or platform admin                        |
 | PATCH  | `/api/v1/organizations/:id/members/:userId`                              | owner, admin, platform admin                        |
@@ -264,9 +285,39 @@ so overlapping drafts can never exceed what was received or fulfilled. `GET
 received, ordered and received value, on-time rate against expected dates, average lead time,
 and the posted-return rate; rates are `null` when their denominator is empty.
 
+Counter sales are one transaction and one idempotency key. `POST .../sales-invoices` calls
+`app.create_sales_invoice`, which creates the outgoing order and its lines, reserves and issues
+them, walks the order `draft → confirmed → fulfilled`, moves the chosen devices `in_stock → sold`
+with an `issued` event, writes the invoice, and records its first payment. A bulk line therefore
+leaves through the ledger as an `outgoing_order` `issue` movement, while a serialized unit leaves
+through the device graph with no ledger movement — a device never enters `stock_balances`. A sale whose lines are all devices has no order at all
+(`sales_order_id` is null) and posts no movement, so it appears in the invoice list rather than the
+outgoing-orders list; a mixed sale splits, bulk lines through the order and devices through the
+invoice. The client sends no totals: quantity × price (a
+line's negotiated price or `products.sale_price_minor`), the per-line tax rate captured at the sale,
+net, tax, and gross are recomputed from the rows the function locks, with tax rounded per line and
+the totals being the sum of those rounded lines (ADR-0010), so HT + taxes = TTC exactly on the
+printed page. Invoices are numbered per organization and year (`FI-2026-0001`) by the same sequence
+as the other documents. An issued invoice is immutable — no edit, no cancel: goods go back through a
+sales return or the device status graph, never through the invoice. Payments are rows of their own
+(`cash`, `bank_transfer`, `card_manual`, `credit`) claimed under their own key, with
+`unpaid`/`partial`/`paid` projected onto the invoice and over-collection refused.
+
+Customers are a minimal tenant-scoped directory that mirrors suppliers: a required name, optional
+contact fields, and deactivation that blocks new invoices without deleting history. Each invoice
+snapshots the buyer's name, email, and phone, so renaming a customer later cannot change what was
+already printed, and a walk-in sale can carry an ad-hoc name with no directory row. `/sale` is the
+counter. Its one scan box takes a USB or Bluetooth scanner (a keyboard wedge: a burst with under
+60 ms between keystrokes, at least three characters, Enter or Tab as the terminator), the phone
+camera, or a typed code, and resolves all three through the unchanged `GET .../scan` — a serial
+resolves to that exact unit, a product code to a quantity line. Basket, buyer, payment, document
+downloads, and the recent invoices with what is still owed on them live on that screen; `/customers`
+manages the directory. Owners, admins, and managers post sales, record payments, and edit customers;
+every member, viewers included, reads invoices and downloads their PDFs.
+
 Purchase documents are rendered on demand from the tenant-scoped rows: `GET
 .../purchase-orders/:id/pdf` and `GET .../purchase-orders/:id/returns/:returnId/pdf` return an
-A4 PDF named `mystock-<number>.pdf` as an attachment. Line amounts are `quantity × unit cost`
+A4 PDF named `nexora-<number>.pdf` as an attachment. Line amounts are `quantity × unit cost`
 rounded per line and summed; a line without a cost is excluded from the total and flagged in a
 printed note. Draft and cancelled documents carry a watermark, every page carries a UTC
 generation timestamp and `Page x of y`, and any member — viewers included — may download,
@@ -274,6 +325,13 @@ while a non-member receives `404`. Text is normalized to the PDF standard fonts'
 so non-Latin scripts degrade to `?` (see
 [ADR-0010](docs/adr/0010-purchasing-documents.md)). Nothing is stored: the PDF always reflects
 the current rows.
+
+The counter's two documents render through the same layers. `GET .../sales-invoices/:id/pdf` is the
+commercial invoice: fiscal totals, per-line tax, the payments taken, and the serial numbers of the
+units sold. `GET .../sales-invoices/:id/issue-note/pdf` is the goods issue note — the warehouse's
+own outbound document, with quantities and no amounts — numbered after the order it released
+(`SO-2026-0001`) or after the invoice when the sale only issued devices. Both are attachments named
+`nexora-<number>.pdf`, are projections of the current rows, and are downloadable by any member.
 
 Team access is managed from `/team`. Every member can see the member list; owners and admins
 change roles, remove members, and manage invitations. Owners may touch owner rows; an admin can

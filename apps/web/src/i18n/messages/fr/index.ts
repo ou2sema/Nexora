@@ -3,9 +3,12 @@ import { admin } from './admin';
 import { auth } from './auth';
 import { catalog } from './catalog';
 import { common } from './common';
+import { counterSale } from './counter-sale';
+import { customers } from './customers';
 import { dashboard } from './dashboard';
 import { devices } from './devices';
 import { errors } from './errors';
+import { invoices } from './invoices';
 import { layout } from './layout';
 import { nav } from './nav';
 import { organizations } from './organizations';
@@ -33,6 +36,9 @@ export const frMessages: Record<MessageKey, string> = {
   ...suppliers,
   ...purchasing,
   ...sales,
+  ...counterSale,
+  ...invoices,
+  ...customers,
   ...returns,
   ...team,
   ...admin,

@@ -6,7 +6,7 @@ import { useI18n } from '@/i18n/provider';
 import { cn } from '@/lib/cn';
 
 interface BarcodeDetectorLike {
-  detect(source: CanvasImageSource): Promise<{ rawValue: string }[]>;
+  detect(source: CanvasImageSource): Promise<{ rawValue: string; format: string }[]>;
 }
 
 type BarcodeDetectorConstructor = new (options?: { formats?: string[] }) => BarcodeDetectorLike;
@@ -21,7 +21,8 @@ function nativeDetectorConstructor(): BarcodeDetectorConstructor | null {
 
 interface CameraScannerProps {
   active: boolean;
-  onDetect: (code: string) => void;
+  /** `format` is only known to the native detector; ZXing reports the value alone. */
+  onDetect: (code: string, format?: string) => void;
 }
 
 /**
@@ -128,8 +129,8 @@ export function CameraScanner({ active, onDetect }: CameraScannerProps) {
           if (video.readyState >= 2) {
             try {
               const codes = await detector.detect(video);
-              const value = codes[0]?.rawValue;
-              if (value) onDetectRef.current(value);
+              const first = codes[0];
+              if (first?.rawValue) onDetectRef.current(first.rawValue, first.format);
             } catch {
               // A single failed frame should not stop continuous scanning.
             }

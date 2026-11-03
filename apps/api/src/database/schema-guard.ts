@@ -37,6 +37,19 @@ export const REQUIRED_SCHEMA: readonly SchemaProbe[] = [
     label: 'app.repair_stock_balances(uuid, boolean)',
     expression: "to_regprocedure('app.repair_stock_balances(uuid,boolean)')",
   },
+  { label: 'public.customers', expression: "to_regclass('public.customers')" },
+  { label: 'public.sales_invoices', expression: "to_regclass('public.sales_invoices')" },
+  {
+    label:
+      'app.create_sales_invoice(uuid, uuid, uuid, jsonb, text, text, uuid, text, text, text, bigint, text, text, text, text)',
+    expression:
+      "to_regprocedure('app.create_sales_invoice(uuid,uuid,uuid,jsonb,text,text,uuid,text,text,text,bigint,text,text,text,text)')",
+  },
+  {
+    label: 'app.record_sales_invoice_payment(uuid, uuid, bigint, text, text, text, text)',
+    expression:
+      "to_regprocedure('app.record_sales_invoice_payment(uuid,uuid,bigint,text,text,text,text)')",
+  },
 ];
 
 export async function findMissingSchemaObjects(handle: DatabaseHandle): Promise<string[]> {

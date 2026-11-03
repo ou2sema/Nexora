@@ -53,7 +53,8 @@ beforeEach(async () => {
         public.purchase_orders, public.sales_orders, public.suppliers,
         public.document_sequences, public.device_events, public.devices,
         public.stock_operations, public.stock_movements, public.stock_reservations,
-        public.stock_balances
+        public.stock_balances, public.sales_invoice_payments, public.sales_invoice_lines,
+        public.sales_invoices, public.customers
     `),
   );
 });

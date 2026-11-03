@@ -61,6 +61,22 @@ interface TransferInput {
   fingerprint?: string;
 }
 
+interface InvoiceInput {
+  locationId: string;
+  lines: unknown[];
+  key: string;
+  customerName?: string;
+  fingerprint?: string;
+}
+
+interface DeviceInput {
+  productId: string;
+  serialNumber: string;
+  locationId: string;
+  key: string;
+  fingerprint?: string;
+}
+
 async function freePort(): Promise<number> {
   return new Promise((resolvePort, reject) => {
     const server = createServer();
@@ -204,20 +220,69 @@ describe('real PostgreSQL concurrency', () => {
     return captureAs(OWNER_ID, fn);
   }
 
-  async function createProduct(): Promise<string> {
+  async function createProduct(options: { serialized?: boolean } = {}): Promise<string> {
     skuCounter += 1;
     const id = randomUUID();
     await admin.query(
-      `insert into public.products (id, organization_id, sku, name)
-       values ($1, $2, $3, $4)`,
+      `insert into public.products (id, organization_id, sku, name, is_serialized, sale_price_minor)
+       values ($1, $2, $3, $4, $5, $6)`,
       [
         id,
         ORGANIZATION_ID,
         `CONC-${String(skuCounter).padStart(3, '0')}`,
         `Concurrency ${skuCounter}`,
+        options.serialized ?? false,
+        options.serialized ? 3_690_000 : null,
       ],
     );
     return id;
+  }
+
+  function postInvoice(client: PoolClient, input: InvoiceInput) {
+    const payload = {
+      locationId: input.locationId,
+      lines: input.lines,
+      customerName: input.customerName ?? 'Counter buyer',
+    };
+
+    return client
+      .query(
+        `select app.create_sales_invoice(
+           $1::uuid, $2::uuid, $3::uuid, $4::jsonb, $5, $6,
+           null, $7, null, null, 0::bigint, 'cash', null, null, null
+         ) as result`,
+        [
+          ORGANIZATION_ID,
+          WAREHOUSE_ID,
+          input.locationId,
+          JSON.stringify(input.lines),
+          input.key,
+          input.fingerprint ?? fingerprint(payload),
+          payload.customerName,
+        ],
+      )
+      .then((response) => response.rows[0]?.result as Record<string, unknown>);
+  }
+
+  function registerDevice(client: PoolClient, input: DeviceInput) {
+    const payload = { productId: input.productId, serialNumber: input.serialNumber };
+
+    return client
+      .query(
+        `select app.register_device(
+           $1::uuid, $2::uuid, $3, $4, $5, null, 'new'::app.device_condition, $6::uuid, $7::uuid
+         ) as result`,
+        [
+          ORGANIZATION_ID,
+          input.productId,
+          input.serialNumber,
+          input.key,
+          input.fingerprint ?? fingerprint(payload),
+          WAREHOUSE_ID,
+          input.locationId,
+        ],
+      )
+      .then((response) => response.rows[0]?.result as Record<string, unknown>);
   }
 
   function postMovement(client: PoolClient, input: MovementInput) {
@@ -569,5 +634,121 @@ describe('real PostgreSQL concurrency', () => {
       [organizationId],
     );
     expect(remaining.rows[0]?.count).toBe(1);
+  }, 30_000);
+
+  it('parallel counter sales cannot oversell the same balance', async () => {
+    const productId = await createProduct();
+    await asOwner((client) =>
+      postMovement(client, {
+        productId,
+        locationId: LOCATION_A,
+        type: 'receipt',
+        quantity: 5,
+        key: `invoice-oversell-receipt-${productId}`,
+      }),
+    );
+
+    const sell = (key: string) =>
+      capture((client) =>
+        postInvoice(client, {
+          locationId: LOCATION_A,
+          key,
+          lines: [{ kind: 'product', productId, quantity: 4, unitPriceMinor: 120_000 }],
+        }),
+      );
+
+    const outcomes = await Promise.all([
+      sell(`invoice-oversell-a-${productId}`),
+      sell(`invoice-oversell-b-${productId}`),
+    ]);
+
+    expect(outcomes.filter((outcome) => outcome.ok)).toHaveLength(1);
+    const rejected = outcomes.find((outcome) => !outcome.ok);
+    expect(rejected && !rejected.ok ? rejected.message : '').toMatch(/insufficient_stock/);
+
+    expect((await balances(productId)).get(LOCATION_A)).toBe(1);
+    expect(await movementCount(productId)).toBe(2);
+
+    const invoices = await admin.query<{ count: number }>(
+      `select count(*)::int as count from public.sales_invoices where organization_id = $1`,
+      [ORGANIZATION_ID],
+    );
+    expect(invoices.rows[0]?.count).toBe(1);
+  }, 30_000);
+
+  it('two counter sales cannot claim the same physical device', async () => {
+    const productId = await createProduct({ serialized: true });
+    const device = await asOwner((client) =>
+      registerDevice(client, {
+        productId,
+        serialNumber: `SN-RACE-${productId.slice(0, 8)}`,
+        locationId: LOCATION_A,
+        key: `invoice-race-device-${productId}`,
+      }),
+    );
+    const deviceId = String(device.deviceId);
+
+    const sell = (key: string) =>
+      capture((client) =>
+        postInvoice(client, {
+          locationId: LOCATION_A,
+          key,
+          lines: [{ kind: 'device', deviceId }],
+        }),
+      );
+
+    const outcomes = await Promise.all([
+      sell(`invoice-device-a-${productId}`),
+      sell(`invoice-device-b-${productId}`),
+    ]);
+
+    expect(outcomes.filter((outcome) => outcome.ok)).toHaveLength(1);
+    const rejected = outcomes.find((outcome) => !outcome.ok);
+    expect(rejected && !rejected.ok ? rejected.message : '').toMatch(/device_not_in_stock/);
+
+    const status = await admin.query<{ status: string }>(
+      'select status from public.devices where id = $1',
+      [deviceId],
+    );
+    expect(status.rows[0]?.status).toBe('sold');
+
+    const issued = await admin.query<{ count: number }>(
+      `select count(*)::int as count from public.device_events
+       where device_id = $1 and event_type = 'issued'`,
+      [deviceId],
+    );
+    expect(issued.rows[0]?.count).toBe(1);
+
+    // A serialized unit leaves through the lifecycle, never through the ledger.
+    expect(await movementCount(productId)).toBe(0);
+  }, 30_000);
+
+  it('one idempotency key submitted twice concurrently still creates one invoice', async () => {
+    const productId = await createProduct();
+    await asOwner((client) =>
+      postMovement(client, {
+        productId,
+        locationId: LOCATION_A,
+        type: 'receipt',
+        quantity: 10,
+        key: `invoice-double-receipt-${productId}`,
+      }),
+    );
+
+    const lines = [{ kind: 'product', productId, quantity: 2, unitPriceMinor: 45_000 }];
+    const key = `invoice-double-${productId}`;
+    const outcomes = await Promise.all([
+      capture((client) => postInvoice(client, { locationId: LOCATION_A, key, lines })),
+      capture((client) => postInvoice(client, { locationId: LOCATION_A, key, lines })),
+    ]);
+
+    expect(outcomes.every((outcome) => outcome.ok)).toBe(true);
+    const first = outcomes[0] && outcomes[0].ok ? outcomes[0].result : {};
+    const second = outcomes[1] && outcomes[1].ok ? outcomes[1].result : {};
+    expect(second.invoiceId).toBe(first.invoiceId);
+    expect([first.duplicate, second.duplicate].filter(Boolean)).toHaveLength(1);
+
+    expect((await balances(productId)).get(LOCATION_A)).toBe(8);
+    expect(await movementCount(productId)).toBe(2);
   }, 30_000);
 });

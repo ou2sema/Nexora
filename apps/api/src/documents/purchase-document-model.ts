@@ -5,6 +5,16 @@
  * document total is the sum of the rounded line amounts.
  */
 
+import {
+  type DocumentHeading,
+  type DocumentMeta,
+  type DocumentNote,
+  type DocumentParty,
+  dateOnly,
+  roundQuantity,
+  sanitizeFileName,
+} from './document-format';
+
 export interface SupplierDocumentInfo {
   name: string;
   contactName: string | null;
@@ -14,16 +24,6 @@ export interface SupplierDocumentInfo {
   city: string | null;
   countryCode: string | null;
   taxId: string | null;
-}
-
-export interface DocumentParty {
-  name: string;
-  details: string[];
-}
-
-export interface PurchaseDocumentMeta {
-  label: string;
-  value: string;
 }
 
 export interface PurchaseDocumentLine {
@@ -43,24 +43,16 @@ export interface PurchaseDocumentTotals {
   knownValueMinor: number;
 }
 
-export interface PurchaseDocumentNote {
-  title: string;
-  body: string;
-}
-
-export interface PurchaseDocument {
+export interface PurchaseDocument extends DocumentHeading {
   kind: 'purchase_order' | 'purchase_return';
-  title: string;
-  number: string;
   statusLabel: string;
   watermark: 'DRAFT' | 'CANCELLED' | null;
-  organizationName: string;
   supplier: DocumentParty;
   shipTo: DocumentParty;
-  meta: PurchaseDocumentMeta[];
+  meta: DocumentMeta[];
   lines: PurchaseDocumentLine[];
   totals: PurchaseDocumentTotals;
-  note: PurchaseDocumentNote | null;
+  note: DocumentNote | null;
   serials: { sku: string; serials: string[] }[];
   fileName: string;
 }
@@ -78,46 +70,6 @@ const RETURN_STATUS_LABELS: Record<string, string> = {
   posted: 'Posted',
   cancelled: 'Cancelled',
 };
-
-export function formatMillimesAscii(minor: number): string {
-  const sign = minor < 0 ? '-' : '';
-  const absolute = Math.abs(Math.trunc(minor));
-  const dinars = Math.floor(absolute / 1000)
-    .toString()
-    .replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  const millimes = (absolute % 1000).toString().padStart(3, '0');
-  return `${sign}${dinars}.${millimes}`;
-}
-
-export function formatQuantityAscii(quantity: number): string {
-  if (Number.isInteger(quantity)) return String(quantity);
-  return quantity.toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
-}
-
-/** Standard PDF fonts use WinAnsi, so non-Latin text is transliterated or replaced. */
-export function sanitizeText(value: string): string {
-  return value
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[\u2010-\u2015]/g, '-')
-    .replace(/[\u2018\u2019]/g, "'")
-    .replace(/[\u201c\u201d]/g, '"')
-    .replace(/\u2026/g, '...')
-    .replace(/[\u00a0\u202f]/g, ' ')
-    .replace(/[^\x20-\x7e\n]/g, '?');
-}
-
-function sanitizeFileName(value: string): string {
-  return value.replace(/[^A-Za-z0-9._-]/g, '-');
-}
-
-function dateOnly(value: string | null): string {
-  return value ? value.slice(0, 10) : '-';
-}
-
-function roundQuantity(quantity: number): number {
-  return Math.round(quantity * 10_000) / 10_000;
-}
 
 function partyForSupplier(supplier: SupplierDocumentInfo): DocumentParty {
   const cityLine = [supplier.city, supplier.countryCode].filter(Boolean).join(', ');

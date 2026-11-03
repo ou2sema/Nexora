@@ -13,6 +13,8 @@ import {
 
 import type {
   MemberRole,
+  PaymentMethod,
+  PaymentStatus,
   ProductStatus,
   PurchaseOrderStatus,
   SalesOrderStatus,
@@ -201,6 +203,74 @@ export const salesOrderLines = pgTable('sales_order_lines', {
   ...timestamps,
 });
 
+export const customers = pgTable('customers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull(),
+  name: text('name').notNull(),
+  email: text('email'),
+  phone: text('phone'),
+  addressLine: text('address_line'),
+  city: text('city'),
+  countryCode: char('country_code', { length: 2 }),
+  taxId: text('tax_id'),
+  isActive: boolean('is_active').notNull().default(true),
+  ...timestamps,
+});
+
+export const salesInvoices = pgTable('sales_invoices', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull(),
+  number: text('number').notNull(),
+  salesOrderId: uuid('sales_order_id'),
+  warehouseId: uuid('warehouse_id').notNull(),
+  locationId: uuid('location_id').notNull(),
+  customerId: uuid('customer_id'),
+  customerName: text('customer_name').notNull(),
+  customerEmail: text('customer_email'),
+  customerPhone: text('customer_phone'),
+  netAmountMinor: bigint('net_amount_minor', { mode: 'number' }).notNull(),
+  taxAmountMinor: bigint('tax_amount_minor', { mode: 'number' }).notNull(),
+  totalAmountMinor: bigint('total_amount_minor', { mode: 'number' }).notNull(),
+  paidAmountMinor: bigint('paid_amount_minor', { mode: 'number' }).notNull().default(0),
+  paymentStatus: text('payment_status').$type<PaymentStatus>().notNull().default('unpaid'),
+  paymentMethod: text('payment_method').$type<PaymentMethod>(),
+  reference: text('reference'),
+  notes: text('notes'),
+  issuedAt: timestamp('issued_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by'),
+  ...timestamps,
+});
+
+export const salesInvoiceLines = pgTable('sales_invoice_lines', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull(),
+  salesInvoiceId: uuid('sales_invoice_id').notNull(),
+  salesOrderLineId: uuid('sales_order_line_id'),
+  deviceId: uuid('device_id'),
+  productId: uuid('product_id').notNull(),
+  kind: text('kind').$type<'product' | 'device'>().notNull(),
+  quantity: numeric('quantity', { precision: 18, scale: 4 }).$type<string>().notNull(),
+  unitPriceMinor: bigint('unit_price_minor', { mode: 'number' }).notNull(),
+  taxRatePercent: numeric('tax_rate_percent', { precision: 7, scale: 4 })
+    .$type<string>()
+    .notNull()
+    .default('0'),
+  netAmountMinor: bigint('net_amount_minor', { mode: 'number' }).notNull(),
+  taxAmountMinor: bigint('tax_amount_minor', { mode: 'number' }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const salesInvoicePayments = pgTable('sales_invoice_payments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull(),
+  salesInvoiceId: uuid('sales_invoice_id').notNull(),
+  amountMinor: bigint('amount_minor', { mode: 'number' }).notNull(),
+  method: text('method').$type<PaymentMethod>().notNull(),
+  note: text('note'),
+  recordedBy: uuid('recorded_by'),
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type Organization = typeof organizations.$inferSelect;
 export type Membership = typeof memberships.$inferSelect;
 export type Profile = typeof profiles.$inferSelect;
@@ -215,3 +285,7 @@ export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
 export type PurchaseOrderLine = typeof purchaseOrderLines.$inferSelect;
 export type SalesOrder = typeof salesOrders.$inferSelect;
 export type SalesOrderLine = typeof salesOrderLines.$inferSelect;
+export type Customer = typeof customers.$inferSelect;
+export type SalesInvoice = typeof salesInvoices.$inferSelect;
+export type SalesInvoiceLine = typeof salesInvoiceLines.$inferSelect;
+export type SalesInvoicePayment = typeof salesInvoicePayments.$inferSelect;

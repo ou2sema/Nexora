@@ -39,7 +39,7 @@ import {
 import type { AuthenticatedUser } from '../auth/authenticated-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import type { RenderedDocument } from '../documents/purchase-documents.service';
+import type { RenderedDocument } from '../documents/rendered-document';
 // The class is a DI token at runtime, so this cannot be a type-only import.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { PurchaseDocumentsService } from '../documents/purchase-documents.service';

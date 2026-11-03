@@ -50,6 +50,9 @@ const CONSTRAINT_MESSAGES: Record<string, string> = {
   sales_return_not_cancellable: 'Only draft sales returns can be cancelled.',
   device_not_in_stock: 'This device is not in stock.',
   device_product_mismatch: 'This device does not belong to the product on the line.',
+  device_wrong_location: 'This device is not in the selected depot location.',
+  customer_not_active: 'This customer is inactive.',
+  payment_exceeds_total: 'The payment is larger than the amount still due.',
 };
 
 const VALIDATION_MESSAGES: Record<string, string> = {
@@ -67,6 +70,11 @@ const VALIDATION_MESSAGES: Record<string, string> = {
   invalid_invitation_email: 'Enter a valid email address for the invitation.',
   invitation_role_owner:
     'Ownership is transferred by changing an existing member, not by invitation.',
+  invalid_customer_name: 'Enter a customer name.',
+  invalid_paid_amount: 'The payment amount must be greater than zero.',
+  invalid_payment_method: 'Choose a supported payment method.',
+  product_price_undefined: 'Set a sale price for this product or price the line.',
+  serialized_line_requires_device: 'Sell a serialized product by scanning the device.',
 };
 
 const NOT_FOUND_MESSAGES: Record<string, string> = {
@@ -85,6 +93,8 @@ const NOT_FOUND_MESSAGES: Record<string, string> = {
   sales_return_not_found: 'Sales return not found.',
   member_not_found: 'Team member not found.',
   invitation_not_found: 'Invitation not found.',
+  customer_not_found: 'Customer not found.',
+  sales_invoice_not_found: 'Sales invoice not found.',
 };
 
 /**

@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  buildPurchaseOrderDocument,
-  buildPurchaseReturnDocument,
   formatMillimesAscii,
   formatQuantityAscii,
   sanitizeText,
+} from '../../src/documents/document-format';
+import {
   type SupplierDocumentInfo,
+  buildPurchaseOrderDocument,
+  buildPurchaseReturnDocument,
 } from '../../src/documents/purchase-document-model';
 
 const supplier: SupplierDocumentInfo = {

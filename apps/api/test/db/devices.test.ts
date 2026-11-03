@@ -49,7 +49,9 @@ afterAll(async () => {
 beforeEach(async () => {
   await database.asPostgres((client) =>
     client.query(
-      'truncate public.purchase_return_devices, public.device_events, public.devices, public.stock_operations',
+      `truncate public.purchase_return_devices, public.device_events, public.devices,
+        public.stock_operations, public.sales_invoice_payments, public.sales_invoice_lines,
+        public.sales_invoices, public.customers`,
     ),
   );
 });

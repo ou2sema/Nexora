@@ -74,6 +74,10 @@ Outgoing orders are quantity-only: serialized devices leave stock through the de
 creation, because an order cannot choose which physical unit is sold without a device-level
 allocation model, which the brief does not require.
 
+_(ADR-0017 later adds that device-level allocation, at the invoice rather than at the order. This
+rejection stands: counter sales allocate serialized units as `device` rows in
+`sales_invoice_lines` and never write them into `sales_order_lines`.)_
+
 ### 5. Confirm-then-fulfil makes overselling impossible
 
 Confirming an outgoing order reserves every line at its source location in the same

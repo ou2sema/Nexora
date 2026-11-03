@@ -55,6 +55,11 @@ movement — the same symmetry as receiving, which registers devices without a r
 Outgoing orders only sell quantity-tracked products, so sales returns are quantity-only; there
 is no device to restock.
 
+_(ADR-0017 amends the premise: counter sales do sell specific devices, allocated by the invoice.
+The sales-return RPC is unchanged — it still only handles quantity lines. A sold device comes back
+with the existing `app.change_device_status` transitions (`sold → returned → in_stock`) rather
+than with a return document.)_
+
 ### 4. Every transition is one RPC claiming one idempotency key
 
 `app.create_purchase_return`, `app.post_purchase_return`, `app.cancel_purchase_return` and the

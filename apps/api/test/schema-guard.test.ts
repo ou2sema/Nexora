@@ -68,6 +68,11 @@ describe('database schema guard', () => {
 
     expect(missing).toContain('public.admin_audit_events');
     expect(missing).toContain('app.is_platform_admin()');
+    expect(missing).toContain('public.customers');
+    expect(missing).toContain('public.sales_invoices');
+    expect(missing).toContain(
+      'app.record_sales_invoice_payment(uuid, uuid, bigint, text, text, text, text)',
+    );
     expect(missing).not.toContain('public.organizations');
     expect(missing).not.toContain('app.create_organization(text, text)');
   });

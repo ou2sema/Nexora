@@ -8,6 +8,22 @@ import {
   paginatedSchema,
   paginationQuerySchema,
 } from '../src/pagination';
+import { customerCreateSchema, salesInvoiceCreateSchema } from '../src/invoicing';
+
+const PRODUCT_ID = '20000000-0000-4000-8000-0000000000a1';
+const DEVICE_ID = '70000000-0000-4000-8000-000000000001';
+const WAREHOUSE_ID = '50000000-0000-4000-8000-00000000000a';
+const LOCATION_ID = '60000000-0000-4000-8000-00000000000a';
+
+function basket(lines: unknown[], rest: Record<string, unknown> = {}) {
+  return salesInvoiceCreateSchema.parse({
+    warehouseId: WAREHOUSE_ID,
+    locationId: LOCATION_ID,
+    customerName: 'SBS Vision',
+    lines,
+    ...rest,
+  });
+}
 
 describe('paginationQuerySchema', () => {
   it('applies defaults', () => {
@@ -70,5 +86,90 @@ describe('idParamSchema', () => {
       true,
     );
     expect(idParamSchema.safeParse({ id: 'not-a-uuid' }).success).toBe(false);
+  });
+});
+
+describe('customerCreateSchema', () => {
+  it('normalizes a country code and keeps optional fields absent', () => {
+    const parsed = customerCreateSchema.parse({ name: 'SBS Vision', countryCode: 'tn' });
+
+    expect(parsed).toEqual({ name: 'SBS Vision', countryCode: 'TN' });
+  });
+
+  it('rejects a blank name and a malformed email', () => {
+    expect(customerCreateSchema.safeParse({ name: '  ' }).success).toBe(false);
+    expect(customerCreateSchema.safeParse({ name: 'Ok', email: 'no-at-sign' }).success).toBe(false);
+  });
+});
+
+describe('salesInvoiceCreateSchema', () => {
+  it('applies the settlement defaults', () => {
+    const parsed = basket([{ kind: 'product', productId: PRODUCT_ID, quantity: 2 }]);
+
+    expect(parsed.paidAmountMinor).toBe(0);
+    expect(parsed.paymentMethod).toBe('cash');
+  });
+
+  it('requires a customer, either a record or a named walk-in buyer', () => {
+    const lines = [{ kind: 'device', deviceId: DEVICE_ID }];
+    const base = { warehouseId: WAREHOUSE_ID, locationId: LOCATION_ID, lines };
+
+    expect(salesInvoiceCreateSchema.safeParse(base).success).toBe(false);
+    expect(salesInvoiceCreateSchema.safeParse({ ...base, customerName: '  ' }).success).toBe(false);
+    expect(salesInvoiceCreateSchema.safeParse({ ...base, customerId: PRODUCT_ID }).success).toBe(
+      true,
+    );
+  });
+
+  it('keeps one product or one physical unit to a single line', () => {
+    expect(
+      salesInvoiceCreateSchema.safeParse({
+        warehouseId: WAREHOUSE_ID,
+        locationId: LOCATION_ID,
+        customerName: 'SBS Vision',
+        lines: [
+          { kind: 'product', productId: PRODUCT_ID, quantity: 1 },
+          { kind: 'product', productId: PRODUCT_ID, quantity: 2 },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      salesInvoiceCreateSchema.safeParse({
+        warehouseId: WAREHOUSE_ID,
+        locationId: LOCATION_ID,
+        customerName: 'SBS Vision',
+        lines: [
+          { kind: 'device', deviceId: DEVICE_ID },
+          { kind: 'device', deviceId: DEVICE_ID },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('refuses invented rates, quantities and line kinds', () => {
+    expect(
+      salesInvoiceCreateSchema.safeParse({
+        warehouseId: WAREHOUSE_ID,
+        locationId: LOCATION_ID,
+        customerName: 'SBS Vision',
+        lines: [{ kind: 'product', productId: PRODUCT_ID, quantity: 1, taxRatePercent: 100.0001 }],
+      }).success,
+    ).toBe(false);
+    expect(
+      salesInvoiceCreateSchema.safeParse({
+        warehouseId: WAREHOUSE_ID,
+        locationId: LOCATION_ID,
+        customerName: 'SBS Vision',
+        lines: [{ kind: 'product', productId: PRODUCT_ID, quantity: 1.00001 }],
+      }).success,
+    ).toBe(false);
+    expect(
+      salesInvoiceCreateSchema.safeParse({
+        warehouseId: WAREHOUSE_ID,
+        locationId: LOCATION_ID,
+        customerName: 'SBS Vision',
+        lines: [{ kind: 'bundle', productId: PRODUCT_ID, quantity: 1 }],
+      }).success,
+    ).toBe(false);
   });
 });

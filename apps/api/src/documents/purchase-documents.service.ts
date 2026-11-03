@@ -14,11 +14,7 @@ import {
   buildPurchaseReturnDocument,
 } from './purchase-document-model';
 import { renderPurchaseDocument } from './purchase-documents.pdf';
-
-export interface RenderedDocument {
-  pdf: Uint8Array;
-  fileName: string;
-}
+import type { RenderedDocument } from './rendered-document';
 
 interface OrganizationRow {
   name: string;
