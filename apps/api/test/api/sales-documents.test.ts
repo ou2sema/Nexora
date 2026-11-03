@@ -1,12 +1,22 @@
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { CONTENT_WIDTH, MARGIN } from '../../src/documents/pdf-layout';
 import { LOCATIONS, ORGS, PRODUCTS, USERS, WAREHOUSES } from '../db/fixtures';
-import { pdfParser, pdfText } from './pdf';
+import { type PdfRun, pdfGeometry, pdfParser, pdfText } from './pdf';
 import { createTestContext, type TestContext } from './test-app';
 
 const YEAR = new Date().getFullYear();
+
+const TOTALS_LABELS = [
+  'Total excl. tax',
+  'Tax',
+  'Total incl. tax',
+  'Paid',
+  'Remaining',
+  'Payment method',
+];
 
 describe('sales document PDFs', () => {
   let ctx: TestContext;
@@ -181,6 +191,64 @@ describe('sales document PDFs', () => {
     const lower = text.toLowerCase();
     for (const forbidden of ['receipt', 'ticket', 'cash register', 'caisse']) {
       expect(lower).not.toContain(forbidden);
+    }
+  });
+
+  it('keeps the totals block inside its own rules', async () => {
+    const list = await request(ctx.app.getHttpServer())
+      .get(invoicesUrl)
+      .set('authorization', auth(aliceToken));
+    const invoiceId = (list.body.items as { id: string }[])[0]!.id;
+
+    const response = await fetchPdf(`${invoicesUrl}/${invoiceId}/pdf`, aliceToken);
+    expect(response.status).toBe(200);
+
+    const pdf = response.body as Buffer;
+    const contentRight = MARGIN + CONTENT_WIDTH;
+    const { rules, runs } = pdfGeometry(pdf);
+
+    const scratch = await PDFDocument.create();
+    const regular = await scratch.embedFont(StandardFonts.Helvetica);
+    const bold = await scratch.embedFont(StandardFonts.HelveticaBold);
+    const rightEdge = (run: PdfRun) =>
+      run.x +
+      (run.size === 9.5 || run.size === 10.5 ? bold : regular).widthOfTextAtSize(
+        run.value,
+        run.size,
+      );
+
+    // The 7.5pt run with the same wording is the table column header, not a total.
+    const labels = runs.filter((run) => TOTALS_LABELS.includes(run.value) && run.size > 8);
+    expect(labels.length).toBe(TOTALS_LABELS.length);
+    const rows = labels.map((label) => ({
+      label,
+      value: runs.find((run) => run.y === label.y && run !== label),
+    }));
+    expect(rows.every((row) => row.value)).toBe(true);
+
+    const bandTop = Math.max(...labels.map((run) => run.y));
+    const bandBottom = Math.min(...labels.map((run) => run.y));
+    const bandRules = rules.filter((rule) => rule.y <= bandTop + 16 && rule.y >= bandBottom - 12);
+    expect(bandRules.length).toBeGreaterThan(0);
+
+    for (const rule of bandRules) {
+      expect(rule.toX).toBeCloseTo(contentRight, 1);
+      expect(rule.fromX).toBeGreaterThan(MARGIN + 100);
+    }
+
+    const blockLeft = Math.max(...bandRules.map((rule) => rule.fromX));
+    const labelEdges = labels.map(rightEdge);
+    const valueEdges = rows.map((row) => rightEdge(row.value!));
+    for (const run of [...labels, ...rows.map((row) => row.value!)]) {
+      expect(run.x).toBeGreaterThanOrEqual(blockLeft);
+    }
+
+    for (const edge of labelEdges) expect(edge).toBeCloseTo(labelEdges[0]!, 1);
+    for (const edge of valueEdges) expect(edge).toBeCloseTo(contentRight, 1);
+
+    // Every label ends left of the amount it belongs to, so nothing sits outside a line.
+    for (const [index, row] of rows.entries()) {
+      expect(labelEdges[index]).toBeLessThan(row.value!.x);
     }
   });
 

@@ -57,8 +57,10 @@ and organization-scoped reporting.
 > through the device graph with no ledger movement, bulk quantity through the existing outgoing
 > order and ledger, so reports, returns, and reconciliation cover counter sales unchanged. The
 > local-stack suite is headed-verified, and on 2026-11-03 the migration was applied to the hosted
-> project, where the API now boots with it; a signed-in counter sale has **not** been run there yet,
-> so no hosted invoice exists. Nothing is production-ready yet.
+> project and the first counter sale was posted there from the signed-in app: invoice
+> `FI-2026-0001`, 14.900 TND paid in cash, its `SO-2026-0002` exit document and the `issue` ledger
+> line behind it all read back out of the hosted database, and both PDFs downloaded. Nothing is
+> production-ready yet.
 
 ## Stack
 

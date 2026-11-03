@@ -768,10 +768,18 @@ balance, two sales cannot claim the same physical device, and one idempotency ke
 concurrently still creates one invoice. The API suite
 (`test/api/invoicing.test.ts`, 10 tests) drives the same rules over HTTP with a locally signed
 JWT, including tenant isolation of customers and invoices. `test/api/sales-documents.test.ts`
-(4) and `test/documents/sales-document-model.test.ts` (6) cover the printed artifacts: the invoice
+(5) and `test/documents/sales-document-model.test.ts` (6) cover the printed artifacts: the invoice
 carries fiscal totals, payments and serials; the issue note carries quantities and no amounts; and
 the note is numbered after the order, or after the invoice when the sale only issued devices.
 `packages/domain` adds 5 invoice-rounding tests and 9 keyboard-wedge tests.
+
+The fifth sales-document test reads the invoice's drawing operators rather than its words, because
+the first hosted PDF proved that text assertions cannot see a layout bug: the totals block drew
+full-page rules under labels that only occupied the right third. `test/api/pdf.ts` now inflates the
+content streams into rules (`x y m … x y l S`) and text runs with their baseline (`1 0 0 1 x y Tm`),
+and the test measures every run with the same Helvetica metrics the renderer used, so it can assert
+that each totals rule spans only the block, that labels share one right edge left of the amount
+column, and that the amounts end on the content edge.
 
 The scan input layer is covered at both ends. `@mystock/domain` reduces keystrokes as pure logic
 (a burst is ≥ 3 characters with under 60 ms between keys; Enter and Tab terminate; non-character
@@ -782,7 +790,7 @@ scan cannot also submit the payment form. The second read of the same code is ty
 two paths merge into one line of two units.
 
 Gates on 2026-11-02/03 for this milestone: `format:check`, `lint`, `typecheck`, and `build` clean;
-361 Vitest tests (293 API across 37 files, 47 domain across 6 files, 14 contracts, 7 config); the
+362 Vitest tests (294 API across 37 files, 47 domain across 6 files, 14 contracts, 7 config); the
 headed local-stack suite 50/50 (25 tests × desktop/mobile) with the counter-sale spec downloading
 and byte-checking both real PDFs, and Allure served from that run; the virgin-database drill against
 a throwaway embedded PostgreSQL on `127.0.0.1:55494` on 2026-11-03, which applied all 14 migrations plus
@@ -804,12 +812,28 @@ Two defects surfaced only under the headed run on the phone project, and both ar
   in-stock units behind. The spec now counts the units from `GET /devices` first and asserts
   `stocked + 2`, which is order-independent.
 
-Not verified yet: the counter flow itself on hosted. The migration landed on 2026-11-03 and the API
-boots there on this build (see “Hosted counter-sale landing”), but no signed-in sale has been posted,
-so no `FI-` invoice, PDF or ledger movement exists in the hosted project, and the hosted `e2e/` suite
-was not run at all for this milestone because it would write to the shared database. A real
-USB/Bluetooth scanner has not been driven physically; the browser test emulates the
-same key-event shape. The PDFs and CSV exports stay English (ADR-0014 decision 4).
+Not verified yet: a real USB/Bluetooth scanner has not been driven physically; the browser test
+emulates the same key-event shape. The PDFs and CSV exports stay English (ADR-0014 decision 4).
+
+**Hosted counter sale (2026-11-03).** The operator posted the first counter sale through the
+signed-in app against the hosted project, and a read-only query of the hosted database confirms the
+whole trail: one `sales_invoices` row `FI-2026-0001`, `paid`/`cash`, net 14.900 TND with 0% tax, one
+`product` line (`CABLE-01`, 1 unit at 14.900), one payment row of the same amount, and the directory
+row `Zahra Style`. The exit document `SO-2026-0002` is `fulfilled`, confirmed and fulfilled at the
+same instant as the invoice, with one `issue` ledger line (`CABLE-01`, −1, `on_hand_after` 15,
+`reference_type` `outgoing_order`) behind one `sales_invoice_create` operation. Both PDFs were
+downloaded from that invoice, which is how the totals-block layout defect below was found. The hosted
+`e2e/` suite was still not run, because it would write more rows to the shared database.
+
+The defect that sale surfaced is a layout one, and it is now fixed for every document family. The
+totals block is a right-hand column, but `drawTotals` drew its rules with the shared full-content
+`drawRule`, so on an invoice with six total rows every rule ran the width of the page while the
+labels and amounts it was supposed to bracket sat in the right third of it. `drawRule` now takes the
+span it should draw, and the block uses its own: rules run from the block's left edge to the content
+edge, labels are right-aligned on one edge just left of the Amount column, amounts stay right-aligned
+on the content edge, and the grand total keeps its rule and its bold row. The table's own bottom rule
+is untouched, so the table is still closed full width. Purchase orders and returns share the same
+primitive, so their totals blocks moved with it.
 
 ## Operator tasks
 
@@ -1073,9 +1097,8 @@ probe. The API was then restarted on the Phase 13 build: the boot log says
 `/health/ready` returned `ok` with a 474 ms database probe over the pooler, the three unauthenticated
 counter routes answered `401`, and the first real request from the signed-in app on
 `http://localhost:5173` — `GET /organizations/:id/customers` — answered `200`. `npm run check:integrity`
-passed for all six organizations afterwards. Still not done on hosted: a signed-in counter sale, so no
-`FI-` invoice, PDF or ledger movement exists there yet, and the tenant carries no verification rows from
-this phase.
+passed for all six organizations afterwards. The signed-in counter sale that was still outstanding at
+that point has since been posted; see “Hosted counter sale (2026-11-03)”.
 
 The Phase 3 migrations (`20261029130000_stock_ledger.sql` and
 `20261029140000_serialized_devices.sql`) were pushed to the hosted project on 2026-10-29 after
@@ -1121,7 +1144,7 @@ npm run test --workspace @mystock/api -- test/db
 
 | Command                                                         | What it runs                                                                                                                                                                                                                                                                                                                                                        |
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run test`                                                  | 361 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, counter sales and invoices, sales document PDFs, team access, platform administration, admin audit + retention, membership write hardening, health probes, schema guard, API shell, env, contracts, domain |
+| `npm run test`                                                  | 362 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, counter sales and invoices, sales document PDFs, team access, platform administration, admin audit + retention, membership write hardening, health probes, schema guard, API shell, env, contracts, domain |
 | `npm run test:e2e`                                              | Playwright against the API and dev server (18 checks: 9 tests × desktop/mobile)                                                                                                                                                                                                                                                                                     |
 | `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                                                                                                                                    |
 | `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                                                                                                                         |

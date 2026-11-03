@@ -130,10 +130,16 @@ export function rightText(
   });
 }
 
-export function drawRule(page: PDFPage, y: number, color = RULE): void {
+export function drawRule(
+  page: PDFPage,
+  y: number,
+  color = RULE,
+  fromX = MARGIN,
+  toX = MARGIN + CONTENT_WIDTH,
+): void {
   page.drawLine({
-    start: { x: MARGIN, y },
-    end: { x: MARGIN + CONTENT_WIDTH, y },
+    start: { x: fromX, y },
+    end: { x: toX, y },
     thickness: 0.7,
     color,
   });
@@ -428,32 +434,41 @@ export function drawTable(
   }
 }
 
+/**
+ * The totals block is a right-hand column, not a full-width band: the labels end
+ * just left of the amount column and the rules stop at the block's own left edge,
+ * so nothing in it hangs outside a line.
+ */
+const TOTALS_BOX_WIDTH = 220;
+const TOTALS_VALUE_WIDTH = 96;
+
 export function drawTotals(
   cursor: PageCursor,
   rows: DocumentTotalRow[],
   caption: string | null,
 ): void {
   const { page, fonts } = cursor;
-  const boxWidth = 220;
-  const leftX = MARGIN + CONTENT_WIDTH - boxWidth;
+  const leftX = MARGIN + CONTENT_WIDTH - TOTALS_BOX_WIDTH;
   const rightEdge = MARGIN + CONTENT_WIDTH;
+  const labelRightEdge = rightEdge - TOTALS_VALUE_WIDTH;
 
   let y = cursor.y;
-  drawRule(page, y);
+  drawRule(page, y, RULE, leftX, rightEdge);
   y -= 15;
 
   for (const row of rows) {
     if (row.strong) {
-      drawRule(page, y + 5, RULE);
+      drawRule(page, y + 5, RULE, leftX, rightEdge);
     }
-    text(
+    rightText(
       page,
       row.strong ? fonts.bold : fonts.regular,
       row.strong ? 9.5 : 8.5,
       row.label,
-      leftX,
+      labelRightEdge,
       y,
       row.strong ? INK : MUTED,
+      labelRightEdge - leftX,
     );
     rightText(
       page,
@@ -463,13 +478,21 @@ export function drawTotals(
       rightEdge,
       y,
       INK,
-      boxWidth,
+      TOTALS_VALUE_WIDTH,
     );
     y -= row.strong ? 18 : 15;
   }
 
   if (caption) {
-    text(page, fonts.regular, 7.5, caption, leftX, y, MUTED);
+    text(
+      page,
+      fonts.regular,
+      7.5,
+      fitText(fonts.regular, 7.5, caption, TOTALS_BOX_WIDTH),
+      leftX,
+      y,
+      MUTED,
+    );
     y -= 10;
   }
 

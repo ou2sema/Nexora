@@ -249,8 +249,8 @@ Neither the schema, the contracts, the UI, nor the PDFs use "ticket", "receipt",
 - The migration must be pushed to the hosted project before the counter screen works there, as with
   every previous phase.
 - Implemented and verified locally on 2026-11-03: 14 database tests, 3 concurrency races, 10 HTTP
-  tests, 10 document tests (4 rendering, 6 model), and 14 domain tests (5 invoice rounding, 9 wedge),
-  inside 361 Vitest; and the headed local-stack suite — 25 tests on desktop and mobile, which posts a
+  tests, 11 document tests (5 rendering, 6 model), and 14 domain tests (5 invoice rounding, 9 wedge),
+  inside 362 Vitest; and the headed local-stack suite — 25 tests on desktop and mobile, which posts a
   sale from a scanner-shaped keystroke burst, sells a picked unit beside a ledger line, settles a
   balance in two instalments, and byte-checks the two PDFs it actually downloads. The run also
   surfaced and fixed a phone-layout defect that mis-centred every dialog on the counter.
@@ -262,9 +262,17 @@ Neither the schema, the contracts, the UI, nor the PDFs use "ticket", "receipt",
   `grant select` is not the write barrier there, because Supabase's schema-level default privileges
   give `anon` and `authenticated` every table privilege — as they already do for `sales_orders` and
   `stock_movements`. A rolled-back probe confirmed row security is what refuses a client write
-  (`42501 new row violates row-level security policy`). No signed-in counter sale has been posted on
-  hosted yet, so no `FI-` invoice, PDF or ledger movement exists there.
-- Invoice PDFs are English, like every other server-rendered artifact (ADR-0014 decision 4).
+  (`42501 new row violates row-level security policy`). The first signed-in counter sale was then
+  posted there on the same day, and a read-only query reads the whole trail back: `FI-2026-0001`
+  (paid, cash, 14.900 TND, one `CABLE-01` line, one payment row, buyer `Zahra Style`), its
+  `SO-2026-0002` exit document confirmed and fulfilled in the same transaction, one `issue` ledger
+  line, and one `sales_invoice_create` operation. Downloading those PDFs is what surfaced the
+  totals-block layout defect: the rules were page-wide while the block they were ruling occupied only
+  the right third. `drawRule` now takes a span and the totals block draws its own.
+- Invoice PDFs are English today, like every other server-rendered artifact (ADR-0014 decision 4).
+  That decision is superseded once documents must be French or Arabic: `pdf-lib` with the standard
+  fonts cannot shape or order Arabic at all, so the agreed path is one HTML/CSS template per document
+  rendered to PDF by a headless browser, fed by the same document models the renderers use now.
 - Open business decisions, recorded rather than invented: the VAT rate(s) and whether the rate,
   `matricule fiscal`, and a tax stamp (`timbre fiscal`) must appear on the printed invoice; the
   legally required invoice layout in Tunisia; whether anonymous walk-in sales are acceptable; the
