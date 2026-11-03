@@ -56,8 +56,9 @@ and organization-scoped reporting.
 > invoice is immutable, and a balance is settled by later payment rows. Serialized units leave
 > through the device graph with no ledger movement, bulk quantity through the existing outgoing
 > order and ledger, so reports, returns, and reconciliation cover counter sales unchanged. The
-> local-stack suite is headed-verified; the migration has **not** been pushed to the hosted
-> project, so the counter screen does not work there yet. Nothing is production-ready yet.
+> local-stack suite is headed-verified, and on 2026-11-03 the migration was applied to the hosted
+> project, where the API now boots with it; a signed-in counter sale has **not** been run there yet,
+> so no hosted invoice exists. Nothing is production-ready yet.
 
 ## Stack
 

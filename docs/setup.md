@@ -755,8 +755,14 @@ refused; a basket the stock cannot cover rolls back including the device claim; 
 leave `in_stock → sold` with an `issued` event and no ledger movement; one physical unit cannot be
 sold twice in one invoice; a device outside the selling location is refused; a credit sale collects
 in parts and refuses to over-collect; the customer is snapshotted and a deactivated one blocks
-issuing; an invoice is numbered per organization and tenants never share a number; and
-`authenticated` still holds only SELECT on the four new tables. The embedded-PostgreSQL concurrency
+issuing; an invoice is numbered per organization and tenants never share a number; and a client
+role cannot write to the four new tables. The mechanism for that last one differs by environment and
+is worth stating exactly: the migration grants only SELECT, so in the PGlite suite a direct
+`insert`/`update`/`delete` fails with `permission denied`, while on the hosted project Supabase's
+schema-level default privileges hand `anon` and `authenticated` every table privilege anyway — the
+same ACL every existing table carries — and there the write is stopped by row security instead
+(`42501 new row violates row-level security policy`, proven below). RLS, not the grant, is the real
+barrier. The embedded-PostgreSQL concurrency
 suite adds three counter-sale races (ADR-0017 decision 9): parallel sales cannot oversell the same
 balance, two sales cannot claim the same physical device, and one idempotency key submitted twice
 concurrently still creates one invoice. The API suite
@@ -798,10 +804,11 @@ Two defects surfaced only under the headed run on the phone project, and both ar
   in-stock units behind. The spec now counts the units from `GET /devices` first and asserts
   `stocked + 2`, which is order-independent.
 
-Not verified: hosted. The migration is not applied there (see “Current hosted state”), so the
-counter screen, the invoice routes and the two PDFs have never run against the hosted project, and
-the hosted `e2e/` suite was not run at all for this milestone because it would write to the shared
-database. A real USB/Bluetooth scanner has not been driven physically; the browser test emulates the
+Not verified yet: the counter flow itself on hosted. The migration landed on 2026-11-03 and the API
+boots there on this build (see “Hosted counter-sale landing”), but no signed-in sale has been posted,
+so no `FI-` invoice, PDF or ledger movement exists in the hosted project, and the hosted `e2e/` suite
+was not run at all for this milestone because it would write to the shared database. A real
+USB/Bluetooth scanner has not been driven physically; the browser test emulates the
 same key-event shape. The PDFs and CSV exports stay English (ADR-0014 decision 4).
 
 ## Operator tasks
@@ -1046,11 +1053,29 @@ current API build boot against hosted. The retention migration
 `20261102120000_admin_audit_retention.sql` was applied on 2026-11-02; `supabase_migrations.schema_migrations`
 then held all 13 local migrations with matching names and none pending.
 
-**Awaiting the operator (checked 2026-11-03):** `supabase/migrations/20261102180000_counter_sales_and_invoices.sql`
-is the 14th local migration and is not applied to hosted. Until it is, the boot-time schema guard
-refuses to start a current API build there, because it probes `public.customers`,
-`public.sales_invoices`, `app.create_sales_invoice(...)`, and `app.record_sales_invoice_payment(...)`.
-That is the intended failure mode: no counter sale can half-work against an unmigrated database.
+**Hosted counter-sale landing (2026-11-03).** `20261102180000_counter_sales_and_invoices.sql` was the
+only migration the `db push --dry-run` listed, and `--yes` applied it. Read-only checks then confirmed:
+the registry holds all 14 local migrations with `20261102180000` / `counter_sales_and_invoices`
+present; the four new tables have `relrowsecurity = true` and exactly one SELECT policy each, for
+`authenticated` members; the raw table ACL is
+`{postgres=…, anon=…, authenticated=…, service_role=…}` — identical to `sales_orders` and
+`stock_movements`, i.e. Supabase default privileges, so writes are refused by RLS rather than by a
+grant; `app.create_sales_invoice(uuid,uuid,uuid,jsonb,text,text,uuid,text,text,text,bigint,text,text,text,text)`
+and `app.record_sales_invoice_payment(uuid,uuid,bigint,text,text,text,text)` are `SECURITY DEFINER`,
+owned by `postgres`, with `search_path = ""`, executable by `authenticated` and refused to `anon`;
+`app.document_kind` now includes `sales_invoice` and `app.payment_status` / `app.payment_method`
+exist; `stock_operations_operation_check` lists `sales_invoice_create` and `sales_invoice_payment`;
+and all four tables held 0 rows. A rolled-back `insert into customers` as `authenticated` with empty
+claims returned `42501 new row violates row-level security policy for table "customers"`, and the
+`update`/`delete` probes touched nothing because the tables were empty — no row was committed by any
+probe. The API was then restarted on the Phase 13 build: the boot log says
+`Database schema verified (14 required objects present)`, both controllers mapped their ten routes,
+`/health/ready` returned `ok` with a 474 ms database probe over the pooler, the three unauthenticated
+counter routes answered `401`, and the first real request from the signed-in app on
+`http://localhost:5173` — `GET /organizations/:id/customers` — answered `200`. `npm run check:integrity`
+passed for all six organizations afterwards. Still not done on hosted: a signed-in counter sale, so no
+`FI-` invoice, PDF or ledger movement exists there yet, and the tenant carries no verification rows from
+this phase.
 
 The Phase 3 migrations (`20261029130000_stock_ledger.sql` and
 `20261029140000_serialized_devices.sql`) were pushed to the hosted project on 2026-10-29 after

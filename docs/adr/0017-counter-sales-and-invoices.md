@@ -254,8 +254,16 @@ Neither the schema, the contracts, the UI, nor the PDFs use "ticket", "receipt",
   sale from a scanner-shaped keystroke burst, sells a picked unit beside a ledger line, settles a
   balance in two instalments, and byte-checks the two PDFs it actually downloads. The run also
   surfaced and fixed a phone-layout defect that mis-centred every dialog on the counter.
-  `docs/setup.md` (“Counter sale verification”) holds the gate output. Nothing here has run against
-  the hosted project: its migration is still awaiting the operator.
+  `docs/setup.md` (“Counter sale verification”) holds the gate output.
+- The migration was applied to the hosted project on 2026-11-03 and the API boots there on this build:
+  the guard verifies 14 objects, the four tables carry RLS with SELECT-only member policies, the two
+  definer functions are `SECURITY DEFINER` with an empty `search_path` and no `anon` execute, and the
+  tables are empty. One design assumption needed correcting against the live schema: the migration's
+  `grant select` is not the write barrier there, because Supabase's schema-level default privileges
+  give `anon` and `authenticated` every table privilege — as they already do for `sales_orders` and
+  `stock_movements`. A rolled-back probe confirmed row security is what refuses a client write
+  (`42501 new row violates row-level security policy`). No signed-in counter sale has been posted on
+  hosted yet, so no `FI-` invoice, PDF or ledger movement exists there.
 - Invoice PDFs are English, like every other server-rendered artifact (ADR-0014 decision 4).
 - Open business decisions, recorded rather than invented: the VAT rate(s) and whether the rate,
   `matricule fiscal`, and a tax stamp (`timbre fiscal`) must appear on the printed invoice; the
