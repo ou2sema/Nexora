@@ -59,6 +59,9 @@ export const errors: ErrorsMessages = {
   'errors.code.member_not_found': 'Membre de l’équipe introuvable.',
   'errors.code.invitation_not_found': 'Invitation introuvable.',
   'errors.code.scan_not_found': 'Aucun produit ni appareil ne correspond à ce code.',
+  'errors.code.unsupported_logo_type': 'Téléversez une image PNG ou JPEG.',
+  'errors.code.invalid_logo_image': 'Image illisible. Exportez-la de nouveau en PNG ou en JPEG.',
+  'errors.code.logo_not_found': 'Cette organisation n’a pas de logo.',
 
   'errors.server.supplierNameConflict': 'Un fournisseur portant ce nom existe déjà.',
   'errors.server.deviceSerialConflict': 'Un appareil avec ce numéro de série est déjà enregistré.',
@@ -169,6 +172,10 @@ export const errors: ErrorsMessages = {
     'Chaque ligne de retour nécessite une ligne de commande et une quantité positive.',
   'errors.server.duplicateDevice': 'Chaque appareil ne peut apparaître qu’une seule fois.',
   'errors.server.invalidInvitationEmail': 'Saisissez une adresse e-mail valide pour l’invitation.',
+  'errors.server.logoEmpty': 'Le téléversement est vide.',
+  'errors.server.logoNotAnImage': 'Le téléversement n’est pas une image PNG ou JPEG.',
+  'errors.server.logoContentTypeMismatch':
+    'Le téléversement ne correspond pas à son type de contenu.',
 
   'errors.auth.invalidCredentials': 'Identifiants de connexion invalides',
   'errors.auth.emailNotConfirmed': 'E-mail non confirmé',

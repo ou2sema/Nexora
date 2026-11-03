@@ -1,9 +1,12 @@
+import { PDFDocument } from 'pdf-lib';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { isValidEan13 } from '@mystock/domain';
 
 import { LOCATIONS, ORGS, PRODUCTS, USERS, WAREHOUSES } from '../db/fixtures';
+import { LOGO_PNG } from './logo-image';
+import { pdfImages, pdfParser, pdfText } from './pdf';
 import { createTestContext, type TestContext } from './test-app';
 
 describe('scanning API', () => {
@@ -177,6 +180,47 @@ describe('scanning API', () => {
       .send({ items: [{ kind: 'product', productId: '20000000-0000-4000-8000-0000000000ff' }] });
     expect(missing.status).toBe(404);
     expect(missing.body.error.code).toBe('product_not_found');
+  });
+
+  it('prints the tenant identity line in the free bottom margin of a label sheet', async () => {
+    const logoUrl = `/api/v1/organizations/${ORGS.a}/logo`;
+    const upload = await request(server())
+      .put(logoUrl)
+      .set('authorization', auth(aliceToken))
+      .set('content-type', 'image/png')
+      .send(LOGO_PNG);
+    expect(upload.status).toBe(200);
+
+    try {
+      const response = await request(server())
+        .post(`${base}/labels`)
+        .set('authorization', auth(aliceToken))
+        .buffer(true)
+        .parse(pdfParser)
+        .send({ items: [{ kind: 'product', productId: PRODUCTS.a2 }] });
+      expect(response.status).toBe(200);
+
+      const pdf = response.body as Buffer;
+      const parsed = await PDFDocument.load(pdf);
+      expect(parsed.getCreator()).toBe('Nexora');
+      expect(parsed.getTitle()).toBe('Org A labels');
+
+      // The grid keeps its pre-cut geometry, so the mark is the last draw on the sheet:
+      // one barcode in a cell, then the identity line in the bottom margin.
+      const images = pdfImages(pdf);
+      expect(images).toHaveLength(2);
+      const barcode = images[0]!;
+      const mark = images[1]!;
+      expect(barcode.y).toBeGreaterThan(30);
+      expect(mark.x).toBe(28);
+      expect(mark.y).toBeLessThan(30);
+      expect(mark.height).toBeLessThanOrEqual(10);
+
+      const text = pdfText(pdf).replace(/\s+/g, ' ');
+      expect(text).toContain('Org A');
+    } finally {
+      await request(server()).delete(logoUrl).set('authorization', auth(aliceToken));
+    }
   });
 
   it('records and posts a scan-assisted count with idempotent replay', async () => {

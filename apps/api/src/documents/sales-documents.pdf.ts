@@ -1,6 +1,8 @@
 import { PDFDocument } from 'pdf-lib';
 
-import { formatMillimesAscii, formatQuantityAscii, sanitizeText } from './document-format';
+import { embedLogoImage } from '../logos/logo.embed';
+import type { StoredLogo } from '../logos/logo.reader';
+import { formatMillimesAscii, formatQuantityAscii } from './document-format';
 import {
   BOTTOM,
   CONTENT_WIDTH,
@@ -12,6 +14,7 @@ import {
   type PageCursor,
   type PdfColumn,
   addPage,
+  brandDocument,
   drawColumnHeader,
   drawDocumentHeader,
   drawMeta,
@@ -125,13 +128,15 @@ function drawPayments(cursor: PageCursor, document: SalesDocument): void {
   cursor.y = y - 6;
 }
 
-export async function renderSalesDocument(document: SalesDocument): Promise<Uint8Array> {
+export async function renderSalesDocument(
+  document: SalesDocument,
+  logo: StoredLogo | null,
+): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
-  pdf.setTitle(sanitizeText(`${document.title} ${document.number}`));
-  pdf.setProducer('Nexora');
-  pdf.setCreator('Nexora');
+  brandDocument(pdf, `${document.title} ${document.number}`);
 
   const fonts = await embedDocumentFonts(pdf);
+  const logoImage = logo ? await embedLogoImage(pdf, logo) : null;
   const columns = document.columns === 'invoice' ? INVOICE_COLUMNS : ISSUE_COLUMNS;
   const cursor: PageCursor = {
     pdf,
@@ -139,6 +144,7 @@ export async function renderSalesDocument(document: SalesDocument): Promise<Uint
     y: 0,
     fonts,
     heading: document,
+    logo: logoImage,
   };
 
   drawDocumentHeader(cursor, 'Nexora inventory platform', document.statusLabel);

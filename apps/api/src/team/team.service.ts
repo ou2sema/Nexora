@@ -19,6 +19,7 @@ import { memberships, organizationInvitations, organizations, profiles } from '.
 // The class is a DI token at runtime, so this cannot be a type-only import.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { TenantDatabase } from '../database/tenant-database.service';
+import { readVisibleLogoMetadata } from '../logos/logo.reader';
 import { toIso } from '../operations/operations.utils';
 // The class is a DI token at runtime, so it cannot be a type-only import.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
@@ -290,7 +291,9 @@ export class TeamService {
           throw new AppError('internal_error', 'Membership was not created.', 500);
         }
 
-        return membership;
+        const [logo] = await readVisibleLogoMetadata(tx, result.organization_id);
+
+        return { ...membership, logo: logo ?? null };
       },
       { email },
     );

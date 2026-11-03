@@ -3,7 +3,15 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { LOCATIONS, ORGS, PRODUCTS, USERS, WAREHOUSES } from '../db/fixtures';
-import { pdfParser, pdfText } from './pdf';
+import {
+  LOGO_BOX_HEIGHT,
+  LOGO_BOX_WIDTH,
+  LOGO_TEXT_GAP,
+  MARGIN,
+  PAGE_HEIGHT,
+} from '../../src/documents/pdf-layout';
+import { LOGO_PNG } from './logo-image';
+import { pdfGeometry, pdfImages, pdfParser, pdfText } from './pdf';
 import { createTestContext, type TestContext } from './test-app';
 
 const YEAR = new Date().getFullYear();
@@ -203,5 +211,78 @@ describe('purchase document PDFs', () => {
     );
     expect(missing.status).toBe(404);
     expect(missing.body.error.code).toBe('purchase_return_not_found');
+  });
+
+  it('carries the tenant mark on the order and the return note', async () => {
+    const logoUrl = `/api/v1/organizations/${ORGS.a}/logo`;
+    const upload = await request(ctx.app.getHttpServer())
+      .put(logoUrl)
+      .set('authorization', auth(aliceToken))
+      .set('content-type', 'image/png')
+      .send(LOGO_PNG);
+    expect(upload.status).toBe(200);
+
+    try {
+      const supplier = await createSupplier();
+      const order = await createOrder(supplier.id);
+
+      const placed = await request(ctx.app.getHttpServer())
+        .post(`${purchaseUrl}/${order.orderId}/order`)
+        .set('authorization', auth(aliceToken))
+        .set('idempotency-key', crypto.randomUUID());
+      expect(placed.status).toBe(200);
+
+      const detail = await fetchJson(`${purchaseUrl}/${order.orderId}`, aliceToken);
+      const cableLine = (detail.body.lines as { id: string; productSku: string }[]).find(
+        (line) => line.productSku === 'CABLE-USB-C',
+      );
+      expect(cableLine).toBeDefined();
+
+      const receipt = await request(ctx.app.getHttpServer())
+        .post(`${purchaseUrl}/${order.orderId}/receipts`)
+        .set('authorization', auth(aliceToken))
+        .set('idempotency-key', crypto.randomUUID())
+        .send({ lines: [{ lineId: cableLine!.id, quantity: 2 }] });
+      expect(receipt.status).toBe(200);
+
+      const returned = await request(ctx.app.getHttpServer())
+        .post(`${purchaseUrl}/${order.orderId}/returns`)
+        .set('authorization', auth(aliceToken))
+        .set('idempotency-key', crypto.randomUUID())
+        .send({
+          reason: 'Wrong gauge',
+          lines: [{ purchaseOrderLineId: cableLine!.id, quantity: 1 }],
+        });
+      expect(returned.status).toBe(201);
+
+      const paths = [
+        `${purchaseUrl}/${order.orderId}/pdf`,
+        `${purchaseUrl}/${order.orderId}/returns/${returned.body.returnId}/pdf`,
+      ];
+
+      for (const path of paths) {
+        const response = await fetchPdf(path, aliceToken);
+        expect(response.status).toBe(200);
+        const pdf = response.body as Buffer;
+
+        const images = pdfImages(pdf);
+        expect(images).toHaveLength(1);
+        const mark = images[0]!;
+        expect(mark.width).toBeLessThanOrEqual(LOGO_BOX_WIDTH);
+        expect(mark.height).toBeLessThanOrEqual(LOGO_BOX_HEIGHT);
+        expect(mark.x).toBeGreaterThanOrEqual(MARGIN);
+        expect(mark.y).toBeGreaterThanOrEqual(PAGE_HEIGHT - MARGIN - LOGO_BOX_HEIGHT);
+        expect(mark.y + mark.height).toBeLessThanOrEqual(PAGE_HEIGHT - MARGIN);
+
+        // The header gives the mark its box and starts the identity text to its right.
+        const { runs } = pdfGeometry(pdf);
+        const orgName = runs.find((run) => run.value === 'Org A' && run.size === 15);
+        expect(orgName?.x).toBe(MARGIN + LOGO_BOX_WIDTH + LOGO_TEXT_GAP);
+
+        expect(pdfText(pdf)).toContain('Org A');
+      }
+    } finally {
+      await request(ctx.app.getHttpServer()).delete(logoUrl).set('authorization', auth(aliceToken));
+    }
   });
 });

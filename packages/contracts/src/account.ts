@@ -3,11 +3,29 @@ import { z } from 'zod';
 export const memberRoleSchema = z.enum(['owner', 'admin', 'manager', 'viewer']);
 export type MemberRole = z.infer<typeof memberRoleSchema>;
 
+/** The only image shapes `pdf-lib` can embed, so anything else is refused at the write. */
+export const logoMimeTypeSchema = z.enum(['image/png', 'image/jpeg']);
+export type LogoMimeType = z.infer<typeof logoMimeTypeSchema>;
+
+export const MIN_LOGO_BYTES = 8;
+export const MAX_LOGO_BYTES = 409_600;
+
+/** Everything the interface needs to draw a mark and to ask for the same bytes again. */
+export const logoSummarySchema = z.object({
+  organizationId: z.uuid(),
+  mime: logoMimeTypeSchema,
+  byteLength: z.int().min(MIN_LOGO_BYTES).max(MAX_LOGO_BYTES),
+  updatedAt: z.string(),
+});
+
+export type LogoSummary = z.infer<typeof logoSummarySchema>;
+
 export const membershipSchema = z.object({
   organizationId: z.uuid(),
   organizationName: z.string(),
   organizationSlug: z.string(),
   role: memberRoleSchema,
+  logo: logoSummarySchema.nullable(),
 });
 
 export const meResponseSchema = z.object({

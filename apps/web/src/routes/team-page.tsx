@@ -6,12 +6,14 @@ import type {
   InvitationRole,
   InvitationStatus,
   InvitationSummary,
+  LogoSummary,
   MemberRole,
   TeamMemberSummary,
 } from '@mystock/contracts';
 
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/features/auth/auth-provider';
+import { BrandingCard } from '@/features/branding/branding-card';
 import { useOrganization } from '@/features/organizations/organization-provider';
 import {
   useChangeMemberRole,
@@ -36,6 +38,8 @@ const ALL_ROLES: MemberRole[] = ['owner', 'admin', 'manager', 'viewer'];
 const NON_OWNER_ROLES: MemberRole[] = ['admin', 'manager', 'viewer'];
 
 interface TeamViewProps {
+  /** Only the member view renders branding; the platform-admin view has no logo to show. */
+  logo?: LogoSummary | null;
   organizationId: string;
   organizationName: string;
   role: MemberRole | null;
@@ -43,6 +47,7 @@ interface TeamViewProps {
 }
 
 export function TeamView({
+  logo = null,
   organizationId,
   organizationName,
   role,
@@ -418,6 +423,17 @@ export function TeamView({
         </section>
       )}
 
+      {/* The logo endpoints are membership-scoped, so a platform admin viewing another
+          organization has nothing to show or change here. */}
+      {role && (
+        <BrandingCard
+          logo={logo}
+          organizationId={organizationId}
+          organizationName={organizationName}
+          role={role}
+        />
+      )}
+
       <InviteDialog
         organizationId={organizationId}
         open={inviteOpen}
@@ -460,6 +476,7 @@ export function TeamPage() {
 
   return (
     <TeamView
+      logo={organization.logo}
       organizationId={organization.organizationId}
       organizationName={organization.organizationName}
       role={organization.role}

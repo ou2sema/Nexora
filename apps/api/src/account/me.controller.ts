@@ -10,6 +10,7 @@ import { resultRows } from '../database/results';
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { TenantDatabase } from '../database/tenant-database.service';
 import { memberships, organizations } from '../database/schema';
+import { readVisibleLogoMetadata } from '../logos/logo.reader';
 
 @Controller('me')
 export class MeController {
@@ -34,13 +35,20 @@ export class MeController {
         await tx.execute(sql`select app.is_platform_admin() as is_platform_admin`),
       );
 
+      const logos = new Map(
+        (await readVisibleLogoMetadata(tx)).map((logo) => [logo.organizationId, logo]),
+      );
+
       return {
         user: {
           id: user.id,
           email: user.email,
           platformAdmin: profile?.is_platform_admin === true,
         },
-        memberships: rows,
+        memberships: rows.map((row) => ({
+          ...row,
+          logo: logos.get(row.organizationId) ?? null,
+        })),
       };
     });
   }

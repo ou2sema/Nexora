@@ -97,3 +97,24 @@ export async function apiDownload(path: string, token: string): Promise<Download
     filename: match?.[1] ?? 'export.csv',
   };
 }
+
+/**
+ * Sends the file as the entire request body. The logo endpoint reads raw bytes, so the
+ * upload must not be wrapped in JSON or multipart.
+ */
+export async function apiUpload<T>(
+  path: string,
+  { token, contentType, body }: { token: string; contentType: string; body: ArrayBuffer },
+): Promise<T> {
+  const response = await fetch(apiUrl(path), {
+    method: 'PUT',
+    headers: { authorization: `Bearer ${token}`, 'content-type': contentType },
+    body,
+  });
+
+  if (!response.ok) {
+    await throwApiError(response);
+  }
+
+  return (await response.json()) as T;
+}

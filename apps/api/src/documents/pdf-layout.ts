@@ -1,4 +1,12 @@
-import { type PDFDocument, type PDFFont, type PDFPage, StandardFonts, degrees, rgb } from 'pdf-lib';
+import {
+  type PDFDocument,
+  type PDFFont,
+  type PDFImage,
+  type PDFPage,
+  StandardFonts,
+  degrees,
+  rgb,
+} from 'pdf-lib';
 
 import {
   type DocumentHeading,
@@ -24,6 +32,11 @@ export const BOTTOM = 72;
 export const ROW_HEIGHT = 20;
 export const TABLE_HEADER_HEIGHT = 20;
 
+/** The cap box a tenant mark is fitted into on the first page of a document. */
+export const LOGO_BOX_WIDTH = 44;
+export const LOGO_BOX_HEIGHT = 30;
+export const LOGO_TEXT_GAP = 12;
+
 export const INK = rgb(0.09, 0.12, 0.16);
 export const MUTED = rgb(0.42, 0.46, 0.52);
 export const RULE = rgb(0.84, 0.86, 0.89);
@@ -48,6 +61,15 @@ export async function embedDocumentFonts(pdf: PDFDocument): Promise<PdfFonts> {
     bold: await pdf.embedFont(StandardFonts.HelveticaBold),
     mono: await pdf.embedFont(StandardFonts.Courier),
   };
+}
+
+/**
+ * pdf-lib overwrites /Producer with its own signature on every save, so /Creator is the
+ * only metadata field that can carry the product name.
+ */
+export function brandDocument(pdf: PDFDocument, title: string): void {
+  pdf.setTitle(sanitizeText(title));
+  pdf.setCreator('Nexora');
 }
 
 export function fitText(font: PDFFont, size: number, value: string, maxWidth: number): string {
@@ -299,6 +321,7 @@ export interface PageCursor {
   y: number;
   fonts: PdfFonts;
   heading: DocumentHeading;
+  logo: PDFImage | null;
 }
 
 export function addPage(cursor: PageCursor, columns: PdfColumn[] | null): void {
@@ -315,11 +338,26 @@ export function drawDocumentHeader(
   subtitle: string,
   statusLabel: string | null,
 ): void {
-  const { page, fonts, heading } = cursor;
+  const { page, fonts, heading, logo } = cursor;
   const top = PAGE_HEIGHT - MARGIN;
 
-  text(page, fonts.bold, 15, heading.organizationName, MARGIN, top - 10);
-  text(page, fonts.regular, 8, subtitle, MARGIN, top - 24, MUTED);
+  // The mark holds the left margin and the identity text starts to its right, so the
+  // header keeps the same vertical rhythm whether or not the tenant has uploaded one.
+  const textX = logo ? MARGIN + LOGO_BOX_WIDTH + LOGO_TEXT_GAP : MARGIN;
+  if (logo) {
+    const scale = Math.min(LOGO_BOX_WIDTH / logo.width, LOGO_BOX_HEIGHT / logo.height);
+    const width = logo.width * scale;
+    const height = logo.height * scale;
+    page.drawImage(logo, {
+      x: MARGIN + (LOGO_BOX_WIDTH - width) / 2,
+      y: top - LOGO_BOX_HEIGHT + (LOGO_BOX_HEIGHT - height) / 2,
+      width,
+      height,
+    });
+  }
+
+  text(page, fonts.bold, 15, heading.organizationName, textX, top - 10);
+  text(page, fonts.regular, 8, subtitle, textX, top - 24, MUTED);
   rightText(page, fonts.bold, 17, heading.title, MARGIN + CONTENT_WIDTH, top - 9);
   rightText(
     page,

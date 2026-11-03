@@ -1,6 +1,8 @@
 import { PDFDocument } from 'pdf-lib';
 
-import { formatMillimesAscii, formatQuantityAscii, sanitizeText } from './document-format';
+import { embedLogoImage } from '../logos/logo.embed';
+import type { StoredLogo } from '../logos/logo.reader';
+import { formatMillimesAscii, formatQuantityAscii } from './document-format';
 import {
   BOTTOM,
   CONTENT_WIDTH,
@@ -9,6 +11,7 @@ import {
   type PageCursor,
   type PdfColumn,
   addPage,
+  brandDocument,
   drawColumnHeader,
   drawDocumentHeader,
   drawMeta,
@@ -43,19 +46,22 @@ function lineValues(index: number, line: PurchaseDocumentLine): string[] {
   ];
 }
 
-export async function renderPurchaseDocument(document: PurchaseDocument): Promise<Uint8Array> {
+export async function renderPurchaseDocument(
+  document: PurchaseDocument,
+  logo: StoredLogo | null,
+): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
-  pdf.setTitle(sanitizeText(`${document.title} ${document.number}`));
-  pdf.setProducer('Nexora');
-  pdf.setCreator('Nexora');
+  brandDocument(pdf, `${document.title} ${document.number}`);
 
   const fonts = await embedDocumentFonts(pdf);
+  const logoImage = logo ? await embedLogoImage(pdf, logo) : null;
   const cursor: PageCursor = {
     pdf,
     page: pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]),
     y: 0,
     fonts,
     heading: document,
+    logo: logoImage,
   };
 
   drawDocumentHeader(cursor, 'Nexora inventory platform', document.statusLabel);

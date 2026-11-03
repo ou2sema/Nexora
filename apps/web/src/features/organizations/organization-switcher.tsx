@@ -9,6 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { useLogoImage } from '@/features/branding/api';
 import { useI18n } from '@/i18n/provider';
 import { CreateOrganizationForm } from './create-organization-form';
 import { useOrganization } from './organization-provider';
@@ -17,12 +18,21 @@ export function OrganizationSwitcher() {
   const { memberships, organization, platformAdmin, selectOrganization } = useOrganization();
   const { t } = useI18n();
   const [createOpen, setCreateOpen] = useState(false);
+  const logoUrl = useLogoImage(organization?.logo ?? null);
 
   return (
     <div className="flex min-w-0 items-center gap-2">
       {organization ? (
         <label className="flex min-w-0 items-center gap-2">
-          <Building2 aria-hidden="true" className="hidden size-4 text-slate-400 sm:block" />
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt=""
+              className="hidden size-6 shrink-0 rounded-md bg-white object-contain p-0.5 ring-1 ring-slate-200 sm:block"
+            />
+          ) : (
+            <Building2 aria-hidden="true" className="hidden size-4 text-slate-400 sm:block" />
+          )}
           <span className="sr-only">{t('organizations.label')}</span>
           <select
             value={organization.organizationId}

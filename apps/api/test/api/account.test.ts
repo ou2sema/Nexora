@@ -84,6 +84,7 @@ describe('authentication', () => {
         organizationName: 'Org A',
         organizationSlug: 'org-a',
         role: 'owner',
+        logo: null,
       },
     ]);
   });

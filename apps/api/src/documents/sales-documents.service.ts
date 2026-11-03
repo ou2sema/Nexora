@@ -7,6 +7,7 @@ import { resultRows } from '../database/results';
 // The class is a DI token at runtime, so this cannot be a type-only import.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { TenantAccessService } from '../tenancy/tenant-access.service';
+import { readStoredLogo } from '../logos/logo.reader';
 import { toIso, toNumber } from '../operations/operations.utils';
 import {
   type CustomerDocumentInfo,
@@ -113,6 +114,7 @@ export class SalesDocumentsService {
   ): Promise<RenderedDocument> {
     return this.access.runAsMember(userId, organizationId, async (tx) => {
       const organizationName = await this.organizationName(tx, organizationId);
+      const logo = await readStoredLogo(tx, organizationId);
       const invoice = await this.findInvoice(tx, organizationId, invoiceId);
       const lines = await this.lines(tx, organizationId, invoiceId);
       const payments = await this.payments(tx, organizationId, invoiceId);
@@ -149,7 +151,7 @@ export class SalesDocumentsService {
         })),
       });
 
-      return { pdf: await renderSalesDocument(document), fileName: document.fileName };
+      return { pdf: await renderSalesDocument(document, logo), fileName: document.fileName };
     });
   }
 
@@ -160,6 +162,7 @@ export class SalesDocumentsService {
   ): Promise<RenderedDocument> {
     return this.access.runAsMember(userId, organizationId, async (tx) => {
       const organizationName = await this.organizationName(tx, organizationId);
+      const logo = await readStoredLogo(tx, organizationId);
       const invoice = await this.findInvoice(tx, organizationId, invoiceId);
       const lines = await this.lines(tx, organizationId, invoiceId);
 
@@ -182,7 +185,7 @@ export class SalesDocumentsService {
         lines: lines.map(toDocumentLine),
       });
 
-      return { pdf: await renderSalesDocument(document), fileName: document.fileName };
+      return { pdf: await renderSalesDocument(document, logo), fileName: document.fileName };
     });
   }
 

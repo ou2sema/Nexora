@@ -46,6 +46,25 @@ export const team: TeamMessages = {
   'team.noOrganization':
     'Sélectionnez une organisation pour consulter son équipe, ou demandez à un administrateur de la plateforme de vous y ajouter.',
   'team.administrationLink': 'Administration →',
+  'team.branding.heading': 'Image de marque',
+  'team.branding.description':
+    'Le logo figure dans l’en-tête de tous les documents émis par cette organisation.',
+  'team.branding.formats':
+    'PNG ou JPEG, {limit} KB au plus. Un fond transparent rend mieux à l’impression.',
+  'team.branding.empty': 'Sans logo',
+  'team.branding.previewAlt': 'Logo de {organizationName}',
+  'team.branding.fileLabel': 'Image du logo',
+  'team.branding.upload': 'Téléverser le logo',
+  'team.branding.replace': 'Remplacer le logo',
+  'team.branding.remove': 'Supprimer le logo',
+  'team.branding.uploading': 'Téléversement…',
+  'team.branding.removing': 'Suppression…',
+  'team.branding.uploadFailed': 'Le logo n’a pas pu être téléversé.',
+  'team.branding.removeFailed': 'Le logo n’a pas pu être supprimé.',
+  'team.branding.choosePngOrJpeg': 'Choisissez une image PNG ou JPEG.',
+  'team.branding.tooLarge': 'L’image doit faire {limit} KB au plus.',
+  'team.branding.readOnly':
+    'Les propriétaires, administrateurs et gestionnaires modifient le logo.',
   'invite.title': 'Inviter un membre de l’équipe',
   'invite.description':
     'L’invitation apparaîtra pour cette adresse e-mail après la connexion. Nexora n’envoie pas d’e-mail ; demandez à la personne de rechercher l’invitation en attente.',

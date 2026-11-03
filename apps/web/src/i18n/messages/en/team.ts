@@ -44,6 +44,23 @@ export const team = {
   'team.noOrganization':
     'Select an organization to view its team, or ask a platform administrator to add you to one.',
   'team.administrationLink': 'Administration →',
+  'team.branding.heading': 'Branding',
+  'team.branding.description':
+    'The mark appears in the header of every document this organization issues.',
+  'team.branding.formats': 'PNG or JPEG, up to {limit} KB. A transparent background prints best.',
+  'team.branding.empty': 'No logo',
+  'team.branding.previewAlt': '{organizationName} logo',
+  'team.branding.fileLabel': 'Logo image',
+  'team.branding.upload': 'Upload logo',
+  'team.branding.replace': 'Replace logo',
+  'team.branding.remove': 'Remove logo',
+  'team.branding.uploading': 'Uploading…',
+  'team.branding.removing': 'Removing…',
+  'team.branding.uploadFailed': 'The logo could not be uploaded.',
+  'team.branding.removeFailed': 'The logo could not be removed.',
+  'team.branding.choosePngOrJpeg': 'Choose a PNG or JPEG image.',
+  'team.branding.tooLarge': 'The image must be {limit} KB or smaller.',
+  'team.branding.readOnly': 'Owners, admins, and managers change the logo.',
   'invite.title': 'Invite a team member',
   'invite.description':
     'The invitation appears for this email after they sign in. Nexora does not send email, so tell them to look for the pending invitation.',

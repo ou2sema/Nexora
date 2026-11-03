@@ -138,6 +138,11 @@ const SERVER_MESSAGE_KEYS: Record<string, MessageKey> = {
     'errors.server.returnLineInvalid',
   'Each device may appear only once.': 'errors.server.duplicateDevice',
   'Enter a valid email address for the invitation.': 'errors.server.invalidInvitationEmail',
+  'Upload a PNG or JPEG image.': 'errors.code.unsupported_logo_type',
+  'The upload is empty.': 'errors.server.logoEmpty',
+  'The upload is not a PNG or JPEG image.': 'errors.server.logoNotAnImage',
+  'The upload does not match its content type.': 'errors.server.logoContentTypeMismatch',
+  'This organization has no logo.': 'errors.code.logo_not_found',
   'Provide an Idempotency-Key header between 8 and 120 characters.':
     'errors.code.idempotency_key_required',
 };

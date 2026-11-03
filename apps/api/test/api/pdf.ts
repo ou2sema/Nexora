@@ -61,6 +61,48 @@ export interface PdfRun {
   y: number;
 }
 
+export interface PdfImagePlacement {
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const CM_MATRIX = /(-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) cm/g;
+
+/**
+ * Every image the renderer actually placed, in page order: pdf-lib wraps each draw in a
+ * graphics state whose matrix chain carries the page position and the drawn size. An
+ * uploaded mark that never reaches the page would otherwise look like a passing test.
+ */
+export function pdfImages(pdf: Buffer): PdfImagePlacement[] {
+  const placements: PdfImagePlacement[] = [];
+
+  for (const content of pdfContentStreams(pdf)) {
+    const blocks = /q([\s\S]*?)\/([\w.-]+) Do\s*Q/g;
+    let block: RegExpExecArray | null;
+    while ((block = blocks.exec(content)) !== null) {
+      const matrices = [...(block[1] ?? '').matchAll(CM_MATRIX)].map((match) =>
+        match.slice(1, 7).map(Number),
+      );
+      const position = matrices.find((m) => m[0] === 1 && m[3] === 1);
+      const scale = matrices.find((m) => m[1] === 0 && m[2] === 0 && m[0] !== 1);
+      if (!position || !scale) continue;
+
+      placements.push({
+        name: block[2] ?? '',
+        x: position[4] ?? 0,
+        y: position[5] ?? 0,
+        width: scale[0] ?? 0,
+        height: scale[3] ?? 0,
+      });
+    }
+  }
+
+  return placements;
+}
+
 /**
  * The geometry a renderer actually drew: horizontal rules and text runs with their
  * baseline position. Layout regressions are invisible to pdfText, so they need this.

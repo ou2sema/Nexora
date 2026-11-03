@@ -1,15 +1,27 @@
 import { Injectable } from '@nestjs/common';
 import { and, eq, inArray } from 'drizzle-orm';
 import bwipjs from 'bwip-js';
-import { type PDFFont, PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import {
+  type PDFFont,
+  type PDFImage,
+  type PDFPage,
+  PDFDocument,
+  StandardFonts,
+  rgb,
+} from 'pdf-lib';
 import { sql } from 'drizzle-orm';
 
 import type { LabelRequest } from '@mystock/contracts';
 import { isValidGtinBarcode } from '@mystock/domain';
 
 import { AppError } from '../common/errors/app-error';
+import type { AppTransaction } from '../database/database.types';
 import { products } from '../database/schema';
 import { resultRows } from '../database/results';
+import { sanitizeText } from '../documents/document-format';
+import { brandDocument } from '../documents/pdf-layout';
+import { embedLogoImage } from '../logos/logo.embed';
+import { type StoredLogo, readStoredLogo } from '../logos/logo.reader';
 // The class is a DI token at runtime, so this cannot be a type-only import.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { TenantAccessService } from '../tenancy/tenant-access.service';
@@ -28,11 +40,29 @@ interface LabelSpec {
   code: string;
 }
 
+interface OrganizationRow {
+  name: string;
+}
+
+interface OrganizationIdentity {
+  name: string;
+  logo: StoredLogo | null;
+}
+
 const PAGE_MARGIN_X = 28;
 const PAGE_MARGIN_Y = 22;
 const GRID_COLUMNS = 3;
 const GRID_ROWS = 8;
 const CELL_HEIGHT = 100;
+
+// Eight 100 pt rows start 22 pt from the top, so the only free paper on an A4 sheet is
+// the bottom margin. Branding goes there: the grid itself never moves, because these
+// sheets are printed on pre-cut label stock.
+const FOOTER_BASELINE = 18;
+const FOOTER_LOGO_MAX_WIDTH = 14;
+const FOOTER_LOGO_MAX_HEIGHT = 10;
+const FOOTER_LOGO_GAP = 6;
+const FOOTER_MUTED = rgb(0.35, 0.4, 0.48);
 
 /** EAN/UPC symbologies are selected by GTIN length; anything else is Code 128. */
 function symbologyFor(code: string): string {
@@ -151,19 +181,31 @@ export class LabelsService {
         }
       }
 
-      return this.buildPdf(labels);
+      return this.buildPdf(labels, await this.organizationIdentity(tx, organizationId));
     });
   }
 
-  private async buildPdf(labels: LabelSpec[]): Promise<Uint8Array> {
+  private async organizationIdentity(
+    tx: AppTransaction,
+    organizationId: string,
+  ): Promise<OrganizationIdentity> {
+    const rows = resultRows<OrganizationRow>(
+      await tx.execute(sql`
+        select name from public.organizations where id = ${organizationId}
+      `),
+    );
+
+    return { name: rows[0]?.name ?? '', logo: await readStoredLogo(tx, organizationId) };
+  }
+
+  private async buildPdf(labels: LabelSpec[], identity: OrganizationIdentity): Promise<Uint8Array> {
     const document = await PDFDocument.create();
-    document.setTitle('MyStock labels');
-    document.setProducer('MyStock');
-    document.setCreator('MyStock');
+    brandDocument(document, identity.name ? `${identity.name} labels` : 'Nexora labels');
 
     const regular = await document.embedFont(StandardFonts.Helvetica);
     const bold = await document.embedFont(StandardFonts.HelveticaBold);
     const mono = await document.embedFont(StandardFonts.Courier);
+    const logoImage = identity.logo ? await embedLogoImage(document, identity.logo) : null;
 
     const barcodeCache = new Map<string, Awaited<ReturnType<typeof document.embedPng>>>();
     for (const label of labels) {
@@ -235,6 +277,51 @@ export class LabelsService {
       }
     }
 
+    for (const page of document.getPages()) {
+      drawIdentityFooter(page, regular, identity.name, logoImage);
+    }
+
     return document.save();
   }
+}
+
+/**
+ * The bottom margin is the only free paper on a pre-cut sheet, so the tenant's identity
+ * line sits there and the 3x8 grid never moves.
+ */
+function drawIdentityFooter(
+  page: PDFPage,
+  font: PDFFont,
+  name: string,
+  logo: PDFImage | null,
+): void {
+  const visibleName = sanitizeText(name);
+  const { width: pageWidth } = page.getSize();
+  let x = PAGE_MARGIN_X;
+
+  if (logo) {
+    const scale = Math.min(
+      FOOTER_LOGO_MAX_WIDTH / logo.width,
+      FOOTER_LOGO_MAX_HEIGHT / logo.height,
+    );
+    const width = logo.width * scale;
+    const height = logo.height * scale;
+    page.drawImage(logo, {
+      x,
+      y: FOOTER_BASELINE + 2.5 - height / 2,
+      width,
+      height,
+    });
+    x += width + FOOTER_LOGO_GAP;
+  }
+
+  if (!visibleName) return;
+
+  page.drawText(fitText(font, 7, visibleName, pageWidth - PAGE_MARGIN_X - x), {
+    x,
+    y: FOOTER_BASELINE,
+    size: 7,
+    font,
+    color: FOOTER_MUTED,
+  });
 }

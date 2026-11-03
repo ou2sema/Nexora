@@ -7,6 +7,7 @@ import { resultRows } from '../database/results';
 // The class is a DI token at runtime, so this cannot be a type-only import.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { TenantAccessService } from '../tenancy/tenant-access.service';
+import { readStoredLogo } from '../logos/logo.reader';
 import { toIso, toNullableIso, toNumber } from '../operations/operations.utils';
 import {
   type SupplierDocumentInfo,
@@ -99,6 +100,7 @@ export class PurchaseDocumentsService {
   ): Promise<RenderedDocument> {
     return this.access.runAsMember(userId, organizationId, async (tx) => {
       const organization = await this.organizationName(tx, organizationId);
+      const logo = await readStoredLogo(tx, organizationId);
 
       const rows = resultRows<PurchaseOrderDocumentRow>(
         await tx.execute(sql`
@@ -161,7 +163,7 @@ export class PurchaseDocumentsService {
         })),
       });
 
-      return { pdf: await renderPurchaseDocument(document), fileName: document.fileName };
+      return { pdf: await renderPurchaseDocument(document, logo), fileName: document.fileName };
     });
   }
 
@@ -173,6 +175,7 @@ export class PurchaseDocumentsService {
   ): Promise<RenderedDocument> {
     return this.access.runAsMember(userId, organizationId, async (tx) => {
       const organization = await this.organizationName(tx, organizationId);
+      const logo = await readStoredLogo(tx, organizationId);
 
       const rows = resultRows<PurchaseReturnDocumentRow>(
         await tx.execute(sql`
@@ -264,7 +267,7 @@ export class PurchaseDocumentsService {
         })),
       });
 
-      return { pdf: await renderPurchaseDocument(document), fileName: document.fileName };
+      return { pdf: await renderPurchaseDocument(document, logo), fileName: document.fileName };
     });
   }
 

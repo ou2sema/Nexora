@@ -2,9 +2,17 @@ import { PDFDocument, StandardFonts } from 'pdf-lib';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { CONTENT_WIDTH, MARGIN } from '../../src/documents/pdf-layout';
+import {
+  CONTENT_WIDTH,
+  LOGO_BOX_HEIGHT,
+  LOGO_BOX_WIDTH,
+  LOGO_TEXT_GAP,
+  MARGIN,
+  PAGE_HEIGHT,
+} from '../../src/documents/pdf-layout';
 import { LOCATIONS, ORGS, PRODUCTS, USERS, WAREHOUSES } from '../db/fixtures';
-import { type PdfRun, pdfGeometry, pdfParser, pdfText } from './pdf';
+import { LOGO_PNG } from './logo-image';
+import { type PdfRun, pdfGeometry, pdfImages, pdfParser, pdfText } from './pdf';
 import { createTestContext, type TestContext } from './test-app';
 
 const YEAR = new Date().getFullYear();
@@ -341,5 +349,45 @@ describe('sales document PDFs', () => {
       .set('authorization', auth(aliceToken));
     expect(missing.status).toBe(404);
     expect(missing.body.error.code).toBe('sales_invoice_not_found');
+  });
+
+  it('draws the tenant mark in the first-page header only', async () => {
+    const logoUrl = `/api/v1/organizations/${ORGS.a}/logo`;
+    const upload = await request(ctx.app.getHttpServer())
+      .put(logoUrl)
+      .set('authorization', auth(aliceToken))
+      .set('content-type', 'image/png')
+      .send(LOGO_PNG);
+    expect(upload.status).toBe(200);
+
+    try {
+      const list = await request(ctx.app.getHttpServer())
+        .get(invoicesUrl)
+        .set('authorization', auth(aliceToken));
+      const invoiceId = (list.body.items as { id: string }[])[0]!.id;
+
+      const response = await fetchPdf(`${invoicesUrl}/${invoiceId}/pdf`, aliceToken);
+      expect(response.status).toBe(200);
+
+      const pdf = response.body as Buffer;
+      const images = pdfImages(pdf);
+      expect(images).toHaveLength(1);
+      const mark = images[0]!;
+      expect(mark.width).toBeLessThanOrEqual(LOGO_BOX_WIDTH);
+      expect(mark.height).toBeLessThanOrEqual(LOGO_BOX_HEIGHT);
+      expect(mark.x).toBeGreaterThanOrEqual(MARGIN);
+      expect(mark.y).toBeGreaterThanOrEqual(PAGE_HEIGHT - MARGIN - LOGO_BOX_HEIGHT);
+      expect(mark.y + mark.height).toBeLessThanOrEqual(PAGE_HEIGHT - MARGIN);
+
+      // The identity text gives the mark its box and starts to the right of it.
+      const { runs } = pdfGeometry(pdf);
+      const orgName = runs.find((run) => run.value === 'Org A' && run.size === 15);
+      expect(orgName?.x).toBe(MARGIN + LOGO_BOX_WIDTH + LOGO_TEXT_GAP);
+
+      const issueNote = await fetchPdf(`${invoicesUrl}/${invoiceId}/issue-note/pdf`, aliceToken);
+      expect(pdfImages(issueNote.body as Buffer)).toHaveLength(1);
+    } finally {
+      await request(ctx.app.getHttpServer()).delete(logoUrl).set('authorization', auth(aliceToken));
+    }
   });
 });

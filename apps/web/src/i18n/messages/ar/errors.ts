@@ -54,6 +54,9 @@ export const errors: ErrorsMessages = {
   'errors.code.member_not_found': 'عضو الفريق غير موجود.',
   'errors.code.invitation_not_found': 'الدعوة غير موجودة.',
   'errors.code.scan_not_found': 'لا يوجد منتج أو جهاز يطابق هذا الرمز.',
+  'errors.code.unsupported_logo_type': 'ارفع صورة PNG أو JPEG.',
+  'errors.code.invalid_logo_image': 'تعذّرت قراءة الصورة. صدّرها من جديد بصيغة PNG أو JPEG.',
+  'errors.code.logo_not_found': 'لا يوجد شعار لهذه المؤسسة.',
 
   'errors.server.supplierNameConflict': 'يوجد مورّد بهذا الاسم بالفعل.',
   'errors.server.deviceSerialConflict': 'تم تسجيل جهاز بهذا الرقم التسلسلي مسبقاً.',
@@ -141,6 +144,9 @@ export const errors: ErrorsMessages = {
   'errors.server.returnLineInvalid': 'يحتاج كل سطر مرتجع إلى سطر أمر وكمية موجبة.',
   'errors.server.duplicateDevice': 'يمكن أن يظهر كل جهاز مرة واحدة فقط.',
   'errors.server.invalidInvitationEmail': 'أدخل بريداً إلكترونياً صالحاً للدعوة.',
+  'errors.server.logoEmpty': 'الملف المرفوع فارغ.',
+  'errors.server.logoNotAnImage': 'الملف المرفوع ليس صورة PNG أو JPEG.',
+  'errors.server.logoContentTypeMismatch': 'الملف المرفوع لا يطابق نوع محتواه.',
 
   'errors.auth.invalidCredentials': 'بيانات الدخول غير صحيحة',
   'errors.auth.emailNotConfirmed': 'البريد الإلكتروني غير مؤكد',

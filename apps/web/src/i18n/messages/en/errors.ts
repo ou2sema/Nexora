@@ -54,6 +54,10 @@ export const errors = {
   'errors.code.member_not_found': 'Team member not found.',
   'errors.code.invitation_not_found': 'Invitation not found.',
   'errors.code.scan_not_found': 'No product or device matches this code.',
+  'errors.code.unsupported_logo_type': 'Upload a PNG or JPEG image.',
+  'errors.code.invalid_logo_image':
+    'The image could not be read. Re-export it as a PNG or JPEG file.',
+  'errors.code.logo_not_found': 'This organization has no logo.',
 
   'errors.server.supplierNameConflict': 'A supplier with this name already exists.',
   'errors.server.deviceSerialConflict': 'A device with this serial number is already registered.',
@@ -151,6 +155,9 @@ export const errors = {
     'Each return line needs an order line and a positive quantity.',
   'errors.server.duplicateDevice': 'Each device may appear only once.',
   'errors.server.invalidInvitationEmail': 'Enter a valid email address for the invitation.',
+  'errors.server.logoEmpty': 'The upload is empty.',
+  'errors.server.logoNotAnImage': 'The upload is not a PNG or JPEG image.',
+  'errors.server.logoContentTypeMismatch': 'The upload does not match its content type.',
 
   'errors.auth.invalidCredentials': 'Invalid login credentials',
   'errors.auth.emailNotConfirmed': 'Email not confirmed',

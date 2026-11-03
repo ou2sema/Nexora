@@ -50,6 +50,18 @@ export const REQUIRED_SCHEMA: readonly SchemaProbe[] = [
     expression:
       "to_regprocedure('app.record_sales_invoice_payment(uuid,uuid,bigint,text,text,text,text)')",
   },
+  {
+    label: 'public.organization_logos',
+    expression: "to_regclass('public.organization_logos')",
+  },
+  {
+    label: 'app.set_organization_logo(uuid, text, bytea)',
+    expression: "to_regprocedure('app.set_organization_logo(uuid,text,bytea)')",
+  },
+  {
+    label: 'app.clear_organization_logo(uuid)',
+    expression: "to_regprocedure('app.clear_organization_logo(uuid)')",
+  },
 ];
 
 export async function findMissingSchemaObjects(handle: DatabaseHandle): Promise<string[]> {

@@ -2,6 +2,7 @@ import {
   bigint,
   boolean,
   char,
+  customType,
   date,
   jsonb,
   numeric,
@@ -12,6 +13,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import type {
+  LogoMimeType,
   MemberRole,
   PaymentMethod,
   PaymentStatus,
@@ -20,6 +22,12 @@ import type {
   SalesOrderStatus,
   UnitOfMeasure,
 } from '@mystock/contracts';
+
+// drizzle-orm 0.45 ships no bytea builder. Only reads go through this column, and both
+// drivers hand back a byte array the caller treats as opaque.
+const bytea = customType<{ data: Uint8Array }>({
+  dataType: () => 'bytea',
+});
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -58,6 +66,14 @@ export const organizationInvitations = pgTable('organization_invitations', {
   acceptedAt: timestamp('accepted_at', { withTimezone: true }),
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
   ...timestamps,
+});
+
+export const organizationLogos = pgTable('organization_logos', {
+  organizationId: uuid('organization_id').primaryKey(),
+  mime: text('mime').$type<LogoMimeType>().notNull(),
+  bytes: bytea('bytes').notNull(),
+  updatedBy: uuid('updated_by'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const categories = pgTable('categories', {

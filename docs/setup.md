@@ -683,8 +683,8 @@ cd apps/web
 npx playwright test --config playwright.local-stack.config.ts --headed
 ```
 
-Expected: 50 checks (25 tests × desktop/mobile). The four `e2e-local/i18n.spec.ts` tests
-cover:
+Expected: 54 checks (27 tests × desktop/mobile), the count as of Phase 14. The four
+`e2e-local/i18n.spec.ts` tests cover:
 
 - French pre-auth copy, the sign-in form, dashboard copy, `fr-TN` money and date output,
   and persistence across a reload;
@@ -834,6 +834,69 @@ edge, labels are right-aligned on one edge just left of the Amount column, amoun
 on the content edge, and the grand total keeps its rule and its bold row. The table's own bottom rule
 is untouched, so the table is still closed full width. Purchase orders and returns share the same
 primitive, so their totals blocks moved with it.
+
+## Logo verification
+
+Phase 14 is specified in
+[`adr/0018-organization-logos.md`](adr/0018-organization-logos.md): each organization brings its own
+mark. The asset is one row in
+`public.organization_logos` — mime, bytes, and who last changed it — read by every member through the
+same row-security policy as `customers`, and written only by `app.set_organization_logo` and
+`app.clear_organization_logo`, which enforce the owner/admin/manager set inside SQL.
+`PUT`/`GET`/`DELETE /api/v1/organizations/:id/logo` move the bytes, and `GET /me` reports the summary
+(mime, byte length, `updated_at`) or `null` per membership, which is what the interface keys its cache
+on.
+
+**Gates (2026-11-03).** `npm run test` is 382 Vitest tests — 314 API across 39 files, 47 domain, 14
+contracts, 7 config — `npm run typecheck` and `npm run format:check` are clean, `npm run lint` reports
+0 errors, and the headed local-stack suite is 54/54 (27 tests × desktop and mobile).
+`npm run check:integrity` still reconciles all seven organizations. The virgin-database drill ran
+against a throwaway localhost instance and reported `15 migrations + seed`, seeded `1/1/7/7/7/2/3`,
+readiness `ok` with an 80 ms database probe, and the negative half still stopping the boot with exit
+code `1` after dropping `public.admin_audit_events`; the guard now verifies 17 objects.
+
+**What the tests prove, rather than assert.** `test/db/organization-logos.test.ts` (5 tests) drives the
+role gate as the database sees it: the catalog-writing roles replace the single row and everyone else,
+including a viewer, is refused; the writer's identity is recorded in `updated_by`; every member can read
+the row and nobody outside the tenant can; a direct client `INSERT` and `DELETE` are refused (the test
+sees `permission denied for table organization_logos`, because the migration grants `authenticated`
+only `select` — on the hosted project Supabase's schema-level default privileges grant more than that,
+so there row security is the barrier, as recorded for the invoice tables in ADR-0017); the definer
+functions reject a mime outside PNG/JPEG and bytes outside the size bounds before touching the row; and
+the mark disappears with the organization. `test/api/logos.test.ts` (12 tests) covers the HTTP contract: an unauthenticated
+`PUT` is refused, the owner's PNG round-trips to any member, another tenant gets `404 organization_not_found`
+rather than `403`, a JPEG replaces the PNG in the same row, the `/me` summary carries the mime, byte
+length and timestamp and returns to `null` after `DELETE`, a viewer cannot change the mark (`403`), an
+SVG, webp or JSON `Content-Type` is `415 unsupported_logo_type`, bytes whose signature contradicts the
+header are `400 invalid_logo_image`, an image that the renderer itself cannot embed is refused before
+anything is stored, and an empty body or one over the 400 KB cap is refused while the stream is counted.
+
+The branding on the page is checked in the bytes of the file, not by eye: a document that should carry
+the mark must contain exactly one `/Subtype /Image` XObject and one that should not must contain zero,
+so the assertion is that the image reached the page rather than that the renderer ran without throwing.
+`test/api/sales-documents.test.ts` proves the invoice header and that the continuation page stays
+text-only, `test/api/purchase-documents.test.ts` proves the purchase order and the return note, and
+`test/api/scanning.test.ts` proves the label sheet, where the mark and the organization name sit in the
+free bottom margin so the 3 × 8 pre-cut grid keeps its geometry. The same tests read `/Creator`, which
+is where the product name lives: `pdf-lib` overwrites `/Producer` with its own signature on every
+`save()`, so an assertion about `getProducer()` would encode a false claim.
+
+The headed spec `e2e-local/branding.spec.ts` covers the client half on the real signed-in app: an
+upload through the file input puts the mark in the preview and in the top-bar switcher, a counter invoice
+posted afterwards contains one image object, replacing the mark with a different-sized PNG changes the
+pixels the browser actually renders (`naturalWidth` 4 → 2 — a blob URL would change even if the bytes
+were stale), removing it returns the card to "No logo", takes the switcher mark away and makes the same
+invoice render with zero images, and a viewer sees the read-only copy with no logo buttons at all. The
+request URL carries `?version=<updated_at>` because the response is `private, max-age=86400, immutable`;
+a tenant with no mark never fetches one, so the interface no longer logs a `404` per dashboard load.
+
+Not verified yet: the migration has not been applied to the hosted project, so the branding card cannot
+work there until the operator applies it, and no logo has been uploaded through the hosted app. The
+order matters: this build's guard verifies 17 objects and the hosted database has 14, so an API started
+against it now stops during boot (the drill's negative half is the same mechanism) — apply
+`20261103120000_organization_logos.sql` first, then restart. The local development API on `:4100` is
+still running the previous build for exactly that reason, and its `.env` points at the hosted pooler.
+The PDFs, CSV exports and labels stay English (ADR-0014 decision 4).
 
 ## Operator tasks
 
@@ -1003,6 +1066,7 @@ The schema is plain SQL in `supabase/migrations`, applied in filename order:
 | `20261101144800_membership_write_hardening.sql`       | tightened membership write policies and re-recorded audit RPCs                                                                                         |
 | `20261102120000_admin_audit_retention.sql`            | owner-only `app.prune_admin_audit_events(integer)` with a 30–3650 day window, `EXECUTE` revoked from `public`                                          |
 | `20261102180000_counter_sales_and_invoices.sql`       | customers, sales invoices with lines and payments, `app.save_customer`, `app.create_sales_invoice`, `app.record_sales_invoice_payment`, `FI` numbering |
+| `20261103120000_organization_logos.sql`               | one PNG/JPEG mark per organization, `app.set_organization_logo`, `app.clear_organization_logo`, member-only `select`                                   |
 
 Demo data lives in `supabase/seed.sql` and requires at least one signed-up user (it raises
 `seed_requires_auth_user` otherwise). The seed inserts demo inventory into the first signed-up
@@ -1142,15 +1206,15 @@ npm run test --workspace @mystock/api -- test/db
 
 ## Test suites
 
-| Command                                                         | What it runs                                                                                                                                                                                                                                                                                                                                                        |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run test`                                                  | 362 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, counter sales and invoices, sales document PDFs, team access, platform administration, admin audit + retention, membership write hardening, health probes, schema guard, API shell, env, contracts, domain |
-| `npm run test:e2e`                                              | Playwright against the API and dev server (18 checks: 9 tests × desktop/mobile)                                                                                                                                                                                                                                                                                     |
-| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                                                                                                                                    |
-| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                                                                                                                         |
-| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–13 flows on the self-contained stack (50 checks: 25 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                                                                                                                                                                                 |
-| `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                                                                                                                                   |
-| `npm run drill:virgin-database --workspace @mystock/api`        | Migrations + seed onto virgin local databases and both schema-guard boot paths (needs `npm run build` and a localhost `DATABASE_URL`)                                                                                                                                                                                                                               |
+| Command                                                         | What it runs                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run test`                                                  | 382 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, counter sales and invoices, sales document PDFs, organization logos, team access, platform administration, admin audit + retention, membership write hardening, health probes, schema guard, API shell, env, contracts, domain |
+| `npm run test:e2e`                                              | Playwright against the API and dev server (18 checks: 9 tests × desktop/mobile)                                                                                                                                                                                                                                                                                                         |
+| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                                                                                                                                                        |
+| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                                                                                                                                             |
+| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–14 flows on the self-contained stack (54 checks: 27 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                                                                                                                                                                                                     |
+| `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                                                                                                                                                       |
+| `npm run drill:virgin-database --workspace @mystock/api`        | Migrations + seed onto virgin local databases and both schema-guard boot paths (needs `npm run build` and a localhost `DATABASE_URL`)                                                                                                                                                                                                                                                   |
 
 The API suites (`apps/api/test/api`) run the real migrations on PGlite, sign JWTs with
 locally generated ES256 keys, and serve the trusted public key from a temporary JWKS

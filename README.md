@@ -59,7 +59,13 @@ and organization-scoped reporting.
 > local-stack suite is headed-verified, and on 2026-11-03 the migration was applied to the hosted
 > project and the first counter sale was posted there from the signed-in app: invoice
 > `FI-2026-0001`, 14.900 TND paid in cash, its `SO-2026-0002` exit document and the `issue` ledger
-> line behind it all read back out of the hosted database, and both PDFs downloaded. Nothing is
+> line behind it all read back out of the hosted database, and both PDFs downloaded. Phase 14 adds
+> the tenant's own mark: an owner, admin or manager uploads a PNG or JPEG, and it appears in the
+> workspace header and in the first-page header of every document the server generates — invoice,
+> goods issue note, purchase order, return note — plus the identity line in the free margin of a
+> label sheet. The bytes are one row in Postgres behind the same row security as every other tenant
+> table, an upload is refused unless `pdf-lib` can actually embed it, and any member may read it. This
+> is headed-verified locally; its migration has not been applied to the hosted project yet. Nothing is
 > production-ready yet.
 
 ## Stack
@@ -100,7 +106,9 @@ plurals, RTL, and error translation are specified in
 specified in [ADR-0015](docs/adr/0015-health-probe-endpoints.md), and audit-trail retention in
 [ADR-0016](docs/adr/0016-operator-audit-retention.md). Counter sales, commercial invoices, and
 the customer directory are specified in
-[ADR-0017](docs/adr/0017-counter-sales-and-invoices.md).
+[ADR-0017](docs/adr/0017-counter-sales-and-invoices.md). Organization logos on the workspace and on
+generated documents are specified in
+[ADR-0018](docs/adr/0018-organization-logos.md).
 
 ## Layout
 

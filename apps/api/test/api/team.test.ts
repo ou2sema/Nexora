@@ -187,6 +187,7 @@ describe('team access', () => {
       organizationName: 'Org A',
       organizationSlug: 'org-a',
       role: 'manager',
+      logo: null,
     });
 
     const me = await request(server()).get('/api/v1/me').set('authorization', auth(carolToken));
