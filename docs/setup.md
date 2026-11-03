@@ -872,8 +872,11 @@ header are `400 invalid_logo_image`, an image that the renderer itself cannot em
 anything is stored, and an empty body or one over the 400 KB cap is refused while the stream is counted.
 
 The branding on the page is checked in the bytes of the file, not by eye: a document that should carry
-the mark must contain exactly one `/Subtype /Image` XObject and one that should not must contain zero,
-so the assertion is that the image reached the page rather than that the renderer ran without throwing.
+the mark contains the image XObject the renderer placed, and one that should not contains zero, so the
+assertion is that the image reached the page rather than that the renderer ran without throwing. The
+count is one for the opaque fixtures these tests use; a PNG with an alpha channel is written as the image
+plus its `/SMask`, so a transparent mark accounts for two `/Subtype /Image` objects — the hosted pass
+below saw exactly that.
 `test/api/sales-documents.test.ts` proves the invoice header and that the continuation page stays
 text-only, `test/api/purchase-documents.test.ts` proves the purchase order and the return note, and
 `test/api/scanning.test.ts` proves the label sheet, where the mark and the organization name sit in the
@@ -890,13 +893,46 @@ invoice render with zero images, and a viewer sees the read-only copy with no lo
 request URL carries `?version=<updated_at>` because the response is `private, max-age=86400, immutable`;
 a tenant with no mark never fetches one, so the interface no longer logs a `404` per dashboard load.
 
-Not verified yet: the migration has not been applied to the hosted project, so the branding card cannot
-work there until the operator applies it, and no logo has been uploaded through the hosted app. The
-order matters: this build's guard verifies 17 objects and the hosted database has 14, so an API started
-against it now stops during boot (the drill's negative half is the same mechanism) — apply
-`20261103120000_organization_logos.sql` first, then restart. The local development API on `:4100` is
-still running the previous build for exactly that reason, and its `.env` points at the hosted pooler.
-The PDFs, CSV exports and labels stay English (ADR-0014 decision 4).
+**Hosted branding pass (2026-11-03).** The dry run listed only `20261103120000_organization_logos.sql`
+and the push took the hosted registry to 15 migrations. Read-only checks then confirmed the shape:
+`public.organization_logos` has row security on with one policy,
+`organization_logos_select_member` for `authenticated` using `app.is_org_member(organization_id)`; both
+`app.set_organization_logo(uuid, text, bytea)` and `app.clear_organization_logo(uuid)` are `SECURITY
+DEFINER`, owned by `postgres`, run with `search_path = ''`, and are executable by `authenticated` only —
+`anon` and `service_role` are refused. The write barrier here is row security, not grants:
+`has_table_privilege('authenticated', …, 'INSERT')` is true because Supabase's schema-level default
+privileges apply, and a direct `INSERT` under that role is still refused with `42501 new row violates
+row-level security policy for table "organization_logos"`, while the definer functions answer `42501
+forbidden` to a caller without a catalog-writing role. The API was then restarted on this build: the boot
+log reads "Database schema verified (17 required objects present)", `PUT`/`GET`/`DELETE` on
+`/organizations/:organizationId/logo` are mapped, and an unauthenticated read is `401 unauthenticated`.
+
+The pass itself ran in the signed-in app against the "MyStock" tenant. Uploading a 240 × 240 transparent
+PNG put the mark in the branding card and in the top-bar switcher, both at `naturalWidth` 240 — the bytes
+came from the hosted row, not from the file picker. The purchase order PDF downloaded from the app then
+measured 4,723 bytes with two `/Subtype /Image` objects (the mark and its `/SMask`), `/Title` "Purchase
+order PO-2026-0001" and `/Creator` "Nexora"; the same document downloaded on 2026-10-31, before the
+feature existed, measured 2,554 bytes with zero image objects, so the before-and-after is one hosted
+document. Replacing the mark with an opaque 180 × 180 PNG re-rendered both places at `naturalWidth` 180,
+which is the versioned URL doing its job against a response the browser was told to hold for a day, and
+the re-downloaded PDF carried one image object with no `/SMask`. The badge was then uploaded again, so
+the tenant keeps a mark. Not exercised on hosted: the remove button and the viewer's read-only card (both
+covered by the headed local suite), and the label sheet and invoice families — the purchase order proves
+the shared header path. At the narrow 472 CSS px window the automated browser uses, the switcher mark is
+`hidden sm:block` by design, so there it was verified in the DOM rather than by eye.
+
+**Operational finding from the same pass.** The hosted session pooler ran out of client slots under
+concurrent use: one API run logged 39 failures with `EMAXCONNSESSION max clients reached in session
+mode`, `/health/ready` answered `service_unavailable` ("The database is not answering") while it did, and
+the first `npm run check:integrity` could not connect at all — the retry a minute later reconciled all
+seven organizations with zero drift. `pg_stat_activity` during the saturation showed roughly twenty idle
+backends with `application_name = 'Supavisor'` next to the single established connection held from this
+machine. The ceiling itself is a Supavisor setting in the dashboard and is not readable from SQL, so no
+number is claimed here; what is measured is that the budget was reached. The affected requests recovered
+as soon as a slot freed, so the diagnosis is the pooler budget rather than this build. It is an operator
+decision in the Supabase dashboard — raise the pool size or stop whatever is holding idle sessions — and
+it is unrelated to the logo code path, which never opened more than its share. The PDFs, CSV exports and
+labels stay English (ADR-0014 decision 4).
 
 ## Operator tasks
 

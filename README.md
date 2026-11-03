@@ -65,8 +65,9 @@ and organization-scoped reporting.
 > goods issue note, purchase order, return note — plus the identity line in the free margin of a
 > label sheet. The bytes are one row in Postgres behind the same row security as every other tenant
 > table, an upload is refused unless `pdf-lib` can actually embed it, and any member may read it. This
-> is headed-verified locally; its migration has not been applied to the hosted project yet. Nothing is
-> production-ready yet.
+> is headed-verified locally, and on 2026-11-03 the migration was applied to the hosted project, the
+> API restarted on this build, and real marks uploaded through the signed-in app — one purchase order
+> downloaded before and after carries the difference in its bytes. Nothing is production-ready yet.
 
 ## Stack
 

@@ -117,16 +117,19 @@ tenant can cache it.
 
 ## Consequences
 
-- The migration `20261103120000_organization_logos.sql` must be applied to the hosted project before
-  the branding card works there, as with every previous phase; it is the fifteenth migration, and the
-  boot schema guard now verifies 17 objects instead of 14 (the table and both functions) so API code
-  that assumes the asset exists cannot start against an un-migrated database.
+- The migration `20261103120000_organization_logos.sql` was applied to the hosted project on
+  2026-11-03; it is the fifteenth migration, and the boot schema guard now verifies 17 objects instead
+  of 14 (the table and both functions) so API code that assumes the asset exists cannot start against
+  an un-migrated database.
 - Tenant bytes now leave the database through an HTTP route. The route is member-gated, returns no
   JSON, and the bytes never enter a log line or a `response` column; `check:integrity` and the
   reconciliation views are untouched because a logo is not a quantity.
 - Logo bytes live inside every generated PDF, so a document's size grows by the embedded image once
   per document (not per page). A 400 KB PNG inflates to raw RGBA and re-compresses, which is the
-  reason the guidance in the UI asks for a small mark; the cap is enforced at the write.
+  reason the guidance in the UI asks for a small mark; the cap is enforced at the write. Measured on
+  hosted: an 870-byte transparent mark took a purchase order from 2,554 to 4,723 bytes, because the
+  alpha channel travels as a second image object, while a 959-byte opaque mark rendered the same
+  document at 3,857 bytes.
 - `app.document_kind`, numbering, ledger, and device flows do not change. A logo is presentation, so
   no idempotency key, no operation type, and no new enum value.
 - The upload is one row per organization with no history: replacing a mark discards the old bytes, and
@@ -137,8 +140,10 @@ tenant can cache it.
   When the HTML/CSS renderer lands for French and Arabic documents, it reads the same
   `organization_logos` row and inlines the same bytes as a `data:` URL, so the branding work here
   carries over to that renderer unchanged.
-- Phase state: implemented and verified locally on 2026-11-03 — 382 Vitest tests (314 API across 39
-  files), the headed local-stack suite 54/54, the virgin-database drill on 15 migrations, and the
-  branding spec byte-checking a real invoice with and without the mark. `docs/setup.md`
-  ("Logo verification") holds the gate output. The hosted project has not received the migration yet,
-  so the branding card is not live there; that step is the operator's.
+- Phase state: implemented, verified locally and landed on hosted on 2026-11-03 — 382 Vitest tests
+  (314 API across 39 files), the headed local-stack suite 54/54, the virgin-database drill on 15
+  migrations, and the branding spec byte-checking a real invoice with and without the mark. The hosted
+  project carries the migration, the restarted API verified 17 objects and mapped the three routes, and
+  the signed-in app uploaded, replaced and re-uploaded a mark in the "MyStock" tenant with the purchase
+  order PDF checked in the bytes each time. `docs/setup.md` ("Logo verification") holds the gate output
+  and the hosted record, including the pooler finding that came out of the same pass.
