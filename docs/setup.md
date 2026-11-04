@@ -916,10 +916,49 @@ feature existed, measured 2,554 bytes with zero image objects, so the before-and
 document. Replacing the mark with an opaque 180 × 180 PNG re-rendered both places at `naturalWidth` 180,
 which is the versioned URL doing its job against a response the browser was told to hold for a day, and
 the re-downloaded PDF carried one image object with no `/SMask`. The badge was then uploaded again, so
-the tenant keeps a mark. Not exercised on hosted: the remove button and the viewer's read-only card (both
-covered by the headed local suite), and the label sheet and invoice families — the purchase order proves
-the shared header path. At the narrow 472 CSS px window the automated browser uses, the switcher mark is
-`hidden sm:block` by design, so there it was verified in the DOM rather than by eye.
+the tenant keeps a mark — the hosted row's `md5` matches the uploaded file byte for byte. Not exercised
+on hosted: the remove button and the viewer's read-only card (both covered by the headed local suite). At
+the narrow 472 CSS px window the automated browser uses, the switcher mark is `hidden sm:block` by
+design, so there it was verified in the DOM rather than by eye.
+
+**Hosted document-family sweep (2026-11-04).** Every family the server generates was then downloaded
+from the signed-in hosted app against the "MyStock" tenant with the badge in place, and each file was
+inflated and read rather than trusted:
+
+| document                        | bytes | `/Subtype /Image` | `/SMask` | mark placement, pt     |
+| ------------------------------- | ----: | ----------------: | -------: | ---------------------- |
+| invoice `FI-2026-0001`          | 5,033 |                 2 |        1 | 30 × 30 at (55, 763.9) |
+| goods issue note `SO-2026-0002` | 4,621 |                 2 |        1 | 30 × 30 at (55, 763.9) |
+| purchase order `PO-2026-0001`   | 4,723 |                 2 |        1 | 30 × 30 at (55, 763.9) |
+| purchase return `PR-2026-0001`  | 4,722 |                 2 |        1 | 30 × 30 at (55, 763.9) |
+| product label `CABLE-01`        | 5,959 |                 3 |        1 | 10 × 10 at (28, 15.5)  |
+| device label `SN-IPH15-0001`    | 9,195 |                 3 |        1 | 10 × 10 at (28, 15.5)  |
+
+The placement is read from the content stream — the `cm` matrix chain that wraps each `/Name Do`
+operator — so the table proves the renderer drew the mark at a page position rather than merely embedded
+it. PDF coordinates start at the bottom left, which is exactly the documented layout: 30 × 30 pt near the
+top of an A4 page for the four documents, 10 × 10 pt in the free bottom margin of a label sheet, where
+the pre-cut grid cannot move. Label sheets count one image object more than the documents because the
+barcode is itself a placed image.
+
+The controls are the same hosted documents downloaded before the row existed — `FI-2026-0001` at 2,885
+bytes and `FI-2026-0003` at 2,884, both with zero image objects, `PO-2026-0001` at 2,554 from 2026-10-31,
+and label sheets at 3,718 and 4,440 with one image object each, the barcode and nothing else. That is the
+logo-free path measured against the hosted database rather than only against PGlite.
+
+One trap for future byte checks: `pdf-lib` writes the document catalogue into compressed object streams
+by default, so `/Title`, `/Creator` and `/Producer` are **not** present in the raw bytes; they surface
+only after the stream is inflated (`/Title <FEFF…>` is UTF-16BE "Purchase order PO-2026-0001", `/Creator`
+"Nexora"). `/Subtype /Image` and `/SMask` do appear raw, because image XObjects sit outside the object
+streams.
+
+**The 400 KB cap is a document-size decision, not a storage one.** The mark the owner uploaded for
+ELECTRO-ELLOUZI is 399,980 bytes and the hosted row's `md5` matches that file, but the tenant has no
+products and no documents, and no data was created to test it. So the same bytes were embedded through
+the same `pdf-lib` path in a scratch page: 956 bytes without the mark, 477,633 with it — **+476,677 per
+document**, because an RGBA PNG is decoded, re-compressed, and travels with its alpha as a second image
+object. The 870-byte badge costs about 2.1 KB on the same page. The cap protects the print queue and the
+download, not the database.
 
 **Operational finding from the same pass.** The hosted session pooler ran out of client slots under
 concurrent use: one API run logged 39 failures with `EMAXCONNSESSION max clients reached in session

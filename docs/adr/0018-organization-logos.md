@@ -129,7 +129,13 @@ tenant can cache it.
   reason the guidance in the UI asks for a small mark; the cap is enforced at the write. Measured on
   hosted: an 870-byte transparent mark took a purchase order from 2,554 to 4,723 bytes, because the
   alpha channel travels as a second image object, while a 959-byte opaque mark rendered the same
-  document at 3,857 bytes.
+  document at 3,857 bytes. All six hosted families now carry it — invoice, goods issue note, purchase
+  order, purchase return, and the product and device label sheets, each with the mark placed at 30 × 30
+  pt in the header or 10 × 10 pt in a label's free margin. The cap's real purpose showed up when the
+  same `pdf-lib` embed path was run over a tenant's actual 399,980-byte mark: 956 bytes became 477,633,
+  so a 400 KB source costs roughly 477 KB **per document**. That is a print-queue and download
+  consideration, not a database one, and it is why the UI guidance asks for a small mark rather than
+  only enforcing the ceiling.
 - `app.document_kind`, numbering, ledger, and device flows do not change. A logo is presentation, so
   no idempotency key, no operation type, and no new enum value.
 - The upload is one row per organization with no history: replacing a mark discards the old bytes, and
@@ -144,6 +150,8 @@ tenant can cache it.
   (314 API across 39 files), the headed local-stack suite 54/54, the virgin-database drill on 15
   migrations, and the branding spec byte-checking a real invoice with and without the mark. The hosted
   project carries the migration, the restarted API verified 17 objects and mapped the three routes, and
-  the signed-in app uploaded, replaced and re-uploaded a mark in the "MyStock" tenant with the purchase
-  order PDF checked in the bytes each time. `docs/setup.md` ("Logo verification") holds the gate output
+  the signed-in app uploaded, replaced and re-uploaded a mark in the "MyStock" tenant. On 2026-11-04 the
+  remaining families were downloaded from hosted and checked in the inflated streams, so the branding is
+  now proven on every document the server generates, not only on the purchase order. `docs/setup.md`
+  ("Logo verification") holds the gate output
   and the hosted record, including the pooler finding that came out of the same pass.
