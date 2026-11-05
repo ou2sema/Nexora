@@ -265,7 +265,10 @@ describe('document template', () => {
 
       const entries = [
         ...(section?.[1] ?? '').matchAll(/<div><h3>([\s\S]*?)<\/h3><p>([\s\S]*?)<\/p><\/div>/g),
-      ].map((entry) => ({ label: entry[1], value: entry[2].replace(/<[^>]+>/g, '') }));
+      ].map((entry) => ({
+        label: (entry[1] ?? '').replace(/<[^>]+>/g, ''),
+        value: (entry[2] ?? '').replace(/<[^>]+>/g, ''),
+      }));
 
       expect(entries).toEqual(document.meta);
 
