@@ -40,7 +40,7 @@ export const guide: GuideMessages = {
   'guide.sale.purpose':
     "L'écran de vente transforme un panier en facture commerciale numérotée en une seule étape et sort le stock en même temps.",
   'guide.sale.step1':
-    'Scannez ou recherchez chaque produit pour l’ajouter au panier. Un lecteur physique se comporte comme un clavier : le code saisi arrive dans le panier sans clic.',
+    'Scannez ou recherchez chaque produit. Un lecteur physique se comporte comme un clavier : le code arrive sans clic, un bip court confirme la lecture, puis une fenêtre nomme le produit et demande la quantité à mettre au panier.',
   'guide.sale.step2':
     'Nommez l’acheteur — une vente au comptoir, ou un client que vous choisissez ou créez.',
   'guide.sale.step3':

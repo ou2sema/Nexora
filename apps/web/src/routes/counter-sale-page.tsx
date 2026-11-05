@@ -23,7 +23,7 @@ export function CounterSalePage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{t('sale.title')}</h1>
-        <p className="mt-1 text-sm text-slate-600">{t('sale.description')}</p>
+        <p className="mt-1 hidden text-sm text-slate-600 sm:block">{t('sale.description')}</p>
       </header>
 
       {organizationId && (

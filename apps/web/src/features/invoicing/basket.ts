@@ -64,33 +64,46 @@ const deviceKey = (deviceId: string) => `device:${deviceId}`;
 
 const ZERO_TOTALS: InvoiceTotals = { netMinor: 0, taxMinor: 0, totalMinor: 0 };
 
-/** One unit more than the line already holds; an unreadable quantity restarts at one. */
-function bumpedQuantity(current: string): string {
+/** Units added to a line that already exists; an unreadable quantity restarts at the scanned amount. */
+function mergeQuantity(current: string, added: number): string {
   const parsed = parseQuantity(current);
-  return parsed === null ? '1' : String(Math.round((parsed + 1) * 10_000) / 10_000);
+  const next = (parsed === null ? 0 : parsed) + added;
+  return String(Math.round(next * 10_000) / 10_000);
 }
 
 export function findLine(lines: BasketLine[], key: string): BasketLine | undefined {
   return lines.find((line) => line.key === key);
 }
 
+/** The line a product code would add to, which is what the confirm dialog reports. */
+export function findProductLine(
+  lines: BasketLine[],
+  productId: string,
+): BasketProductLine | undefined {
+  return lines.find(
+    (line): line is BasketProductLine => line.kind === 'product' && line.productId === productId,
+  );
+}
+
 /**
- * A product scan adds one unit to the matching line, which is what a depot
- * operator expects when the same carton barcode is read twice. A serialized
- * product never becomes a quantity line — the caller resolves it to a device.
+ * A product scan adds units to the matching line, which is what a depot operator
+ * expects when the same carton barcode is read twice; the confirm dialog decides
+ * how many. A serialized product never becomes a quantity line — the caller
+ * resolves it to a device.
  */
 export function addProduct(
   lines: BasketLine[],
   product: ProductSummary,
-  options: { taxRate: string; origin: BasketOrigin },
+  options: { taxRate: string; origin: BasketOrigin; quantity?: number },
 ): BasketLine[] {
   const key = productKey(product.id);
   const existing = findLine(lines, key);
+  const added = options.quantity ?? 1;
 
   if (existing && existing.kind === 'product') {
     return lines.map((line) =>
       line.key === key && line.kind === 'product'
-        ? { ...line, quantity: bumpedQuantity(line.quantity) }
+        ? { ...line, quantity: mergeQuantity(line.quantity, added) }
         : line,
     );
   }
@@ -103,7 +116,7 @@ export function addProduct(
       productId: product.id,
       sku: product.sku,
       productName: product.name,
-      quantity: '1',
+      quantity: String(added),
       unitPrice: '',
       catalogPriceMinor: product.salePriceMinor,
       taxRate: options.taxRate,

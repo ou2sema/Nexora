@@ -66,10 +66,6 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
           ))}
         </ul>
       </nav>
-
-      <div className="shrink-0 border-t border-white/10 px-5 py-4 text-xs text-slate-500">
-        {t('layout.footer')}
-      </div>
     </div>
   );
 }

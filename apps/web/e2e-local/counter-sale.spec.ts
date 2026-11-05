@@ -239,6 +239,50 @@ async function scanWithWedge(page: Page, code: string): Promise<void> {
   await page.keyboard.press('Enter');
 }
 
+function confirmDialog(page: Page): Locator {
+  return page.getByRole('dialog');
+}
+
+/**
+ * A product read is held until the operator accepts it, so every scan of a plain
+ * product ends here. The quantity is the one the popup will add to the basket.
+ */
+async function confirmScan(page: Page, quantity?: string): Promise<void> {
+  const dialog = confirmDialog(page);
+  await expect(dialog).toBeVisible();
+  const field = dialog.getByLabel('Quantity to add');
+  if (quantity !== undefined) await field.fill(quantity);
+  await dialog.getByRole('button', { name: 'Add to basket' }).click();
+  await expect(dialog).toBeHidden();
+}
+
+function summaryBar(page: Page): Locator {
+  return page.locator('#sale-mobile-summary');
+}
+
+/**
+ * A beep cannot be heard by a test runner, but the tone it plays is an oscillator
+ * on the Web Audio graph, so the counter below proves a read was announced and
+ * that one held-up label is announced once rather than on every frame.
+ */
+async function armBeepCounter(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const counted = window as unknown as { __beeps: number };
+    counted.__beeps = 0;
+    const audio = window.AudioContext;
+    if (!audio) return;
+    const createOscillator = audio.prototype.createOscillator;
+    audio.prototype.createOscillator = function (this: AudioContext) {
+      counted.__beeps += 1;
+      return createOscillator.call(this);
+    };
+  });
+}
+
+async function beepCount(page: Page): Promise<number> {
+  return page.evaluate(() => (window as unknown as { __beeps: number }).__beeps);
+}
+
 test.beforeAll(async () => {
   token = await ownerToken();
 });
@@ -253,6 +297,7 @@ test.describe('counter sale', () => {
     const reference = `E2E-CS-${RUN}`;
     const buyer = `E2E Buyer ${RUN}`;
 
+    await armBeepCounter(page);
     await signIn(page);
     await page.goto('/sale');
     await expect(page.getByRole('heading', { level: 1, name: 'Counter sale' })).toBeVisible();
@@ -262,12 +307,24 @@ test.describe('counter sale', () => {
     await page.locator('#sale-default-tax').fill('19');
 
     // The same code read twice is one line with two units, not two lines: once as
-    // a hardware-scanner burst, once typed by hand.
+    // a hardware-scanner burst, once typed by hand. Each read waits for the operator.
     await scanWithWedge(page, CABLE_CODE);
+    const popup = confirmDialog(page);
+    await expect(popup.getByRole('heading', { name: `Add ${CABLE_NAME}?` })).toBeVisible();
+    await expect(popup).toContainText(CABLE_CODE);
+    await expect(popup.getByLabel('Quantity to add')).toHaveValue('1');
+    await expect(popup.getByLabel('Quantity to add')).toBeFocused();
+    await expect(popup).not.toContainText('Already in basket');
+    await confirmScan(page);
+    expect(await beepCount(page)).toBe(1);
     await expect(scanSection(page).getByRole('status')).toContainText('added to the basket');
     await expect(page.getByLabel('Barcode, serial number or SKU')).toHaveValue('');
     await expect(page.getByLabel('Barcode, serial number or SKU')).toBeFocused();
+
     await scan(page, CABLE_CODE);
+    expect(await beepCount(page)).toBe(2);
+    await expect(popup).toContainText('Already in basket');
+    await confirmScan(page);
     await expect(page.getByLabel(`Quantity for ${CABLE_NAME}`)).toHaveValue('2');
     await expect(page.getByLabel(`Tax rate for ${CABLE_NAME}`)).toHaveValue('19');
 
@@ -317,6 +374,38 @@ test.describe('counter sale', () => {
     await expect(row).toBeVisible();
     await expect(row).toContainText(buyer);
     await expect(row.getByText('Partially paid')).toBeVisible();
+  });
+
+  test('holds a product read until the operator confirms it', async ({ page }) => {
+    const viewport = page.viewportSize();
+    const phone = Boolean(viewport && viewport.width < 1024);
+
+    await armBeepCounter(page);
+    await signIn(page);
+    await page.goto('/sale');
+    await chooseDepot(page);
+
+    // A read is an offer, not an order: refusing it leaves the basket as it was.
+    await scanWithWedge(page, CABLE_CODE);
+    const popup = confirmDialog(page);
+    await expect(popup.getByRole('heading', { name: `Add ${CABLE_NAME}?` })).toBeVisible();
+    await popup.getByRole('button', { name: 'Cancel' }).click();
+    await expect(popup).toBeHidden();
+    await expect(page.getByText('Nothing scanned yet')).toBeVisible();
+    expect(await beepCount(page)).toBe(1);
+
+    // The popup is also where a bulk add happens: three cartons read as one code.
+    await scan(page, CABLE_CODE);
+    await confirmScan(page, '3');
+    await expect(page.getByLabel(`Quantity for ${CABLE_NAME}`)).toHaveValue('3');
+
+    // On a phone the basket the operator built stays on screen, not below the fold.
+    if (phone) {
+      const summary = summaryBar(page);
+      await expect(summary).toBeInViewport();
+      await expect(summary).toContainText('1 line / 3 units');
+      await expect(summary.getByRole('button', { name: 'Post sale' })).toBeVisible();
+    }
   });
 
   test('sells a serialized unit chosen from the picker without a ledger movement', async ({

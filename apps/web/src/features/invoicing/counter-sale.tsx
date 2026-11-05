@@ -22,7 +22,7 @@ import type { ScanCapture } from '@/features/scanning/scan-wedge';
 import type { MessageKey, MessageValues } from '@/i18n/messages';
 import { useI18n } from '@/i18n/provider';
 import { fieldClass } from '@/lib/form-field';
-import { parseAmountToMinor } from '@/lib/parse-amount';
+import { parseAmountToMinor, parseQuantity } from '@/lib/parse-amount';
 
 import { usePostSale, useRetrySafeIdempotencyKey } from './api';
 import { BasketTable } from './basket-table';
@@ -31,6 +31,8 @@ import {
   addProduct,
   type BasketLine,
   type BasketOrigin,
+  effectivePriceMinor,
+  findProductLine,
   previewBasket,
   removeLine,
   toInvoiceLines,
@@ -42,6 +44,7 @@ import { InvoicePdfButtons } from './invoice-pdf-buttons';
 import { paymentMethodKeys, paymentStatusKeys } from './labels';
 import { ProductSearch } from './product-search';
 import { ScanBox } from './scan-box';
+import { ScanConfirmDialog, type PendingScan } from './scan-confirm-dialog';
 
 type Translator = (key: MessageKey, values?: MessageValues) => string;
 
@@ -109,6 +112,7 @@ export function CounterSale({
   const [customer, setCustomer] = useState<SaleCustomer>(emptyManualCustomer);
   const [defaultTaxRate, setDefaultTaxRate] = useState('');
   const [pickerProduct, setPickerProduct] = useState<ProductSummary | null>(null);
+  const [pendingScan, setPendingScan] = useState<PendingScan | null>(null);
   const [busy, setBusy] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -205,16 +209,34 @@ export function CounterSale({
         return;
       }
 
-      setLines((current) =>
-        addProduct(current, product, { taxRate: defaultTaxRate, origin: capture.source }),
-      );
-      setNotice(t('sale.scan.productAdded', { product: product.name }));
+      // Nothing enters the basket from a read until the operator confirms it:
+      // the camera keeps seeing the label and the wedge fires on its own trigger.
+      const existing = findProductLine(lines, product.id);
+      setPendingScan({
+        product,
+        code: capture.rawValue,
+        origin: capture.source,
+        unitPriceMinor: existing ? effectivePriceMinor(existing) : product.salePriceMinor,
+        alreadyInBasket: existing ? (parseQuantity(existing.quantity) ?? 0) : 0,
+      });
     } catch (error) {
       setScanError(errorMessage(error, 'sale.scan.unknownCode'));
     } finally {
       resolving.current = false;
       setBusy(false);
     }
+  };
+
+  const confirmScan = (scan: PendingScan, quantity: number) => {
+    setLines((current) =>
+      addProduct(current, scan.product, {
+        taxRate: defaultTaxRate,
+        origin: scan.origin,
+        quantity,
+      }),
+    );
+    setNotice(t('sale.scan.productAdded', { product: scan.product.name }));
+    setPendingScan(null);
   };
 
   const addFromSearch = (product: ProductSummary) => {
@@ -290,11 +312,14 @@ export function CounterSale({
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-      <div className="min-w-0 space-y-4">
+    <>
+      {/* One flat flow: on a phone the sections stack in the order the counter is
+          worked — scan, basket, buyer, checkout, and the manual search last — and
+          the second column only appears from `lg` up. */}
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-start lg:gap-6">
         <section
           aria-labelledby="sale-counter-heading"
-          className="rounded-xl border border-slate-200 bg-white p-4"
+          className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 lg:col-start-1 lg:row-start-1"
         >
           <h2 id="sale-counter-heading" className="text-sm font-semibold text-slate-900">
             {t('sale.scan.title')}
@@ -302,7 +327,7 @@ export function CounterSale({
 
           <div className="mt-3">
             <ScanBox
-              active={canWrite}
+              active={canWrite && pendingScan === null}
               busy={busy || sale.isPending}
               disabled={!canWrite}
               onCapture={(capture) => void handleCapture(capture)}
@@ -329,7 +354,7 @@ export function CounterSale({
                 onChange={(event) => setDefaultTaxRate(event.target.value)}
               />
             </div>
-            <p className="text-xs text-slate-500">{t('sale.defaultTax.hint')}</p>
+            <p className="hidden text-xs text-slate-500 sm:block">{t('sale.defaultTax.hint')}</p>
           </div>
 
           {busy && (
@@ -350,7 +375,7 @@ export function CounterSale({
           )}
         </section>
 
-        <div className="rounded-xl border border-slate-200 bg-white">
+        <div className="min-w-0 rounded-xl border border-slate-200 bg-white lg:col-start-1 lg:row-start-2">
           <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
               <ReceiptText aria-hidden="true" className="size-4 text-slate-500" />
@@ -380,33 +405,24 @@ export function CounterSale({
           />
         </div>
 
-        <ProductSearch
-          organizationId={organizationId}
-          disabled={!canWrite || busy}
-          onAddProduct={addFromSearch}
-          onPickDevice={(product) => {
-            setScanError(null);
-            setPickerProduct(product);
-          }}
-        />
-      </div>
-
-      <div className="min-w-0 space-y-4">
-        <CustomerPicker
-          organizationId={organizationId}
-          value={customer}
-          canWrite={canWrite}
-          onChange={(next) => {
-            setCustomerError(null);
-            setCustomer(next);
-          }}
-          onSelected={(selected) => setCustomer({ mode: 'directory', customer: selected })}
-          errorKey={customerError}
-        />
+        <div className="min-w-0 lg:col-start-2 lg:row-start-1">
+          <CustomerPicker
+            organizationId={organizationId}
+            value={customer}
+            canWrite={canWrite}
+            onChange={(next) => {
+              setCustomerError(null);
+              setCustomer(next);
+            }}
+            onSelected={(selected) => setCustomer({ mode: 'directory', customer: selected })}
+            errorKey={customerError}
+          />
+        </div>
 
         <form
+          id="sale-post-form"
           noValidate
-          className="space-y-4 rounded-xl border border-slate-200 bg-white p-4"
+          className="min-w-0 space-y-4 rounded-xl border border-slate-200 bg-white p-4 lg:col-start-2 lg:row-start-2"
           onSubmit={post}
         >
           <h2 className="text-sm font-semibold text-slate-900">{t('sale.checkout.title')}</h2>
@@ -514,7 +530,13 @@ export function CounterSale({
             </p>
           )}
 
-          <Button type="submit" disabled={!canWrite || sale.isPending || !preview.ready}>
+          {/* Below `lg` the sticky summary bar owns this action; two identical buttons
+              on one screen would leave the operator guessing which one posts. */}
+          <Button
+            type="submit"
+            className="max-lg:hidden"
+            disabled={!canWrite || sale.isPending || !preview.ready}
+          >
             {sale.isPending && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
             {t('sale.post.action')}
           </Button>
@@ -528,19 +550,69 @@ export function CounterSale({
           )}
         </form>
 
-        <DevicePickerDialog
-          organizationId={organizationId}
-          product={pickerProduct}
-          warehouseId={warehouseId}
-          locationId={locationId}
-          locationLabel={locationLabel}
-          onOpenChange={(open) => {
-            if (!open) setPickerProduct(null);
-          }}
-          onPick={(device) => appendDevice(device, 'picker')}
-        />
+        <div className="min-w-0 lg:col-start-1 lg:row-start-3">
+          <ProductSearch
+            organizationId={organizationId}
+            disabled={!canWrite || busy}
+            onAddProduct={addFromSearch}
+            onPickDevice={(product) => {
+              setScanError(null);
+              setPickerProduct(product);
+            }}
+          />
+        </div>
       </div>
-    </div>
+
+      <ScanConfirmDialog
+        scan={pendingScan}
+        onOpenChange={(open) => {
+          if (!open) setPendingScan(null);
+        }}
+        onConfirm={confirmScan}
+      />
+
+      <DevicePickerDialog
+        organizationId={organizationId}
+        product={pickerProduct}
+        warehouseId={warehouseId}
+        locationId={locationId}
+        locationLabel={locationLabel}
+        onOpenChange={(open) => {
+          if (!open) setPickerProduct(null);
+        }}
+        onPick={(device) => appendDevice(device, 'picker')}
+      />
+
+      {/* A phone never shows the whole counter at once, so what the basket holds and
+          what it costs ride at the bottom of the screen beside the posting action. */}
+      <div aria-hidden="true" className="h-24 lg:hidden" />
+      <div
+        id="sale-mobile-summary"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden"
+      >
+        <div className="flex items-center gap-3 px-4 py-3 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))]">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs text-slate-500">
+              {t('sale.basket.count', {
+                lines: plural('common.noun.lines', lines.length),
+                quantity: plural('common.noun.units', preview.totalQuantity),
+              })}
+            </p>
+            <p className="font-mono text-base font-semibold text-slate-900">
+              {formatMoney(preview.totals.totalMinor)}
+            </p>
+          </div>
+          <Button
+            type="submit"
+            form="sale-post-form"
+            className="shrink-0"
+            disabled={!canWrite || sale.isPending || !preview.ready}
+          >
+            {t('sale.post.action')}
+          </Button>
+        </div>
+      </div>
+    </>
   );
 }
 

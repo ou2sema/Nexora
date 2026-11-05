@@ -7,6 +7,7 @@ import { type ScanCapture, useScanWedge } from '@/features/scanning/scan-wedge';
 import { useI18n } from '@/i18n/provider';
 import { fieldClass } from '@/lib/form-field';
 import { cn } from '@/lib/cn';
+import { useScanBeep } from '@/lib/use-scan-beep';
 
 /**
  * A camera reads the same label on every frame until it is moved. One capture
@@ -31,6 +32,7 @@ interface ScanBoxProps {
  */
 export function ScanBox({ active, busy = false, disabled = false, onCapture }: ScanBoxProps) {
   const { t } = useI18n();
+  const beep = useScanBeep();
   const [code, setCode] = useState('');
   const [cameraOn, setCameraOn] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -41,6 +43,7 @@ export function ScanBox({ active, busy = false, disabled = false, onCapture }: S
     targetRef: inputRef,
     getManualValue: () => code,
     onCapture: (capture) => {
+      beep();
       setCode('');
       onCapture(capture);
     },
@@ -54,6 +57,7 @@ export function ScanBox({ active, busy = false, disabled = false, onCapture }: S
     const value = code.trim();
     if (!value || busy || disabled) return;
 
+    beep();
     setCode('');
     onCapture({ rawValue: value, source: 'manual', scannedAt: new Date().toISOString() });
     inputRef.current?.focus();
@@ -70,6 +74,7 @@ export function ScanBox({ active, busy = false, disabled = false, onCapture }: S
 
     if (previous && previous.value === value && now - previous.at < CAMERA_REPEAT_WINDOW_MS) return;
     lastCameraRead.current = { value, at: now };
+    beep();
     onCapture({
       rawValue: value,
       source: 'camera',
@@ -116,11 +121,13 @@ export function ScanBox({ active, busy = false, disabled = false, onCapture }: S
         </div>
       </div>
 
-      <p className="text-xs text-slate-500">{t('sale.scan.hint')}</p>
+      <p className="hidden text-xs text-slate-500 sm:block">{t('sale.scan.hint')}</p>
 
       {cameraOn && (
         <div className="rounded-lg border border-slate-200 p-3">
-          <CameraScanner active={cameraOn} onDetect={handleCameraDetect} />
+          {/* A held-up label is still in frame while a dialog covers the preview; the
+              read that opened the dialog must not open the next one behind it. */}
+          <CameraScanner active={active} onDetect={handleCameraDetect} />
         </div>
       )}
     </div>

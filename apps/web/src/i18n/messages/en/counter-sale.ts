@@ -16,6 +16,14 @@ export const counterSale = {
   'sale.scan.pickDevice': '{product} is serialized — choose which unit leaves the depot.',
   'sale.scan.unknownCode': 'This code could not be resolved.',
 
+  'sale.confirm.title': 'Add {product}?',
+  'sale.confirm.hint': 'Nothing enters the basket until you confirm the read.',
+  'sale.confirm.code': 'Read from',
+  'sale.confirm.unitPrice': 'Unit price',
+  'sale.confirm.inBasket': 'Already in basket',
+  'sale.confirm.quantity': 'Quantity to add',
+  'sale.confirm.add': 'Add to basket',
+
   'sale.defaultTax.label': 'Default tax %',
   'sale.defaultTax.hint':
     'Applied to every new line and stored on the invoice at the moment of sale. A line can still be retaxed before posting.',

@@ -695,7 +695,7 @@ cd apps/web
 npx playwright test --config playwright.local-stack.config.ts --headed
 ```
 
-Expected: 66 checks (33 tests × desktop/mobile), the count as of the sidebar menu fix. The four
+Expected: 68 checks (34 tests × desktop/mobile), the count as of the counter confirmation pass. The four
 `e2e-local/i18n.spec.ts` tests cover:
 
 - French pre-auth copy, the sign-in form, dashboard copy, `fr-TN` money and date output,
@@ -810,9 +810,13 @@ The scan input layer is covered at both ends. `@mystock/domain` reduces keystrok
 (a burst is ≥ 3 characters with under 60 ms between keys; Enter and Tab terminate; non-character
 keys belong to the person typing). In the browser, the first counter-sale test types
 `ms-a-0002` at 8 ms per keystroke and presses Enter — no click anywhere — and asserts the code
-became a basket line, the field came back empty, and it kept focus, which is what proves a hardware
-scan cannot also submit the payment form. The second read of the same code is typed by hand, so the
-two paths merge into one line of two units.
+reaches the operator as a confirmation, that the scan field came back empty and kept focus, and
+that the read announced itself once. A test that counts `AudioContext.prototype.createOscillator`
+calls stands in for the ear: the beep is a Web Audio tone, and the only thing a runner can prove
+about a sound is that the graph was built. Cancelling the confirmation leaves the basket empty and
+the beep at one, so a read is an offer rather than an order, and the same code confirmed with
+quantity `3` becomes three units at once. The typed path opens the same confirmation, which is
+where the wedge and the keyboard merge into one line.
 
 Gates on 2026-11-02/03 for this milestone: `format:check`, `lint`, `typecheck`, and `build` clean;
 362 Vitest tests (294 API across 37 files, 47 domain across 6 files, 14 contracts, 7 config); the
@@ -836,6 +840,21 @@ Two defects surfaced only under the headed run on the phone project, and both ar
   database: the local stack reuses one embedded PostgreSQL across runs, so earlier specs leave
   in-stock units behind. The spec now counts the units from `GET /devices` first and asserts
   `stocked + 2`, which is order-independent.
+
+**Counter UX pass (2026-11-05).** The phone counter was taller than the workflow it serves: after a
+read the operator had to scroll to find out what the read had brought. Every product read now sounds a
+short Web Audio tone and opens a confirmation with the price and the quantity to add, the sections
+stack below `lg` in the order the counter is worked, and a sticky bar carries the line count, the total
+and the posting action. The scan box goes inactive while the confirmation is open, so a label still in
+front of the camera cannot queue a second read behind the first, and the phase line under the sidebar
+menu is gone. Gates: `format:check`, `lint`, `typecheck` and `build` clean; 413 Vitest tests (345 API
+across 43 files, 47 domain, 14 contracts, 7 config); the headed local-stack suite 68/68 (34 tests ×
+desktop/mobile) in 8.7 minutes on `E2E_PG_PORT=55499`.
+
+One trap showed up while this pass was being verified: editing a message catalog while the headed suite
+is running makes Vite hot-reload the i18n provider out from under the live app, and the next sign-in
+then dies on `useI18n must be used inside I18nProvider`. The gates are measured on a tree that is not
+being edited.
 
 Not verified yet: a real USB/Bluetooth scanner has not been driven physically; the browser test
 emulates the same key-event shape. The PDFs and CSV exports stay English (ADR-0014 decision 4).
@@ -1415,11 +1434,11 @@ npm run test --workspace @mystock/api -- test/db
 
 | Command                                                         | What it runs                                                                                                                                                                                                                                                                                                                                                                                                                |
 | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run test`                                                  | 409 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, counter sales and invoices, sales document PDFs, the print engine and its templates, organization logos, team access, platform administration, admin audit + retention, membership write hardening, health probes, schema guard, API shell, env, contracts, domain |
+| `npm run test`                                                  | 413 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, counter sales and invoices, sales document PDFs, the print engine and its templates, organization logos, team access, platform administration, admin audit + retention, membership write hardening, health probes, schema guard, API shell, env, contracts, domain |
 | `npm run test:e2e`                                              | Playwright against the API and dev server (18 checks: 9 tests × desktop/mobile)                                                                                                                                                                                                                                                                                                                                             |
 | `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                                                                                                                                                                                            |
 | `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–15 flows on the self-contained stack (66 checks: 33 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`; needs Chromium, because the API under test prints its own documents                                                                                                                                                                                                                    |
+| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–15 flows on the self-contained stack (68 checks: 34 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`; needs Chromium, because the API under test prints its own documents                                                                                                                                                                                                                    |
 | `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                                                                                                                                                                                           |
 | `npm run drill:virgin-database --workspace @mystock/api`        | Migrations + seed onto virgin local databases and both schema-guard boot paths (needs `npm run build` and a localhost `DATABASE_URL`)                                                                                                                                                                                                                                                                                       |
 

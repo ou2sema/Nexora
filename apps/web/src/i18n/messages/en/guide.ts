@@ -38,7 +38,7 @@ export const guide = {
   'guide.sale.purpose':
     'The sale screen turns a basket into a numbered commercial invoice in one step, and takes the stock out at the same time.',
   'guide.sale.step1':
-    'Scan or search each product into the basket. A hardware scanner behaves like a keyboard: type the code and it lands in the basket without a click.',
+    'Scan or search each product. A hardware scanner behaves like a keyboard: the code arrives without a click, a short beep confirms the read, and a confirmation names the product and asks how many units go in the basket.',
   'guide.sale.step2': 'Name the buyer — a walk-in sale, or a customer you pick or create.',
   'guide.sale.step3':
     'Record the payment. You can take part of it now and leave the rest on account.',

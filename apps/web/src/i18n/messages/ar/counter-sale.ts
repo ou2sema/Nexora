@@ -18,6 +18,14 @@ export const counterSale: CounterSaleMessages = {
   'sale.scan.pickDevice': '{product} مُسلسَل — اختر الوحدة التي ستخرج من المستودع.',
   'sale.scan.unknownCode': 'لم يمكن التعرّف على هذا الرمز.',
 
+  'sale.confirm.title': 'إضافة {product}؟',
+  'sale.confirm.hint': 'لا يدخل أي بند إلى السلة قبل أن تؤكد القراءة.',
+  'sale.confirm.code': 'قُرئ من',
+  'sale.confirm.unitPrice': 'سعر الوحدة',
+  'sale.confirm.inBasket': 'موجود أصلًا في السلة',
+  'sale.confirm.quantity': 'الكمية المراد إضافتها',
+  'sale.confirm.add': 'إضافة إلى السلة',
+
   'sale.defaultTax.label': 'الضريبة الافتراضية %',
   'sale.defaultTax.hint':
     'تُطبَّق على كل سطر جديد وتُحفظ في الفاتورة لحظة البيع. يبقى تعديل الضريبة ممكنًا على السطر قبل التثبيت.',

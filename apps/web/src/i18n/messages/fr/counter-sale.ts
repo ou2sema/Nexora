@@ -18,6 +18,14 @@ export const counterSale: CounterSaleMessages = {
   'sale.scan.pickDevice': '{product} est sérialisé — choisissez l’unité qui quitte le dépôt.',
   'sale.scan.unknownCode': 'Ce code n’a pas pu être résolu.',
 
+  'sale.confirm.title': 'Ajouter {product} ?',
+  'sale.confirm.hint': 'Rien n’entre dans le panier avant votre confirmation.',
+  'sale.confirm.code': 'Lu sur',
+  'sale.confirm.unitPrice': 'Prix unitaire',
+  'sale.confirm.inBasket': 'Déjà au panier',
+  'sale.confirm.quantity': 'Quantité à ajouter',
+  'sale.confirm.add': 'Ajouter au panier',
+
   'sale.defaultTax.label': 'Taxe par défaut %',
   'sale.defaultTax.hint':
     'Appliquée à chaque nouvelle ligne et enregistrée sur la facture au moment de la vente. Une ligne reste retaxable avant la validation.',
