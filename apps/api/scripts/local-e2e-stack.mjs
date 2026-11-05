@@ -305,6 +305,11 @@ apiProcess = spawn(process.execPath, ['dist/main.js'], {
     SUPABASE_JWT_AUDIENCE: 'authenticated',
     DATABASE_URL: `postgresql://postgres:postgres@127.0.0.1:${PG_PORT}/postgres`,
     DATABASE_SSL: 'false',
+    // Every test arrives at this one process from one loopback IP, so the production
+    // budget of 120 requests per minute is a wall the suite was never meant to test:
+    // the CI runner clears the suite twice as fast as a laptop and starts answering 429,
+    // which the dashboard bell can only report as "Low stock alerts: none".
+    RATE_LIMIT_LIMIT: '6000',
   },
   stdio: 'inherit',
 });
