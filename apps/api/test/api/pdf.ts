@@ -61,6 +61,59 @@ export function pdfText(pdf: Buffer): string {
   return pdfPages(pdf).join('\n');
 }
 
+const ARABIC_LETTERS = /[\u0600-\u06ff]/g;
+
+/**
+ * Text with every run of whitespace removed. The reader reports the space between two words only when
+ * it finds one worth printing, so an English label that leaked into an Arabic page can arrive glued
+ * together — CI read `Deliver before noon.` as `Deliverbeforenoon`. Absence checks compare this form.
+ */
+export function withoutSpaces(text: string): string {
+  return text.replace(/\s+/g, '');
+}
+
+function letterKey(chars: string[]): string {
+  return [...chars].sort().join('');
+}
+
+function arabicLetters(text: string): string[] {
+  return text.match(ARABIC_LETTERS) ?? [];
+}
+
+/**
+ * Assert that a printed page carries an Arabic phrase, comparing its letters rather than the
+ * order a reader reports them in.
+ *
+ * Chromium gives every shaped Arabic glyph its own position on the page, and `pdftotext` has to
+ * rebuild the word from those positions. The readers disagree: poppler — what CI installs — reports
+ * some letters in the wrong order, and in every pair recorded from CI run #14 the letter that moves
+ * is one whose box drops below the baseline (final ـي، ـئ، ـر، the hamza under an alif), which is what
+ * a reader grouping glyphs by vertical extent would do. The Xpdf 4.00 build on this machine keeps the
+ * run whole. `المعرف الجبائي` therefore comes back as `المعرفالجبايئ` there and `المعرفالجبائي` here,
+ * from the same bytes.
+ *
+ * The exact spelling stays pinned where no reader can reach it: every document writes its Arabic
+ * title into the PDF /Title, and these tests assert that verbatim. What is checked here is that
+ * the word's letters reached the page — a wrong, missing or duplicated letter still fails, a
+ * reader-specific transposition does not. Latin text extracts in order and uses `toContain`.
+ */
+export function expectArabicPhrase(text: string, phrase: string): void {
+  const expected = letterKey(arabicLetters(phrase));
+  if (expected.length === 0) {
+    throw new Error(`expectArabicPhrase needs an Arabic phrase, got: ${phrase}`);
+  }
+
+  const letters = arabicLetters(text);
+  for (let start = 0; start + expected.length <= letters.length; start += 1) {
+    if (letterKey(letters.slice(start, start + expected.length)) === expected) return;
+  }
+
+  throw new Error(
+    `Printed Arabic text is missing the phrase "${phrase}" (letters: ${expected}).\n` +
+      `Received: ${text}`,
+  );
+}
+
 /** The faces actually embedded in the file, so a document cannot silently fall back to a host font. */
 export function pdfFontNames(pdf: Buffer): string[] {
   const names = new Set<string>();

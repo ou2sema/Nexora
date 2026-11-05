@@ -1022,25 +1022,30 @@ What the suites prove:
   the same invoice in `en`, `fr` and `ar`, the French and Arabic label sets, `Page 1 of 2` /
   `Page 2 of 2`, the totals, the serials, `/Title` in the document's own language, and
   `AAAAAA+IBMPlexSansArabic-*` as the only embedded faces — so a document that quietly fell back to a
-  host font fails. `?locale=de` is refused with `400`.
+  host font fails. Arabic phrases go through `expectArabicPhrase`, which compares the letters of the word
+  rather than the order a given reader reports them in (finding 3 below); `/Title` holds the exact spelling.
+  `?locale=de` is refused with `400`.
+- `test/api/pdf-text.test.ts` (6) covers that matcher itself with the two readers' recorded strings: both
+  reconstructions of the same page pass, a missing or substituted letter fails, and a Latin phrase is
+  refused rather than silently matching on an empty letter set.
 - `test/health-readiness.test.ts` covers the renderer probe shape and the `503` whose details name the
   renderer.
 
 Measured on this machine (Windows 11, Node 26.13, one warm browser) on 2026-11-05, with the
 117,384-byte `logo-icon.png` badge embedded as the tenant mark:
 
-|                                                         |                                                                                                                      |
-| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| one-page document                                       | 176,173 – 189,209 bytes (the same invoice is 179,331 en / 180,123 fr / 189,209 ar)                                   |
-| two-page purchase order                                 | 187,058 – 195,309 bytes                                                                                              |
-| render on a warm page                                   | 521 – 693 ms each; the first render after a launch 1,446 ms                                                          |
-| twelve documents on one browser                         | 12 renders, 1 launch, 0 failures                                                                                     |
-| deterministic bytes                                     | yes — two renders in the same printed second are one file (180,123 bytes both times)                                 |
-| embedded faces                                          | `AAAAAA+IBMPlexSansArabic-Regular`, `BAAAAA+IBMPlexSansArabic-Bold`, from `data:` URIs — the host font is never used |
-| readiness probe on a warm browser                       | 0 ms                                                                                                                 |
-| browser killed out from under the API (SIGKILL mid-job) | the in-flight request rejects in 1,595 ms, the next render starts a new browser in 1,595 ms and succeeds             |
-| page that stops answering (infinite script)             | the 750 ms deadline frees the request, teardown with `server.kill()` measures 744 ms, recovery render 1,858 ms       |
-| Arabic read back with `pdftotext -enc UTF-8`            | correct joined words in logical order; `X` digits, SKUs and `FI-2026-0007` stay left-to-right inside them            |
+|                                                         |                                                                                                                                                                                                     |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| one-page document                                       | 176,173 – 189,209 bytes (the same invoice is 179,331 en / 180,123 fr / 189,209 ar)                                                                                                                  |
+| two-page purchase order                                 | 187,058 – 195,309 bytes                                                                                                                                                                             |
+| render on a warm page                                   | 521 – 693 ms each; the first render after a launch 1,446 ms                                                                                                                                         |
+| twelve documents on one browser                         | 12 renders, 1 launch, 0 failures                                                                                                                                                                    |
+| deterministic bytes                                     | yes — two renders in the same printed second are one file (180,123 bytes both times)                                                                                                                |
+| embedded faces                                          | `AAAAAA+IBMPlexSansArabic-Regular`, `BAAAAA+IBMPlexSansArabic-Bold`, from `data:` URIs — the host font is never used                                                                                |
+| readiness probe on a warm browser                       | 0 ms                                                                                                                                                                                                |
+| browser killed out from under the API (SIGKILL mid-job) | the in-flight request rejects in 1,595 ms, the next render starts a new browser in 1,595 ms and succeeds                                                                                            |
+| page that stops answering (infinite script)             | the 750 ms deadline frees the request, teardown with `server.kill()` measures 744 ms, recovery render 1,858 ms                                                                                      |
+| Arabic read back with `pdftotext -enc UTF-8`            | Xpdf 4.00: joined words in logical order, `X` digits, SKUs and `FI-2026-0007` left-to-right inside them. poppler on CI reports the same bytes with some adjacent letters transposed (see finding 3) |
 
 Three findings are worth keeping:
 
@@ -1051,23 +1056,41 @@ Three findings are worth keeping:
 2. **`/CreationDate` has second resolution**, so Chromium's output is byte-identical only inside one
    second. The post-pass re-stamps the metadata to the render instant, and `useObjectStreams: false`
    keeps `/FontFile2`, `/BaseFont`, `/Title` and `/Subtype /Image` in plain objects for the byte probes.
-3. **Arabic extraction is not verbatim.** `pdftotext` on this machine (Xpdf 4.00) inserts whitespace
-   inside justified presentation-form words and reports slash-separated ASCII in visual order, so the
-   Arabic assertions compare de-spaced text and match digits rather than whole identifiers. A reader
-   that reflows differently will still pass.
+3. **Arabic extraction is reader-specific, not verbatim.** `pdftotext` on this machine (Xpdf 4.00)
+   inserts whitespace inside justified presentation-form words and reports slash-separated ASCII in visual
+   order; poppler, which CI installs, additionally transposes some adjacent letters — and in every pair
+   recorded from CI run #14 the letter that moves is one whose box drops below the baseline (final ـي، ـئ،
+   ـر، the hamza under an alif), which is what a reader grouping glyphs by vertical extent would do. Its
+   reading of the same bytes gives `المعرفالجبايئ` where Xpdf gives `المعرفالجبائي`, and `أمررشاء` for
+   `أمر شراء`. The pages themselves are not in question: the Arabic documents were converted to images
+   during the spike and read back correctly, and the same template and browser build print on CI. So
+   `expectArabicPhrase` in `apps/api/test/api/pdf.ts` matches a phrase's letters over a sliding window, the
+   exact spelling stays pinned in the document's own `/Title` that no reader touches, and Latin and digits
+   keep verbatim assertions. The English-must-be-absent checks compare `withoutSpaces(text)`, because the
+   reader drops the space between English words too — CI read `Deliver before noon.` as `Deliverbeforenoon`.
 
-**Gates (2026-11-05).** `npm run test` is 403 Vitest tests — 335 API across 42 files, 47 domain, 14
+**Gates (2026-11-05).** `npm run test` is 409 Vitest tests — 341 API across 43 files, 47 domain, 14
 contracts, 7 config — and `npm run typecheck`, `npm run format:check` and `npm run build` are clean;
 `npm run lint` reports 0 errors, with `logs/` added to the eslint ignores because that directory is
 gitignored scratch the CI checkout never sees. The self-contained local-stack suite is 54/54 (27 tests ×
 desktop and mobile) in 7.4 minutes on `E2E_PG_PORT=55442`; it now also switches the interface to French
 mid-flow and asserts the next download carries `?locale=fr`.
 
-Deployment consequence, for the operator: the machine that hosts the API now needs Chromium. Before
-the next restart on `:4100`, run `npx playwright-core install --with-deps chromium
-chromium-headless-shell` there — otherwise the API boots, `/health/ready` answers `503` with the
-renderer down, and every document route returns `503 renderer_unavailable`. This is the same browser
-the E2E suite already downloads, pinned to `playwright-core` 1.64.1 in the lockfile.
+CI run #14 on 2026-11-05 took that build and came back red on two of the four jobs — `Playwright E2E` and
+`Playwright local stack` passed, which is the proof that Chromium starts and prints on `ubuntu-latest`.
+`database` failed on the drill, for the reason recorded under [Continuous
+integration](#continuous-integration); `quality` failed on the two Arabic document assertions, for the
+reason recorded as finding 3 above. Both are the CI environment teaching the suite something the local box
+could not, not a defect in the printed file.
+
+Deployment consequence, for the operator: the machine that hosts the API now needs Chromium. This one
+already has it — build 1248 (`chromium-1248` and `chromium_headless_shell-1248` under
+`%LocalAppData%\ms-playwright`), downloaded by the E2E suite and used by every document test above — so the
+restart on `:4100` needs no install. A new host does: run `npx playwright-core install --with-deps chromium
+chromium-headless-shell` there, otherwise the API boots, `/health/ready` answers `503` with the renderer
+down, and every document route returns `503 renderer_unavailable`. That is the state measured here by
+pointing `PLAYWRIGHT_BROWSERS_PATH` at an empty directory. This is the same browser the E2E suite downloads,
+pinned to `playwright-core` 1.64.1 in the lockfile.
 
 ## Operator tasks
 
@@ -1379,7 +1402,7 @@ npm run test --workspace @mystock/api -- test/db
 
 | Command                                                         | What it runs                                                                                                                                                                                                                                                                                                                                                                                                                |
 | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run test`                                                  | 403 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, counter sales and invoices, sales document PDFs, the print engine and its templates, organization logos, team access, platform administration, admin audit + retention, membership write hardening, health probes, schema guard, API shell, env, contracts, domain |
+| `npm run test`                                                  | 409 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, counter sales and invoices, sales document PDFs, the print engine and its templates, organization logos, team access, platform administration, admin audit + retention, membership write hardening, health probes, schema guard, API shell, env, contracts, domain |
 | `npm run test:e2e`                                              | Playwright against the API and dev server (18 checks: 9 tests × desktop/mobile)                                                                                                                                                                                                                                                                                                                                             |
 | `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                                                                                                                                                                                            |
 | `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -1398,7 +1421,7 @@ The API suite runs at most three workers at a time (`test.maxWorkers` in
 document files bring a Chromium each, so the default `cpus - 1` oversubscribes an 8-core laptop
 badly enough that a render misses the engine's own deadline and a teardown hook times out. Vitest 4
 moved this setting out of `poolOptions.forks`, which v5 ignores with a deprecation warning, so a cap
-written there does nothing. With the cap the suite is 42 files and 335 tests in about 165 seconds.
+written there does nothing. With the cap the suite is 43 files and 341 tests in about 178 seconds.
 
 Playwright starts both servers itself (`webServer` in `apps/web/playwright.config.ts`)
 and reuses already-running instances locally. Reuse means a stale process can serve old
@@ -1433,15 +1456,18 @@ and every pull request:
 | Job         | Steps                                                                                                               |
 | ----------- | ------------------------------------------------------------------------------------------------------------------- |
 | `quality`   | `npm ci` → install Chromium + poppler → format check → lint → typecheck → unit tests → build                        |
-| `database`  | `npm ci` → build → Postgres service → virgin-database drill (migrations, seed, schema guard)                        |
+| `database`  | `npm ci` → build → install Chromium → Postgres service → virgin-database drill (migrations, seed, schema guard)     |
 | `e2e`       | `npm ci` → install Chromium → Postgres service + migrations → write test `.env.local` → build → Playwright → upload |
 | `e2e-local` | `npm ci` → install Chromium → build → full local-stack Playwright suite → artifact upload                           |
 
 The `quality` job installs a browser (`npx playwright-core install --with-deps chromium
 chromium-headless-shell`) because the document suites print real PDFs with the engine the API
 ships, and `poppler-utils` because those suites read the printed text back with `pdftotext`. The
-`e2e` and `e2e-local` jobs already installed Chromium for Playwright; the API they boot uses that
-same download, since `@playwright/test` and `playwright-core` are both pinned to 1.64.1.
+`e2e`, `e2e-local` and `database` jobs need that same download: the first two boot the built API,
+and the drill waits for `/health/ready`, which prints a document since ADR-0019. Chromium is a
+runtime dependency of the API now, not only of the test suite, so a job that boots the API without
+it is testing a deployment that cannot exist. `@playwright/test` and `playwright-core` are both
+pinned to 1.64.1, so every job shares one browser build.
 
 The `e2e` job writes placeholder `VITE_` values (no real project, no real secrets) and
 uploads `test-results/` plus `allure-results/` only when the run fails. It also runs a
@@ -1471,7 +1497,13 @@ readiness `ok` with a 54–78 ms database probe, and the negative run exiting `1
 `Database schema is out of date; missing public.admin_audit_events`. First remote run:
 Actions run #10 on 2026-11-01 (commit `62db120`), where the `database` job passed on
 `postgres:16` — its "Run the virgin-database drill" step finished in about 64 seconds and the
-whole run concluded `success` across all four jobs.
+whole run concluded `success` across all four jobs. Run #14 on 2026-11-05 (commit `b6f3284`, the
+Chromium print engine) broke exactly that job: the drill waits for `/health/ready` to answer `200`,
+readiness now prints a document, and the job installed no browser, so the probe answered `503`
+forever and the drill reported `The API never reported ready`. The same failure was reproduced here
+by pointing `PLAYWRIGHT_BROWSERS_PATH` at an empty directory — the API starts, `/health/live` stays
+`200`, `/health/ready` answers `503` naming the missing executable — and the job now installs the
+browser before the drill.
 
 To reproduce the `quality` job locally, run the gates above in the same order after a
 clean `npm ci`. To reproduce the `e2e` job locally, stop any running dev servers first — CI mode never
@@ -1497,6 +1529,12 @@ degrades — stock, reports and the label sheets keep working.
 binary on `PATH`. Git for Windows ships `mingw64/bin/pdftotext.exe` (4.00 here); elsewhere install
 `poppler-utils`. The suite cannot decode Chromium's text output without a ToUnicode-aware reader, so it
 fails loudly rather than skipping.
+
+**An Arabic document assertion passes here and fails in CI** — the two readers disagree about the order of
+the glyphs Chromium positions. `mingw64/bin` is Xpdf 4.00 (`pdftotext -v` says "Glyph & Cog"), CI installs
+poppler, and poppler reports some adjacent letters transposed: `أمر شراء` arrives as `أمررشاء`. Print the
+page to an image before blaming the renderer, then check that the phrase went through `expectArabicPhrase`
+rather than `toContain`.
 
 **The local E2E stack dies at start with `undefined` and `Node.js v26`** — the script binds an embedded
 PostgreSQL on `55432`, and a database left over from an earlier run holds that port; `embedded-postgres`

@@ -4,7 +4,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { LOCATIONS, ORGS, PRODUCTS, USERS, WAREHOUSES } from '../db/fixtures';
 import { LOGO_PNG } from './logo-image';
-import { pdfFontNames, pdfImageCount, pdfParser, pdfText } from './pdf';
+import {
+  expectArabicPhrase,
+  pdfFontNames,
+  pdfImageCount,
+  pdfParser,
+  pdfText,
+  withoutSpaces,
+} from './pdf';
 import { createTestContext, type TestContext } from './test-app';
 
 const YEAR = new Date().getFullYear();
@@ -109,15 +116,6 @@ describe('sales document PDFs', () => {
 
   function fetchedText(pdf: Buffer): string {
     return pdfText(pdf).replace(/\s+/g, ' ');
-  }
-
-  /**
-   * Arabic extraction is not verbatim: the command re-flows a justified word across the
-   * whitespace it reports between presentation-form glyphs, so a catalog phrase only meets
-   * its extracted counterpart once both are de-spaced.
-   */
-  function squeezed(text: string): string {
-    return text.replace(/\s+/g, '');
   }
 
   it('renders the invoice with the fiscal totals, payments, and serials', async () => {
@@ -232,7 +230,7 @@ describe('sales document PDFs', () => {
     const arabicPdf = arabic.body as Buffer;
     expect((await PDFDocument.load(arabicPdf)).getTitle()).toBe(`فاتورة FI-${YEAR}-0001`);
 
-    const arabicText = squeezed(fetchedText(arabicPdf));
+    const arabicText = fetchedText(arabicPdf);
     for (const phrase of [
       'فاتورة',
       'مدفوعة جزئيا',
@@ -240,15 +238,15 @@ describe('sales document PDFs', () => {
       'المجموع مع الضريبة',
       'تحويل بنكي',
     ]) {
-      expect(arabicText).toContain(squeezed(phrase));
+      expectArabicPhrase(arabicText, phrase);
     }
     // A slash-separated tax number is reported in visual order, so only its digits are stable.
     expect(arabicText).toContain('1180000');
-    expect(arabicText).not.toContain(squeezed('Total excl. tax'));
+    expect(withoutSpaces(arabicText)).not.toContain(withoutSpaces('Total excl. tax'));
 
     const note = await fetchPdf(`${invoicesUrl}/${invoiceId}/issue-note/pdf?locale=ar`, aliceToken);
     expect(note.status).toBe(200);
-    expect(squeezed(fetchedText(note.body as Buffer))).toContain(squeezed('سند خروج البضاعة'));
+    expectArabicPhrase(fetchedText(note.body as Buffer), 'سند خروج البضاعة');
 
     const rejected = await fetchPdf(`${invoicesUrl}/${invoiceId}/pdf?locale=de`, aliceToken);
     expect(rejected.status).toBe(400);

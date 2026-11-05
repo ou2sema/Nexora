@@ -263,7 +263,26 @@ Shipped as decided, with three choices the spike had not made:
   render misses the engine's own deadline — the kill test measured 15.5 s of wall clock against a 750 ms
   budget — and another file's teardown hook timed out. `test.maxWorkers = 3` in `apps/api/vitest.config.mts`
   fixes both; Vitest 4 retired `poolOptions.forks`, so a cap written there is silently ignored by v5. With
-  the cap, 42 files and 335 API tests pass in 165 s.
+  the cap, 43 files and 341 API tests pass in 178 s.
+- **Every CI job that boots the API installs the browser.** Run #14 came back red on the `database` job: the
+  virgin-database drill waits for `/health/ready` to answer `200`, readiness now prints a document, and that
+  job never installed Chromium. Reproduced on this machine with `PLAYWRIGHT_BROWSERS_PATH` pointed at an empty
+  directory — the API starts, `/health/live` answers `200`, `/health/ready` answers `503` naming the missing
+  executable — and fixed by giving the job the same `playwright-core install` step `quality` already runs.
+  A browser is now part of the API's runtime contract, so a CI job that boots it without one is testing a
+  deployment that cannot exist.
+- **Arabic is matched by letters, not by reader order.** The two `pdftotext` builds disagree about a printed
+  Arabic word: Chromium gives each shaped glyph its own position, and the reader has to rebuild the word from
+  those positions. poppler (CI) reports some of them transposed — in every pair recorded from run #14 the
+  letter that moves is one whose box drops below the baseline (final ـي، ـئ، ـر، the hamza under an alif), so
+  the reading looks like a grouping by vertical extent — while Xpdf 4.00 on this machine keeps the run whole.
+  Same bytes, two readings: `المعرف الجبائي` versus `المعرفالجبايئ`, `أمر شراء` versus `أمررشاء`. Nothing here
+  says the page is wrong — the Arabic pages were converted to images during the spike and read back correctly,
+  and the same template and browser build print on CI. So `expectArabicPhrase` in `apps/api/test/api/pdf.ts`
+  compares the phrase's letters over a sliding window and the exact spelling stays pinned in the `/Title` every
+  document writes, which no reader touches. Latin and digits keep verbatim assertions, and the
+  English-must-be-absent checks compare the de-spaced text — poppler drops the space between English words
+  as well, reporting `Deliver before noon.` as `Deliverbeforenoon`.
 
 The retired code is deleted, not guarded: `pdf-layout.ts`, `purchase-documents.pdf.ts` and
 `sales-documents.pdf.ts` are gone, `document-format.ts` keeps the ASCII formatters and the WinAnsi
@@ -276,7 +295,9 @@ sanitizer for the label path, and the byte-level test helpers now read printed t
    Arabic? The spike assumes the latter (one locale per download); a bilingual document is a
    second page per document, not a second column.
 2. Which Arabic font, and is bundling it in the repository acceptable for the licence? Latin and
-   Arabic metrics differ enough that the choice is visible on the page.
+   Arabic metrics differ enough that the choice is visible on the page. — Settled during implementation:
+   IBM Plex Sans Arabic (regular and bold), bundled with its Open Font Licence text, so the printed page
+   does not depend on a host font being installed.
 3. Where will the API run once this ships — this Windows machine, a VPS, a container image? The
    answer decides whether a browser install is a one-line setup step or a Dockerfile change.
 4. Is a 187 KB PDF acceptable for anything that emails or archives documents, or should the

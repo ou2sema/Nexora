@@ -4,7 +4,15 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { CATEGORIES, LOCATIONS, ORGS, PRODUCTS, USERS, WAREHOUSES } from '../db/fixtures';
 import { LOGO_PNG } from './logo-image';
-import { pdfFontNames, pdfImageCount, pdfPages, pdfParser, pdfText } from './pdf';
+import {
+  expectArabicPhrase,
+  pdfFontNames,
+  pdfImageCount,
+  pdfPages,
+  pdfParser,
+  pdfText,
+  withoutSpaces,
+} from './pdf';
 import { createTestContext, type TestContext } from './test-app';
 
 const YEAR = new Date().getFullYear();
@@ -95,15 +103,6 @@ describe('purchase document PDFs', () => {
     return pdfText(pdf).replace(/\s+/g, ' ');
   }
 
-  /**
-   * Arabic extraction is not verbatim: the command re-flows a justified word across the
-   * whitespace it reports between presentation-form glyphs, so a catalog phrase only meets
-   * its extracted counterpart once both are de-spaced.
-   */
-  function squeezed(text: string): string {
-    return text.replace(/\s+/g, '');
-  }
-
   it('renders a purchase order PDF for every member of the tenant', async () => {
     const supplier = await createSupplier();
     const order = await createOrder(supplier.id);
@@ -180,11 +179,12 @@ describe('purchase document PDFs', () => {
     const arabicPdf = arabic.body as Buffer;
     expect((await PDFDocument.load(arabicPdf)).getTitle()).toBe(`أمر شراء ${order.number}`);
 
-    const arabicText = squeezed(fetchedText(arabicPdf));
-    for (const phrase of ['أمر شراء', 'مسودة', 'المورد', 'المعرف الجبائي', 'TN1234567']) {
-      expect(arabicText).toContain(squeezed(phrase));
+    const arabicText = fetchedText(arabicPdf);
+    for (const phrase of ['أمر شراء', 'مسودة', 'المورد', 'المعرف الجبائي']) {
+      expectArabicPhrase(arabicText, phrase);
     }
-    expect(arabicText).not.toContain(squeezed('Purchase order'));
+    expect(arabicText).toContain('TN1234567');
+    expect(withoutSpaces(arabicText)).not.toContain(withoutSpaces('Purchase order'));
 
     const rejected = await fetchJson(`${purchaseUrl}/${order.orderId}/pdf?locale=de`, aliceToken);
     expect(rejected.status).toBe(400);

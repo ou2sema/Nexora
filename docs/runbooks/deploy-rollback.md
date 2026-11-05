@@ -39,6 +39,10 @@ the worst case: the oldest retained snapshot, and no recovery to an arbitrary se
 
 - The repository at a clean checkout; `npm ci` and `npm run build` complete for the target
   commit.
+- Chromium on the machine that runs the API: `npx playwright-core install --with-deps chromium
+chromium-headless-shell` (ADR-0019 makes the browser a runtime dependency, pinned to
+  `playwright-core` 1.64.1 in the lockfile). A host that has never run the E2E suite needs this
+  install, and without it `/health/ready` answers `503` for the renderer.
 - `DATABASE_URL` / `DATABASE_SSL` for the hosted project available to the operator (root
   `.env` or the environment). Never paste them into chat, commits, or this document.
 - The commit or release identifier you are rolling back **from** and **to**. There are
@@ -63,12 +67,14 @@ Restart the API the way it is normally started, then verify before declaring suc
 
 ```powershell
 Invoke-RestMethod http://localhost:4100/health/live    # must answer immediately
-Invoke-RestMethod http://localhost:4100/health/ready   # must answer once the database is reachable
+Invoke-RestMethod http://localhost:4100/health/ready   # must answer once the database and the renderer do
 npm run check:integrity                                # must exit 0, every organization OK
 ```
 
-`/health/ready` returning `503` with `service_unavailable` means the database is not
-answering, which is a different incident than a code regression.
+`/health/ready` returning `503` with `service_unavailable` names its cause in the message and in the
+`details` — `database` when the pooler is unreachable, `renderer` when the machine has no Chromium for
+the print engine to start (ADR-0019). Neither is a code regression: a renderer outage is an install
+problem, and the same build keeps serving stock, reports and the pdf-lib label sheets either way.
 
 ## Procedure: the API refused to start after a deploy
 
@@ -119,18 +125,19 @@ you used and the resulting RPO in the incident notes.
 
 ## Decision table
 
-| Symptom                                             | Most likely cause                | Action                                               |
-| --------------------------------------------------- | -------------------------------- | ---------------------------------------------------- |
-| API exits at boot naming missing objects            | Migration not applied to hosted  | Apply the migration, do not roll back                |
-| Boot fails on `Invalid environment configuration`   | Missing/renamed env var          | Fix the environment, see `.env.example`              |
-| `/health/ready` is 503, `/health/live` is 200       | Database unreachable or slow     | Check the pooler/credentials, not the build          |
-| Sign-in works, API calls are blocked in the browser | `WEB_ORIGIN` mismatch (CORS)     | Correct `WEB_ORIGIN` to the exact origin             |
-| Routes 404 on `/api/v1/health/live`                 | Expected                         | Global prefix excludes the probes                    |
-| Data looks wrong after a deploy                     | Application bug or bad migration | Stop writes, integrity sweep, forward-fix or restore |
+| Symptom                                             | Most likely cause                                                                                                 | Action                                                    |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| API exits at boot naming missing objects            | Migration not applied to hosted                                                                                   | Apply the migration, do not roll back                     |
+| Boot fails on `Invalid environment configuration`   | Missing/renamed env var                                                                                           | Fix the environment, see `.env.example`                   |
+| `/health/ready` is 503, `/health/live` is 200       | `details.database`: pooler unreachable. `details.renderer`: the print engine did not answer — usually no Chromium | Check credentials, or install the browser — not the build |
+| Sign-in works, API calls are blocked in the browser | `WEB_ORIGIN` mismatch (CORS)                                                                                      | Correct `WEB_ORIGIN` to the exact origin                  |
+| Routes 404 on `/api/v1/health/live`                 | Expected                                                                                                          | Global prefix excludes the probes                         |
+| Data looks wrong after a deploy                     | Application bug or bad migration                                                                                  | Stop writes, integrity sweep, forward-fix or restore      |
 
 ## Post-rollback verification checklist
 
-- [ ] `/health/live` answers, `/health/ready` answers 200 with `database.status = up`.
+- [ ] `/health/live` answers, `/health/ready` answers 200 with `database.status = up` and
+      `renderer.status = up`.
 - [ ] `npm run check:integrity` exits `0` with no `DRIFT` rows.
 - [ ] `npm run test` and the headed local-stack E2E run pass on the rolled-back commit.
 - [ ] A signed-in read of the affected screen matches the ledger.

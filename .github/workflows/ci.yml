@@ -81,6 +81,11 @@ jobs:
       - name: Build workspaces
         run: npm run build
 
+      # The drill boots the API and waits for /health/ready to answer 200, and since ADR-0019
+      # readiness prints a document — an API with no Chromium answers 503 forever.
+      - name: Install the document renderer
+        run: npx playwright-core install --with-deps chromium chromium-headless-shell
+
       - name: Run the virgin-database drill
         env:
           DATABASE_URL: postgresql://postgres:pw@localhost:5432/postgres
