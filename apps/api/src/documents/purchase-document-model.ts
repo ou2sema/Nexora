@@ -13,6 +13,7 @@ import {
   type DocumentMeta,
   type DocumentNote,
   type DocumentParty,
+  compactMeta,
   dateOnly,
   roundQuantity,
   sanitizeFileName,
@@ -170,11 +171,11 @@ export function buildPurchaseOrderDocument(input: PurchaseOrderDocumentInput): P
       name: `${order.warehouseCode} / ${order.locationCode}`,
       details: [order.warehouseName, order.locationName, strings.instructions.deliverTo],
     },
-    meta: [
+    meta: compactMeta([
       { label: strings.meta.orderDate, value: dateOnly(order.orderedAt ?? order.createdAt) },
-      { label: strings.meta.expected, value: order.expectedOn ?? '-' },
-      { label: strings.meta.reference, value: order.reference ?? '-' },
-    ],
+      { label: strings.meta.expected, value: order.expectedOn },
+      { label: strings.meta.reference, value: order.reference },
+    ]),
     lines,
     totals: buildTotals(lines),
     note: order.notes ? { title: strings.notes.title, body: order.notes } : null,
@@ -238,14 +239,14 @@ export function buildPurchaseReturnDocument(input: PurchaseReturnDocumentInput):
       name: `${purchaseReturn.warehouseCode} / ${purchaseReturn.locationCode}`,
       details: [purchaseReturn.warehouseName, purchaseReturn.locationName],
     },
-    meta: [
+    meta: compactMeta([
       {
         label: strings.meta.returnDate,
         value: dateOnly(purchaseReturn.postedAt ?? purchaseReturn.createdAt),
       },
       { label: strings.meta.sourceOrder, value: purchaseReturn.purchaseOrderNumber },
-      { label: strings.meta.reference, value: purchaseReturn.reference ?? '-' },
-    ],
+      { label: strings.meta.reference, value: purchaseReturn.reference },
+    ]),
     lines,
     totals: buildTotals(lines),
     note: { title: strings.notes.returnReason, body: purchaseReturn.reason },

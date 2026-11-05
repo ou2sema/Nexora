@@ -203,9 +203,76 @@ describe('document template', () => {
 
       // The block is its own ruled box, so no total can reach outside the page.
       expect(html).toMatch(
-        /\.totals \{ width: 220pt; margin-inline-start: auto;[^}]*break-inside: avoid/,
+        /\.totals \{ width: 248pt; margin-inline-start: auto;[^}]*break-inside: avoid/,
       );
       expect(html).toMatch(/\.totals td\.value \{ width: 96pt; text-align: end/);
+    }
+  });
+
+  /** Each payment as the template emits it: the method, its detail and the amount in one row. */
+  function paymentRows(html: string): { method: string; detail: string; amount: string }[] {
+    const section = /<section class="payments">([\s\S]*?)<\/section>/.exec(html);
+    expect(section, 'an invoice with payments prints them').not.toBeNull();
+
+    const rows =
+      /<tr><td><span class="method">([\s\S]*?)<\/span>(?:<span class="detail">([\s\S]*?)<\/span>)?<\/td><td class="amount">([\s\S]*?)<\/td><\/tr>/g;
+
+    return [...(section?.[1] ?? '').matchAll(rows)].map((row) => ({
+      method: (row[1] ?? '').replace(/<[^>]+>/g, ''),
+      detail: (row[2] ?? '').replace(/<[^>]+>/g, ''),
+      amount: (row[3] ?? '').replace(/<[^>]+>/g, ''),
+    }));
+  }
+
+  it('keeps each payment amount beside the method it was paid with', async () => {
+    for (const locale of ['en', 'fr', 'ar'] as DocumentLocale[]) {
+      const document = invoice(locale);
+      const html = await htmlOf(document);
+
+      expect(paymentRows(html)).toEqual(
+        document.payments.map((payment) => ({
+          method: payment.methodLabel,
+          detail: payment.detail ?? '',
+          amount: '10.000 TND',
+        })),
+      );
+
+      // The list is a table of its own, and its money column is the one the totals use.
+      expect(html).toMatch(/\.payments table \{ width: 100%; table-layout: fixed/);
+      expect(html).toMatch(/\.payments \.amount \{ width: 96pt; text-align: end/);
+
+      // Only the last row of the table is unruled: the totals box draws the rule under it.
+      expect(html).toMatch(/table\.lines tbody tr:last-child td \{ border-bottom: 0/);
+    }
+  });
+
+  it('wraps a description too long for its column instead of truncating it', async () => {
+    const html = await htmlOf(invoice('ar'));
+
+    expect(html).toMatch(/table\.lines td\.wrap \{[^}]*white-space: normal/);
+    expect(html).toContain('<td class="start wrap"><span class="iso">USB-C cable</span></td>');
+
+    // A wrapped row keeps its own height: the cell padding cannot push the rule onto the text.
+    expect(html).toMatch(/table\.lines tr \{ break-inside: avoid/);
+  });
+
+  it('pairs each meta label with its value and gives a long one a second line', async () => {
+    for (const locale of ['en', 'fr', 'ar'] as DocumentLocale[]) {
+      const document = invoice(locale);
+      const html = await htmlOf(document);
+      const section = /<section class="meta">([\s\S]*?)<\/section>/.exec(html);
+      expect(section, 'the meta row prints the dates and the reference').not.toBeNull();
+
+      const entries = [
+        ...(section?.[1] ?? '').matchAll(/<div><h3>([\s\S]*?)<\/h3><p>([\s\S]*?)<\/p><\/div>/g),
+      ].map((entry) => ({ label: entry[1], value: entry[2].replace(/<[^>]+>/g, '') }));
+
+      expect(entries).toEqual(document.meta);
+
+      // Nothing in the row is cut with an ellipsis: a reference the counter cannot read in full
+      // is the same defect as a truncated SKU, and the row has the room to break onto a second line.
+      expect(html).toMatch(/\.meta p \{[^}]*overflow-wrap: anywhere/);
+      expect(html).not.toMatch(/\.meta p \{[^}]*text-overflow/);
     }
   });
 

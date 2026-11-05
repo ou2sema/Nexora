@@ -188,8 +188,10 @@ describe('sales document PDFs', () => {
     expect(text).toContain('1,000.000 TND');
     expect(text).toContain('Remaining');
     expect(text).toContain('2,711.182 TND');
-    expect(text).toContain('Payment method');
-    expect(text).toContain('Bank transfer');
+
+    // The method belongs to the payment, so it is the payments list that names it - once.
+    expect(text).not.toContain('Payment method');
+    expect(text.match(/Bank transfer/g)).toHaveLength(1);
     expect(text).toContain('PAYMENTS RECEIVED');
     expect(text).toContain('Transfer ref 55/2026');
     expect(text).toContain('Collect at the counter.');
@@ -218,12 +220,12 @@ describe('sales document PDFs', () => {
       'Partiellement payée',
       "DATE D'ÉMISSION",
       'Total HT',
-      'Mode de paiement',
       'Virement bancaire',
     ]) {
       expect(frenchText).toContain(phrase);
     }
     expect(frenchText).not.toContain('Total excl. tax');
+    expect(frenchText).not.toContain('Mode de paiement');
 
     const arabic = await fetchPdf(`${invoicesUrl}/${invoiceId}/pdf?locale=ar`, aliceToken);
     expect(arabic.status).toBe(200);

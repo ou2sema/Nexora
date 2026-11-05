@@ -27,6 +27,19 @@ export interface DocumentHeading {
   number: string;
 }
 
+/**
+ * The meta row, with the entries that have nothing to print left out. A document that
+ * prints `Référence  -` advertises a gap in its own data; a document that prints nothing
+ * for a field nobody filled in reads as intentional, and the row simply holds fewer columns.
+ */
+export function compactMeta(
+  entries: { label: string; value: string | null | undefined }[],
+): DocumentMeta[] {
+  return entries
+    .filter((entry): entry is { label: string; value: string } => Boolean(entry.value))
+    .map((entry) => ({ label: entry.label, value: entry.value }));
+}
+
 /** One right-aligned row in the totals box, already formatted for print. */
 export interface DocumentTotalRow {
   label: string;

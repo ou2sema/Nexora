@@ -17,6 +17,7 @@ import {
   type DocumentNote,
   type DocumentParty,
   type DocumentTotalRow,
+  compactMeta,
   dateOnly,
   formatMillimesAscii,
   formatQuantityAscii,
@@ -178,12 +179,20 @@ export function buildSalesInvoiceDocument(input: SalesInvoiceDocumentInput): Sal
       value: moneyMinor(invoice.remainingAmountMinor),
       strong: invoice.remainingAmountMinor > 0,
     },
-    {
-      label: strings.totals.paymentMethod,
-      value: invoice.paymentMethod
-        ? pickLabel(strings.statuses.paymentMethod, invoice.paymentMethod as PaymentMethod)
-        : '-',
-    },
+    // The payments list names the method of every receipt, and the invoice column only ever
+    // carries the most recent one, so the totals would repeat - or contradict - that list.
+    // Nothing has been recorded yet, though, and an on-account sale has no other place to say so.
+    ...(input.payments.length === 0 && invoice.paymentMethod
+      ? [
+          {
+            label: strings.totals.paymentMethod,
+            value: pickLabel(
+              strings.statuses.paymentMethod,
+              invoice.paymentMethod as PaymentMethod,
+            ),
+          },
+        ]
+      : []),
   ];
 
   return {
@@ -198,12 +207,12 @@ export function buildSalesInvoiceDocument(input: SalesInvoiceDocumentInput): Sal
       name: `${invoice.warehouseCode} / ${invoice.locationCode}`,
       details: [invoice.warehouseName, invoice.locationName, strings.instructions.goodsLeaveFrom],
     },
-    meta: [
+    meta: compactMeta([
       { label: strings.meta.issueDate, value: dateOnly(invoice.issuedAt) },
-      { label: strings.meta.exitDocument, value: invoice.salesOrderNumber ?? '-' },
-      { label: strings.meta.reference, value: invoice.reference ?? '-' },
-      { label: strings.meta.soldBy, value: invoice.createdByEmail ?? '-' },
-    ],
+      { label: strings.meta.exitDocument, value: invoice.salesOrderNumber },
+      { label: strings.meta.reference, value: invoice.reference },
+      { label: strings.meta.soldBy, value: invoice.createdByEmail },
+    ]),
     columns: 'invoice',
     lines,
     totals,
@@ -278,12 +287,12 @@ export function buildIssueNoteDocument(input: IssueNoteDocumentInput): SalesDocu
       name: `${invoice.warehouseCode} / ${invoice.locationCode}`,
       details: [invoice.warehouseName, invoice.locationName],
     },
-    meta: [
+    meta: compactMeta([
       { label: strings.meta.issueDate, value: dateOnly(invoice.issuedAt) },
       { label: strings.meta.invoice, value: invoice.number },
-      { label: strings.meta.reference, value: invoice.reference ?? '-' },
-      { label: strings.meta.releasedBy, value: invoice.createdByEmail ?? '-' },
-    ],
+      { label: strings.meta.reference, value: invoice.reference },
+      { label: strings.meta.releasedBy, value: invoice.createdByEmail },
+    ]),
     columns: 'issue',
     lines,
     totals,

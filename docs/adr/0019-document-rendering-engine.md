@@ -289,6 +289,38 @@ The retired code is deleted, not guarded: `pdf-layout.ts`, `purchase-documents.p
 sanitizer for the label path, and the byte-level test helpers now read printed text with `pdftotext`
 (`apps/api/test/api/pdf.ts`) while the label sheets keep content-stream geometry checks.
 
+## The first page the owner read: what the download found
+
+The engine shipped green through 341 API tests that read _text_, and text cannot show a collision:
+an amount that belongs to a line but prints 380 pt away from it extracts as the same two strings.
+The first real download (`nexora-FI-2026-0008.pdf`, French, printed from the hosted API) was turned
+into images and read the way a counter reads it. Five things were wrong, and none of them was the
+renderer:
+
+1. **The payments row was a flex row inside a 220 pt box**, so the method and its reference wrapped
+   while the amount stayed on the first baseline — the money looked detached from the payment. It is
+   now a table across the full content column with a 96 pt amount column, which is the same end edge
+   the line table and the totals already finish at: every figure on the page is in one vertical line.
+2. **The totals repeated the payment method.** `sales_invoices.payment_method` is a projection that
+   each new payment overwrites (migration `20261102180000`, `set payment_method = p_method`), so the
+   row restated — and on a mixed-cash-then-transfer invoice _contradicted_ — the list below it. The
+   method now prints in the totals only when no payment row exists, which is the one case where the
+   invoice is the only source: an unpaid on-account sale has nothing else that says «Sur compte».
+3. **Empty fields printed a hyphen next to their own label** («RÉFÉRENCE -»). `compactMeta` drops an
+   entry with nothing to print, and the row divides whatever width is left among what remains. A value
+   too long for its column broke onto a second line rather than ending in an ellipsis: the probe
+   «DEVIS-11-TRÈS-LONG-RÉFÉRENT-2026» printed whole instead of «…RÉ...».
+4. **Identifiers were truncated with an ellipsis** at 96 pt, so a long SKU printed as
+   `CHARGEUR-USB-C-65W-PD-202…`. The SKU, serial and description columns wrap; the money columns and
+   the line number stay on one line, and the widths were re-measured for the three- and four-digit
+   amounts the real ledger produces.
+5. **Two rules under the last line** — the table's own bottom border plus the totals box's top
+   border — read as an empty row. The last row is now unruled and the box draws the single rule.
+
+What that pass cannot fix is the missing issuer: a Tunisian VAT invoice has to carry the seller's
+address and tax number, and `public.organizations` holds only `id, name, slug, created_at, updated_at`
+(no migration has ever added a column). That is a schema decision, not a layout one, and it is open.
+
 ## Open questions for the product owner
 
 1. Arabic invoices: printed alongside the French copy, or only when the operator's device is in

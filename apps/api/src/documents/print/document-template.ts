@@ -47,6 +47,8 @@ export interface TemplateColumn {
   label: string;
   widthPt: number;
   align: 'start' | 'end';
+  /** Free text gets to wrap instead of ending in an ellipsis. */
+  wrap?: boolean;
 }
 
 export interface TemplatePartyBlock {
@@ -117,45 +119,63 @@ function salesLineValues(index: number, line: SalesDocumentLine, withAmounts: bo
  * Purchase documents share one column set: the order and the return note differ only in
  * which rows they carry and which caption sits under the totals.
  *
- * The SKU and quantity widths are measured, not guessed: 96pt is what a 17-character SKU
- * needs and 58pt what the longest single-word header, French «QUANTITÉ», needs.
+ * The quantity and index widths are measured, not guessed: 58pt is what the longest
+ * single-word header, French «QUANTITÉ», needs and 28pt is what a two-digit line number
+ * needs after the cell padding. The identifiers — SKU and serial — and the description
+ * wrap onto a second line rather than ending in an ellipsis, because a truncated part
+ * number is a document the reader cannot act on.
  */
 function purchaseColumns(strings: DocumentStrings): TemplateColumn[] {
-  const fixed = 24 + 96 + 58 + 74 + 79;
+  const fixed = 28 + 96 + 58 + 78 + 80;
 
   return [
-    { label: strings.columns.index, widthPt: 24, align: 'start' },
-    { label: strings.columns.sku, widthPt: 96, align: 'start' },
-    { label: strings.columns.description, widthPt: CONTENT_WIDTH_PT - fixed, align: 'start' },
+    { label: strings.columns.index, widthPt: 28, align: 'start' },
+    { label: strings.columns.sku, widthPt: 96, align: 'start', wrap: true },
+    {
+      label: strings.columns.description,
+      widthPt: CONTENT_WIDTH_PT - fixed,
+      align: 'start',
+      wrap: true,
+    },
     { label: strings.columns.quantity, widthPt: 58, align: 'end' },
-    { label: strings.columns.unitCost, widthPt: 74, align: 'end' },
-    { label: strings.columns.amount, widthPt: 79, align: 'end' },
+    { label: strings.columns.unitCost, widthPt: 78, align: 'end' },
+    { label: strings.columns.amount, widthPt: 80, align: 'end' },
   ];
 }
 
 function salesColumns(strings: DocumentStrings, withAmounts: boolean): TemplateColumn[] {
   if (withAmounts) {
-    const fixed = 24 + 96 + 58 + 70 + 40 + 72;
+    const fixed = 28 + 96 + 58 + 78 + 46 + 80;
 
     return [
-      { label: strings.columns.index, widthPt: 24, align: 'start' },
-      { label: strings.columns.sku, widthPt: 96, align: 'start' },
-      { label: strings.columns.description, widthPt: CONTENT_WIDTH_PT - fixed, align: 'start' },
+      { label: strings.columns.index, widthPt: 28, align: 'start' },
+      { label: strings.columns.sku, widthPt: 96, align: 'start', wrap: true },
+      {
+        label: strings.columns.description,
+        widthPt: CONTENT_WIDTH_PT - fixed,
+        align: 'start',
+        wrap: true,
+      },
       { label: strings.columns.quantity, widthPt: 58, align: 'end' },
-      { label: strings.columns.unitPrice, widthPt: 70, align: 'end' },
-      { label: strings.columns.tax, widthPt: 40, align: 'end' },
-      { label: strings.columns.amount, widthPt: 72, align: 'end' },
+      { label: strings.columns.unitPrice, widthPt: 78, align: 'end' },
+      { label: strings.columns.tax, widthPt: 46, align: 'end' },
+      { label: strings.columns.amount, widthPt: 80, align: 'end' },
     ];
   }
 
-  const fixed = 24 + 96 + 58 + 150;
+  const fixed = 28 + 96 + 58 + 150;
 
   return [
-    { label: strings.columns.index, widthPt: 24, align: 'start' },
-    { label: strings.columns.sku, widthPt: 96, align: 'start' },
-    { label: strings.columns.description, widthPt: CONTENT_WIDTH_PT - fixed, align: 'start' },
+    { label: strings.columns.index, widthPt: 28, align: 'start' },
+    { label: strings.columns.sku, widthPt: 96, align: 'start', wrap: true },
+    {
+      label: strings.columns.description,
+      widthPt: CONTENT_WIDTH_PT - fixed,
+      align: 'start',
+      wrap: true,
+    },
     { label: strings.columns.quantity, widthPt: 58, align: 'end' },
-    { label: strings.columns.serial, widthPt: 150, align: 'start' },
+    { label: strings.columns.serial, widthPt: 150, align: 'start', wrap: true },
   ];
 }
 
@@ -299,13 +319,14 @@ function tableBlock(template: DocumentTemplate): string {
           .map(
             (row) =>
               `<tr>${row
-                .map(
-                  (cell, index) =>
-                    `<td class="${template.columns[index]?.align ?? 'start'}">${printed(
-                      template,
-                      cell,
-                    )}</td>`,
-                )
+                .map((cell, index) => {
+                  const column = template.columns[index];
+                  const classes = [column?.align ?? 'start', column?.wrap ? 'wrap' : '']
+                    .filter(Boolean)
+                    .join(' ');
+
+                  return `<td class="${classes}">${printed(template, cell)}</td>`;
+                })
                 .join('')}</tr>`,
           )
           .join('');
@@ -353,23 +374,32 @@ function totalsBlock(template: DocumentTemplate): string {
   );
 }
 
+/**
+ * One row per payment across the full content column, like the line table above it: the
+ * amount sits in a 96pt column on the reader's end edge, which is the same edge the totals
+ * and the line amounts finish at, so every figure on the page reads in one vertical line.
+ * The detail — the transfer reference, the note, whoever recorded it — belongs to the method,
+ * so it follows it on the same line; the full width is what keeps a long reference on one line.
+ */
 function paymentsBlock(template: DocumentTemplate): string {
   if (template.payments.rows.length === 0) return '';
 
   const rows = template.payments.rows
     .map(
       (payment) =>
-        '<div class="payment"><p class="payment-line">' +
-        `<span class="method">${escapeHtml(payment.method)}</span>` +
-        `<span class="amount">${printed(template, payment.amount)}</span></p>` +
-        (payment.detail
-          ? `<p class="payment-detail">${printed(template, payment.detail)}</p>`
-          : '') +
-        '</div>',
+        '<tr><td><span class="method">' +
+        escapeHtml(payment.method) +
+        '</span>' +
+        (payment.detail ? `<span class="detail">${printed(template, payment.detail)}</span>` : '') +
+        `</td><td class="amount">${printed(template, payment.amount)}</td></tr>`,
     )
     .join('');
 
-  return `<section class="payments"><h3>${escapeHtml(template.payments.label)}</h3>${rows}</section>`;
+  return (
+    `<section class="payments"><h3>${escapeHtml(template.payments.label)}</h3>` +
+    '<table><colgroup><col><col style="width:96pt"></colgroup>' +
+    `<tbody>${rows}</tbody></table></section>`
+  );
 }
 
 function noteBlock(template: DocumentTemplate): string {
@@ -451,29 +481,31 @@ p { margin: 0; }
 .meta { display: flex; margin-bottom: 18pt; }
 .meta > div { flex: 1 1 0; min-width: 0; padding-inline-end: 10pt; }
 .meta h3 { font-size: 7pt; }
-.meta p { font-size: 9pt; line-height: 13pt; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meta p { font-size: 9pt; line-height: 13pt; overflow-wrap: anywhere; }
 
 table.lines { width: 100%; table-layout: fixed; border-collapse: collapse; }
 table.lines tr { break-inside: avoid; }
 table.lines th, table.lines td { padding: 0 6pt; height: 20pt; font-size: 8.5pt; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+table.lines td.wrap { white-space: normal; overflow-wrap: anywhere; line-height: 10.5pt; }
 table.lines th { background: ${FILL}; font-weight: 700; color: ${MUTED}; text-transform: uppercase; letter-spacing: .03em; padding: 5pt 6pt; height: auto; white-space: normal; line-height: 9pt; }
 table.lines td { border-bottom: .4pt solid ${RULE}; }
+table.lines tbody tr:last-child td { border-bottom: 0; }
 table.lines td.empty { color: ${MUTED}; }
 
-.totals { width: 220pt; margin-inline-start: auto; margin-top: 10pt; padding-top: 8pt; border-top: .7pt solid ${RULE}; break-inside: avoid; }
+.totals { width: 248pt; margin-inline-start: auto; margin-top: 6pt; padding-top: 8pt; border-top: .7pt solid ${RULE}; break-inside: avoid; }
 .totals table { width: 100%; table-layout: fixed; border-collapse: collapse; }
 .totals td { padding: 0; height: 15pt; font-size: 8.5pt; color: ${MUTED}; white-space: nowrap; }
-.totals td.label { text-align: end; padding-inline-end: 6pt; overflow: hidden; text-overflow: ellipsis; }
+.totals td.label { text-align: end; padding-inline-end: 8pt; overflow: hidden; text-overflow: ellipsis; }
 .totals td.value { width: 96pt; text-align: end; color: ${INK}; font-size: 9pt; }
 .totals tr.strong td { height: 18pt; border-top: .7pt solid ${RULE}; font-weight: 700; color: ${INK}; }
 .totals tr.strong td.value { font-size: 10.5pt; }
 .totals-caption { margin-top: 4pt; font-size: 7.5pt; line-height: 10pt; color: ${MUTED}; }
 
 .payments, .note, .serials { margin-top: 14pt; break-inside: avoid; }
-.payments .payment-line { display: flex; justify-content: space-between; font-size: 8.5pt; line-height: 11pt; }
-.payments .method { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.payments .amount { width: 120pt; text-align: end; }
-.payment-detail { font-size: 7.5pt; line-height: 9.5pt; color: ${MUTED}; overflow-wrap: anywhere; }
+.payments table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.payments td { padding: 0; height: 15pt; vertical-align: baseline; }
+.payments .amount { width: 96pt; text-align: end; font-size: 9pt; color: ${INK}; }
+.payments .detail { margin-inline-start: 8pt; font-size: 7.5pt; color: ${MUTED}; overflow-wrap: anywhere; }
 .note p { margin-top: 3pt; }
 .serials p { font-size: 8pt; line-height: 10.5pt; }
 

@@ -131,13 +131,13 @@ describe('sales invoice document', () => {
     expect(document.columns).toBe('invoice');
     expect(document.fileName).toBe('nexora-FI-2026-0007.pdf');
 
+    // The payments list below names the method of every receipt, so the totals do not repeat it.
     expect(document.totals).toEqual([
       { label: 'Total excl. tax', value: '26.700 TND' },
       { label: 'Tax', value: '3.382 TND' },
       { label: 'Total incl. tax', value: '30.082 TND', strong: true },
       { label: 'Paid', value: '10.000 TND' },
       { label: 'Remaining', value: '20.082 TND', strong: true },
-      { label: 'Payment method', value: 'Card (manual entry)' },
     ]);
 
     expect(document.meta).toEqual([
@@ -163,24 +163,38 @@ describe('sales invoice document', () => {
   });
 
   it('keeps a walk-in sale readable and an unpaid invoice flat', () => {
-    const document = buildSalesInvoiceDocument(
-      invoiceInput({
-        paymentStatus: 'unpaid',
-        paymentMethod: null,
-        salesOrderNumber: null,
-        reference: null,
-        notes: null,
-        paidAmountMinor: 0,
-        remainingAmountMinor: 30082,
-        customer: WALK_IN,
-      }),
-    );
+    const base = invoiceInput({
+      paymentStatus: 'unpaid',
+      paymentMethod: null,
+      salesOrderNumber: null,
+      reference: null,
+      notes: null,
+      paidAmountMinor: 0,
+      remainingAmountMinor: 30082,
+      customer: WALK_IN,
+    });
+
+    // Nothing has been paid, so nothing has been received: the payments list is empty too.
+    const document = buildSalesInvoiceDocument({ ...base, payments: [] });
 
     expect(document.statusLabel).toBe('Unpaid');
     expect(document.note).toBe(null);
-    expect(document.meta[1]).toEqual({ label: 'Exit document', value: '-' });
-    expect(document.totals[5]).toEqual({ label: 'Payment method', value: '-' });
+
+    // A field nobody filled in prints nothing rather than a label next to a hyphen.
+    expect(document.meta).toEqual([
+      { label: 'Issue date', value: '2026-11-02' },
+      { label: 'Sold by', value: 'alice@example.com' },
+    ]);
+    expect(document.totals).toHaveLength(5);
+    expect(document.payments).toEqual([]);
     expect(document.customer).toEqual({ name: 'Walk-in', details: [] });
+  });
+
+  it('names the method on the totals only when no payment was recorded', () => {
+    const base = invoiceInput({ paymentStatus: 'unpaid', paymentMethod: 'credit' });
+    const document = buildSalesInvoiceDocument({ ...base, payments: [] });
+
+    expect(document.totals[5]).toEqual({ label: 'Payment method', value: 'On account' });
   });
 
   it('labels the same invoice in French and in Arabic', () => {
@@ -190,10 +204,7 @@ describe('sales invoice document', () => {
     expect(french.statusLabel).toBe('Partiellement payée');
     expect(french.meta[0]).toEqual({ label: "Date d'émission", value: '2026-11-02' });
     expect(french.totals[0]).toEqual({ label: 'Total HT', value: '26.700 TND' });
-    expect(french.totals[5]).toEqual({
-      label: 'Mode de paiement',
-      value: 'Carte (saisie manuelle)',
-    });
+    expect(french.totals[4]).toEqual({ label: 'Restant', value: '20.082 TND', strong: true });
     expect(french.payments[0]?.methodLabel).toBe('Carte (saisie manuelle)');
 
     const arabic = buildSalesInvoiceDocument(invoiceInput({}, 'ar'));
