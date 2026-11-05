@@ -695,7 +695,7 @@ cd apps/web
 npx playwright test --config playwright.local-stack.config.ts --headed
 ```
 
-Expected: 54 checks (27 tests × desktop/mobile), the count as of Phase 14. The four
+Expected: 60 checks (30 tests × desktop/mobile), the count as of the user-guide page. The four
 `e2e-local/i18n.spec.ts` tests cover:
 
 - French pre-auth copy, the sign-in form, dashboard copy, `fr-TN` money and date output,
@@ -706,6 +706,13 @@ Expected: 54 checks (27 tests × desktop/mobile), the count as of Phase 14. The 
   Latin digits with no Arabic-Indic digits, and persistence;
 - live switching in the sign-in page and top bar (`en` → `fr` → `ar` → `en`) with the
   stored `mystock.locale` value checked at each step.
+
+`e2e-local/guide.spec.ts` adds three more over the `/guide` page: the French copy with its
+screen links still navigating, the same page right-to-left in Arabic with Latin digits, and a
+parity check that switching language live keeps every section and step count while the copy
+changes. The Arabic test also pins each route as a left-to-right island (`<bdi dir="ltr">`):
+interpolated into RTL text, bidi moves the leading slash and the link reads `sale/ فتح`
+instead of `فتح /sale`.
 
 The local stack also seeds a second organization, `Org B`, with no catalog data so
 organization switching can be exercised. A `dashboard.spec.ts` regression test exports the
@@ -1406,7 +1413,7 @@ npm run test --workspace @mystock/api -- test/db
 | `npm run test:e2e`                                              | Playwright against the API and dev server (18 checks: 9 tests × desktop/mobile)                                                                                                                                                                                                                                                                                                                                             |
 | `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                                                                                                                                                                                            |
 | `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–15 flows on the self-contained stack (54 checks: 27 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`; needs Chromium, because the API under test prints its own documents                                                                                                                                                                                                                    |
+| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–15 flows on the self-contained stack (60 checks: 30 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`; needs Chromium, because the API under test prints its own documents                                                                                                                                                                                                                    |
 | `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                                                                                                                                                                                           |
 | `npm run drill:virgin-database --workspace @mystock/api`        | Migrations + seed onto virgin local databases and both schema-guard boot paths (needs `npm run build` and a localhost `DATABASE_URL`)                                                                                                                                                                                                                                                                                       |
 

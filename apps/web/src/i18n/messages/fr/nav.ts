@@ -18,5 +18,6 @@ export const nav: NavMessages = {
   'nav.catalog': 'Paramètres du catalogue',
   'nav.team': 'Équipe',
   'nav.admin': 'Administration',
+  'nav.guide': 'Guide',
   'nav.main': 'Navigation principale',
 };

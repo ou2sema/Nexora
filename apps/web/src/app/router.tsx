@@ -90,6 +90,10 @@ export const router = createBrowserRouter([
         }),
       },
       {
+        path: 'guide',
+        lazy: async () => ({ Component: (await import('@/routes/guide-page')).GuidePage }),
+      },
+      {
         path: 'team',
         lazy: async () => ({ Component: (await import('@/routes/team-page')).TeamPage }),
       },

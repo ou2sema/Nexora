@@ -3,6 +3,7 @@ import type { MessageKey } from '@/i18n/messages';
 import {
   ArrowLeftRight,
   Boxes,
+  BookOpen,
   Building2,
   ClipboardList,
   LayoutDashboard,
@@ -46,6 +47,7 @@ export const navItems: NavItem[] = [
   { to: '/stock/reconciliation', labelKey: 'nav.reconciliation', icon: Scale },
   { to: '/warehouses', labelKey: 'nav.warehouses', icon: Warehouse },
   { to: '/catalog', labelKey: 'nav.catalog', icon: Tags },
+  { to: '/guide', labelKey: 'nav.guide', icon: BookOpen, requiresOrganization: false },
   { to: '/team', labelKey: 'nav.team', icon: Users },
   {
     to: '/admin',

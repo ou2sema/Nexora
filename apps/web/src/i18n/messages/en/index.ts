@@ -7,6 +7,7 @@ import { customers } from './customers';
 import { dashboard } from './dashboard';
 import { devices } from './devices';
 import { errors } from './errors';
+import { guide } from './guide';
 import { invoices } from './invoices';
 import { layout } from './layout';
 import { nav } from './nav';
@@ -42,6 +43,7 @@ export const enMessages = {
   ...team,
   ...admin,
   ...warehouses,
+  ...guide,
 } as const;
 
 export type Messages = typeof enMessages;

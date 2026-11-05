@@ -16,6 +16,7 @@ export const nav = {
   'nav.catalog': 'Catalog settings',
   'nav.team': 'Team',
   'nav.admin': 'Administration',
+  'nav.guide': 'Guide',
   'nav.main': 'Main navigation',
 } as const;
 

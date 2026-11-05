@@ -18,5 +18,6 @@ export const nav: NavMessages = {
   'nav.catalog': 'إعدادات الكتالوج',
   'nav.team': 'الفريق',
   'nav.admin': 'الإدارة',
+  'nav.guide': 'الدليل',
   'nav.main': 'التنقل الرئيسي',
 };
