@@ -19,7 +19,6 @@ import type { AppTransaction } from '../database/database.types';
 import { products } from '../database/schema';
 import { resultRows } from '../database/results';
 import { sanitizeText } from '../documents/document-format';
-import { brandDocument } from '../documents/pdf-layout';
 import { embedLogoImage } from '../logos/logo.embed';
 import { type StoredLogo, readStoredLogo } from '../logos/logo.reader';
 // The class is a DI token at runtime, so this cannot be a type-only import.
@@ -200,7 +199,10 @@ export class LabelsService {
 
   private async buildPdf(labels: LabelSpec[], identity: OrganizationIdentity): Promise<Uint8Array> {
     const document = await PDFDocument.create();
-    brandDocument(document, identity.name ? `${identity.name} labels` : 'Nexora labels');
+    // pdf-lib overwrites /Producer with its own signature on every save, so /Creator is the
+    // only metadata field that can carry the product name.
+    document.setTitle(sanitizeText(identity.name ? `${identity.name} labels` : 'Nexora labels'));
+    document.setCreator('Nexora');
 
     const regular = await document.embedFont(StandardFonts.Helvetica);
     const bold = await document.embedFont(StandardFonts.HelveticaBold);

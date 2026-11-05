@@ -116,14 +116,24 @@ async function openLatestRow(page: Page, text: string): Promise<void> {
   await expect(page.getByRole('dialog')).toBeVisible();
 }
 
+/**
+ * A download proves two things the file name cannot: the request asked for the locale the
+ * reader is looking at, and the bytes that came back are a PDF.
+ */
 async function expectPdfDownload(
   page: Page,
   trigger: () => Promise<void>,
   filenamePattern: RegExp,
+  locale: 'en' | 'fr' | 'ar' = 'en',
 ): Promise<void> {
   const downloadPromise = page.waitForEvent('download');
+  const printPromise = page.waitForRequest((request) =>
+    new URL(request.url()).pathname.endsWith('/pdf'),
+  );
   await trigger();
-  const download = await downloadPromise;
+  const [download, printRequest] = await Promise.all([downloadPromise, printPromise]);
+
+  expect(new URL(printRequest.url()).searchParams.get('locale')).toBe(locale);
   expect(download.suggestedFilename()).toMatch(filenamePattern);
 
   const path = await download.path();
@@ -400,10 +410,14 @@ test.describe('purchase orders', () => {
 
     const returnRow = dialog.getByRole('row', { name: /PR-/ });
     await expect(returnRow).toContainText('Posted');
+
+    // The manager changes the app's language; the next document is printed in it.
+    await page.getByLabel('Language').selectOption('fr');
     await expectPdfDownload(
       page,
-      () => returnRow.getByRole('button', { name: 'Download PDF' }).click(),
+      () => returnRow.getByRole('button', { name: 'Télécharger le PDF' }).click(),
       /^nexora-PR-\d{4}-\d{4}\.pdf$/,
+      'fr',
     );
 
     await page.keyboard.press('Escape');

@@ -3,6 +3,9 @@
  * rows come in as plain values, and the renderer only draws what the model
  * says. Amounts are integer millimes; a line amount is rounded once and the
  * document total is the sum of the rounded line amounts.
+ *
+ * Every printed word comes from `DocumentStrings` (ADR-0019 decision 3), so the same model
+ * builds an English, French or Arabic document and the template never holds a literal.
  */
 
 import {
@@ -14,6 +17,12 @@ import {
   roundQuantity,
   sanitizeFileName,
 } from './document-format';
+import {
+  type DocumentStrings,
+  type PurchaseOrderStatus,
+  type PurchaseReturnStatus,
+  pickLabel,
+} from './document-catalog';
 
 export interface SupplierDocumentInfo {
   name: string;
@@ -45,8 +54,10 @@ export interface PurchaseDocumentTotals {
 
 export interface PurchaseDocument extends DocumentHeading {
   kind: 'purchase_order' | 'purchase_return';
+  /** The catalog the document was built from; the template reads its labels from here. */
+  strings: DocumentStrings;
   statusLabel: string;
-  watermark: 'DRAFT' | 'CANCELLED' | null;
+  watermark: string | null;
   supplier: DocumentParty;
   shipTo: DocumentParty;
   meta: DocumentMeta[];
@@ -57,31 +68,17 @@ export interface PurchaseDocument extends DocumentHeading {
   fileName: string;
 }
 
-const PURCHASE_ORDER_STATUS_LABELS: Record<string, string> = {
-  draft: 'Draft',
-  ordered: 'Ordered',
-  partially_received: 'Partially received',
-  received: 'Received',
-  cancelled: 'Cancelled',
-};
-
-const RETURN_STATUS_LABELS: Record<string, string> = {
-  draft: 'Draft',
-  posted: 'Posted',
-  cancelled: 'Cancelled',
-};
-
-function partyForSupplier(supplier: SupplierDocumentInfo): DocumentParty {
+function partyForSupplier(supplier: SupplierDocumentInfo, strings: DocumentStrings): DocumentParty {
   const cityLine = [supplier.city, supplier.countryCode].filter(Boolean).join(', ');
   return {
     name: supplier.name,
     details: [
-      supplier.contactName ? `Contact: ${supplier.contactName}` : null,
+      supplier.contactName ? `${strings.partyFields.contact}: ${supplier.contactName}` : null,
       supplier.addressLine,
       cityLine || null,
       supplier.email,
       supplier.phone,
-      supplier.taxId ? `Tax ID: ${supplier.taxId}` : null,
+      supplier.taxId ? `${strings.partyFields.taxId}: ${supplier.taxId}` : null,
     ].filter((detail): detail is string => Boolean(detail)),
   };
 }
@@ -117,8 +114,15 @@ function buildSerials(lines: PurchaseDocumentLine[]): { sku: string; serials: st
     .map((line) => ({ sku: line.sku, serials: line.serials }));
 }
 
+function watermarkFor(status: string, strings: DocumentStrings): string | null {
+  if (status === 'draft') return strings.watermarks.draft;
+  if (status === 'cancelled') return strings.watermarks.cancelled;
+  return null;
+}
+
 export interface PurchaseOrderDocumentInput {
   organizationName: string;
+  strings: DocumentStrings;
   order: {
     number: string;
     status: string;
@@ -142,7 +146,7 @@ export interface PurchaseOrderDocumentInput {
 }
 
 export function buildPurchaseOrderDocument(input: PurchaseOrderDocumentInput): PurchaseDocument {
-  const { order } = input;
+  const { order, strings } = input;
   const lines: PurchaseDocumentLine[] = input.lines.map((line) => ({
     sku: line.productSku,
     description: line.productName,
@@ -155,29 +159,25 @@ export function buildPurchaseOrderDocument(input: PurchaseOrderDocumentInput): P
 
   return {
     kind: 'purchase_order',
-    title: 'Purchase order',
+    strings,
+    title: strings.titles.purchaseOrder,
     number: order.number,
-    statusLabel: PURCHASE_ORDER_STATUS_LABELS[order.status] ?? order.status,
-    watermark:
-      order.status === 'draft' ? 'DRAFT' : order.status === 'cancelled' ? 'CANCELLED' : null,
+    statusLabel: pickLabel(strings.statuses.purchaseOrder, order.status as PurchaseOrderStatus),
+    watermark: watermarkFor(order.status, strings),
     organizationName: input.organizationName,
-    supplier: partyForSupplier(order.supplier),
+    supplier: partyForSupplier(order.supplier, strings),
     shipTo: {
       name: `${order.warehouseCode} / ${order.locationCode}`,
-      details: [
-        order.warehouseName,
-        order.locationName,
-        'Deliver to this location. Quote the purchase order number on all documents.',
-      ],
+      details: [order.warehouseName, order.locationName, strings.instructions.deliverTo],
     },
     meta: [
-      { label: 'Order date', value: dateOnly(order.orderedAt ?? order.createdAt) },
-      { label: 'Expected', value: order.expectedOn ?? '-' },
-      { label: 'Reference', value: order.reference ?? '-' },
+      { label: strings.meta.orderDate, value: dateOnly(order.orderedAt ?? order.createdAt) },
+      { label: strings.meta.expected, value: order.expectedOn ?? '-' },
+      { label: strings.meta.reference, value: order.reference ?? '-' },
     ],
     lines,
     totals: buildTotals(lines),
-    note: order.notes ? { title: 'Notes', body: order.notes } : null,
+    note: order.notes ? { title: strings.notes.title, body: order.notes } : null,
     serials: [],
     fileName: `nexora-${sanitizeFileName(order.number)}.pdf`,
   };
@@ -185,6 +185,7 @@ export function buildPurchaseOrderDocument(input: PurchaseOrderDocumentInput): P
 
 export interface PurchaseReturnDocumentInput {
   organizationName: string;
+  strings: DocumentStrings;
   purchaseReturn: {
     number: string;
     status: string;
@@ -210,6 +211,7 @@ export interface PurchaseReturnDocumentInput {
 
 export function buildPurchaseReturnDocument(input: PurchaseReturnDocumentInput): PurchaseDocument {
   const purchaseReturn = input.purchaseReturn;
+  const { strings } = input;
   const lines: PurchaseDocumentLine[] = input.lines.map((line) => ({
     sku: line.productSku,
     description: line.productName,
@@ -222,32 +224,31 @@ export function buildPurchaseReturnDocument(input: PurchaseReturnDocumentInput):
 
   return {
     kind: 'purchase_return',
-    title: 'Purchase return note',
+    strings,
+    title: strings.titles.purchaseReturnNote,
     number: purchaseReturn.number,
-    statusLabel: RETURN_STATUS_LABELS[purchaseReturn.status] ?? purchaseReturn.status,
-    watermark:
-      purchaseReturn.status === 'draft'
-        ? 'DRAFT'
-        : purchaseReturn.status === 'cancelled'
-          ? 'CANCELLED'
-          : null,
+    statusLabel: pickLabel(
+      strings.statuses.purchaseReturn,
+      purchaseReturn.status as PurchaseReturnStatus,
+    ),
+    watermark: watermarkFor(purchaseReturn.status, strings),
     organizationName: input.organizationName,
-    supplier: partyForSupplier(purchaseReturn.supplier),
+    supplier: partyForSupplier(purchaseReturn.supplier, strings),
     shipTo: {
       name: `${purchaseReturn.warehouseCode} / ${purchaseReturn.locationCode}`,
       details: [purchaseReturn.warehouseName, purchaseReturn.locationName],
     },
     meta: [
       {
-        label: 'Return date',
+        label: strings.meta.returnDate,
         value: dateOnly(purchaseReturn.postedAt ?? purchaseReturn.createdAt),
       },
-      { label: 'Source order', value: purchaseReturn.purchaseOrderNumber },
-      { label: 'Reference', value: purchaseReturn.reference ?? '-' },
+      { label: strings.meta.sourceOrder, value: purchaseReturn.purchaseOrderNumber },
+      { label: strings.meta.reference, value: purchaseReturn.reference ?? '-' },
     ],
     lines,
     totals: buildTotals(lines),
-    note: { title: 'Return reason', body: purchaseReturn.reason },
+    note: { title: strings.notes.returnReason, body: purchaseReturn.reason },
     serials: buildSerials(lines),
     fileName: `nexora-${sanitizeFileName(purchaseReturn.number)}.pdf`,
   };

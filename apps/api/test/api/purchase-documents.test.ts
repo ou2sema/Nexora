@@ -2,19 +2,18 @@ import { PDFDocument } from 'pdf-lib';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { LOCATIONS, ORGS, PRODUCTS, USERS, WAREHOUSES } from '../db/fixtures';
-import {
-  LOGO_BOX_HEIGHT,
-  LOGO_BOX_WIDTH,
-  LOGO_TEXT_GAP,
-  MARGIN,
-  PAGE_HEIGHT,
-} from '../../src/documents/pdf-layout';
+import { CATEGORIES, LOCATIONS, ORGS, PRODUCTS, USERS, WAREHOUSES } from '../db/fixtures';
 import { LOGO_PNG } from './logo-image';
-import { pdfGeometry, pdfImages, pdfParser, pdfText } from './pdf';
+import { pdfFontNames, pdfImageCount, pdfPages, pdfParser, pdfText } from './pdf';
 import { createTestContext, type TestContext } from './test-app';
 
 const YEAR = new Date().getFullYear();
+
+/** Chromium names an embedded subset with a six-letter prefix in front of the family. */
+const BUNDLED_FACE = /^[A-Z]{6}\+IBMPlexSansArabic-(Bold|Regular)$/;
+
+/** Twenty-four distinct products: enough lines to push the order onto a second page. */
+const BULK_PRODUCTS = '70000000-0000-4000-8000-0000000000';
 
 describe('purchase document PDFs', () => {
   let ctx: TestContext;
@@ -92,6 +91,19 @@ describe('purchase document PDFs', () => {
     return request(ctx.app.getHttpServer()).get(path).set('authorization', auth(token));
   }
 
+  function fetchedText(pdf: Buffer): string {
+    return pdfText(pdf).replace(/\s+/g, ' ');
+  }
+
+  /**
+   * Arabic extraction is not verbatim: the command re-flows a justified word across the
+   * whitespace it reports between presentation-form glyphs, so a catalog phrase only meets
+   * its extracted counterpart once both are de-spaced.
+   */
+  function squeezed(text: string): string {
+    return text.replace(/\s+/g, '');
+  }
+
   it('renders a purchase order PDF for every member of the tenant', async () => {
     const supplier = await createSupplier();
     const order = await createOrder(supplier.id);
@@ -111,6 +123,12 @@ describe('purchase document PDFs', () => {
     const parsed = await PDFDocument.load(pdf);
     expect(parsed.getPageCount()).toBe(1);
     expect(parsed.getTitle()).toBe(`Purchase order ${order.number}`);
+
+    // Only the faces shipped with the API may reach the page: a host font would make the
+    // same order look different on every machine that prints it.
+    const fonts = pdfFontNames(pdf);
+    expect(fonts).toHaveLength(2);
+    for (const font of fonts) expect(font).toMatch(BUNDLED_FACE);
 
     const shipToInstruction = pdfText(pdf).replace(/\s+/g, ' ');
     expect(shipToInstruction).toContain(
@@ -132,6 +150,97 @@ describe('purchase document PDFs', () => {
     );
     expect(missing.status).toBe(404);
     expect(missing.body.error.code).toBe('purchase_order_not_found');
+  });
+
+  it('prints the same order in French and in Arabic', async () => {
+    const supplier = await createSupplier();
+    const order = await createOrder(supplier.id);
+
+    const french = await fetchPdf(`${purchaseUrl}/${order.orderId}/pdf?locale=fr`, aliceToken);
+    expect(french.status).toBe(200);
+    const frenchPdf = french.body as Buffer;
+    expect((await PDFDocument.load(frenchPdf)).getTitle()).toBe(`Bon de commande ${order.number}`);
+
+    const frenchText = fetchedText(frenchPdf);
+    for (const phrase of [
+      'Bon de commande',
+      'Brouillon',
+      'FOURNISSEUR',
+      'DATE DE COMMANDE',
+      'QUANTITÉ',
+      'Identifiant fiscal: TN1234567',
+      'Deliver before noon.',
+    ]) {
+      expect(frenchText).toContain(phrase);
+    }
+    expect(frenchText).not.toContain('Purchase order');
+
+    const arabic = await fetchPdf(`${purchaseUrl}/${order.orderId}/pdf?locale=ar`, aliceToken);
+    expect(arabic.status).toBe(200);
+    const arabicPdf = arabic.body as Buffer;
+    expect((await PDFDocument.load(arabicPdf)).getTitle()).toBe(`أمر شراء ${order.number}`);
+
+    const arabicText = squeezed(fetchedText(arabicPdf));
+    for (const phrase of ['أمر شراء', 'مسودة', 'المورد', 'المعرف الجبائي', 'TN1234567']) {
+      expect(arabicText).toContain(squeezed(phrase));
+    }
+    expect(arabicText).not.toContain(squeezed('Purchase order'));
+
+    const rejected = await fetchJson(`${purchaseUrl}/${order.orderId}/pdf?locale=de`, aliceToken);
+    expect(rejected.status).toBe(400);
+  });
+
+  it('breaks a long order onto a second page with the continuation header', async () => {
+    await ctx.database.query(
+      `insert into public.products (
+         id, organization_id, sku, name, category_id, purchase_price_minor, sale_price_minor, is_serialized
+       )
+       select ($1 || lpad(i::text, 2, '0'))::uuid, $2, 'REEL-' || lpad(i::text, 2, '0'),
+              'Cable reel ' || i, $3, 1000, 2000, false
+       from generate_series(1, 24) as i`,
+      [BULK_PRODUCTS, ORGS.a, CATEGORIES.aRoot],
+    );
+    const bulk = await ctx.database.query<{ id: string }>(
+      `select id from public.products where id::text like $1 order by id`,
+      [`${BULK_PRODUCTS}%`],
+    );
+    expect(bulk.rows).toHaveLength(24);
+
+    const supplier = await createSupplier();
+    const response = await request(ctx.app.getHttpServer())
+      .post(purchaseUrl)
+      .set('authorization', auth(aliceToken))
+      .set('idempotency-key', crypto.randomUUID())
+      .send({
+        supplierId: supplier.id,
+        warehouseId: WAREHOUSES.a,
+        locationId: LOCATIONS.a,
+        lines: bulk.rows.map((row) => ({ productId: row.id, quantity: 1, unitCostMinor: 1000 })),
+      });
+    expect(response.status).toBe(201);
+    const order = response.body as { orderId: string; number: string };
+
+    const pdf = await fetchPdf(`${purchaseUrl}/${order.orderId}/pdf`, aliceToken);
+    expect(pdf.status).toBe(200);
+    const pages = pdfPages(pdf.body as Buffer);
+    expect(pages).toHaveLength(2);
+
+    // The printed line order is the stored one, not the SKU order, so which reel lands on
+    // which page is not fixed. What is fixed is that both pages carry lines, all 24 of them
+    // reach the paper, and only the last page carries the totals.
+    const reelsOnPage = pages.map((page) => (page.match(/REEL-\d\d/g) ?? []).length);
+    expect(reelsOnPage[0]).toBeGreaterThan(0);
+    expect(reelsOnPage[1]).toBeGreaterThan(0);
+    expect(reelsOnPage[0]! + reelsOnPage[1]!).toBe(24);
+
+    expect(pages[0]).toContain('Page 1 of 2');
+    expect(pages[1]).toContain('Page 2 of 2');
+    // Only the letterhead carries the status, so the same identity line on page two is the
+    // continuation header the margin box draws.
+    expect(pages[1]).toContain(`Purchase order ${order.number}`);
+    expect(pages[0]).not.toContain('Total value');
+    expect(pages[1]).toContain('Total value');
+    expect(pages[1]).toContain('24.000 TND');
   });
 
   it('renders the posted return note with the source order and ledger quantity', async () => {
@@ -215,6 +324,51 @@ describe('purchase document PDFs', () => {
 
   it('carries the tenant mark on the order and the return note', async () => {
     const logoUrl = `/api/v1/organizations/${ORGS.a}/logo`;
+
+    const supplier = await createSupplier();
+    const order = await createOrder(supplier.id);
+
+    const placed = await request(ctx.app.getHttpServer())
+      .post(`${purchaseUrl}/${order.orderId}/order`)
+      .set('authorization', auth(aliceToken))
+      .set('idempotency-key', crypto.randomUUID());
+    expect(placed.status).toBe(200);
+
+    const detail = await fetchJson(`${purchaseUrl}/${order.orderId}`, aliceToken);
+    const cableLine = (detail.body.lines as { id: string; productSku: string }[]).find(
+      (line) => line.productSku === 'CABLE-USB-C',
+    );
+    expect(cableLine).toBeDefined();
+
+    const receipt = await request(ctx.app.getHttpServer())
+      .post(`${purchaseUrl}/${order.orderId}/receipts`)
+      .set('authorization', auth(aliceToken))
+      .set('idempotency-key', crypto.randomUUID())
+      .send({ lines: [{ lineId: cableLine!.id, quantity: 2 }] });
+    expect(receipt.status).toBe(200);
+
+    const returned = await request(ctx.app.getHttpServer())
+      .post(`${purchaseUrl}/${order.orderId}/returns`)
+      .set('authorization', auth(aliceToken))
+      .set('idempotency-key', crypto.randomUUID())
+      .send({
+        reason: 'Wrong gauge',
+        lines: [{ purchaseOrderLineId: cableLine!.id, quantity: 1 }],
+      });
+    expect(returned.status).toBe(201);
+
+    const paths = [
+      `${purchaseUrl}/${order.orderId}/pdf`,
+      `${purchaseUrl}/${order.orderId}/returns/${returned.body.returnId}/pdf`,
+    ];
+
+    // A tenant without a mark prints no image at all, so the count below can only be the upload.
+    for (const path of paths) {
+      const plain = await fetchPdf(path, aliceToken);
+      expect(plain.status).toBe(200);
+      expect(pdfImageCount(plain.body as Buffer)).toBe(0);
+    }
+
     const upload = await request(ctx.app.getHttpServer())
       .put(logoUrl)
       .set('authorization', auth(aliceToken))
@@ -223,63 +377,13 @@ describe('purchase document PDFs', () => {
     expect(upload.status).toBe(200);
 
     try {
-      const supplier = await createSupplier();
-      const order = await createOrder(supplier.id);
-
-      const placed = await request(ctx.app.getHttpServer())
-        .post(`${purchaseUrl}/${order.orderId}/order`)
-        .set('authorization', auth(aliceToken))
-        .set('idempotency-key', crypto.randomUUID());
-      expect(placed.status).toBe(200);
-
-      const detail = await fetchJson(`${purchaseUrl}/${order.orderId}`, aliceToken);
-      const cableLine = (detail.body.lines as { id: string; productSku: string }[]).find(
-        (line) => line.productSku === 'CABLE-USB-C',
-      );
-      expect(cableLine).toBeDefined();
-
-      const receipt = await request(ctx.app.getHttpServer())
-        .post(`${purchaseUrl}/${order.orderId}/receipts`)
-        .set('authorization', auth(aliceToken))
-        .set('idempotency-key', crypto.randomUUID())
-        .send({ lines: [{ lineId: cableLine!.id, quantity: 2 }] });
-      expect(receipt.status).toBe(200);
-
-      const returned = await request(ctx.app.getHttpServer())
-        .post(`${purchaseUrl}/${order.orderId}/returns`)
-        .set('authorization', auth(aliceToken))
-        .set('idempotency-key', crypto.randomUUID())
-        .send({
-          reason: 'Wrong gauge',
-          lines: [{ purchaseOrderLineId: cableLine!.id, quantity: 1 }],
-        });
-      expect(returned.status).toBe(201);
-
-      const paths = [
-        `${purchaseUrl}/${order.orderId}/pdf`,
-        `${purchaseUrl}/${order.orderId}/returns/${returned.body.returnId}/pdf`,
-      ];
-
       for (const path of paths) {
         const response = await fetchPdf(path, aliceToken);
         expect(response.status).toBe(200);
         const pdf = response.body as Buffer;
 
-        const images = pdfImages(pdf);
-        expect(images).toHaveLength(1);
-        const mark = images[0]!;
-        expect(mark.width).toBeLessThanOrEqual(LOGO_BOX_WIDTH);
-        expect(mark.height).toBeLessThanOrEqual(LOGO_BOX_HEIGHT);
-        expect(mark.x).toBeGreaterThanOrEqual(MARGIN);
-        expect(mark.y).toBeGreaterThanOrEqual(PAGE_HEIGHT - MARGIN - LOGO_BOX_HEIGHT);
-        expect(mark.y + mark.height).toBeLessThanOrEqual(PAGE_HEIGHT - MARGIN);
-
-        // The header gives the mark its box and starts the identity text to its right.
-        const { runs } = pdfGeometry(pdf);
-        const orgName = runs.find((run) => run.value === 'Org A' && run.size === 15);
-        expect(orgName?.x).toBe(MARGIN + LOGO_BOX_WIDTH + LOGO_TEXT_GAP);
-
-        expect(pdfText(pdf)).toContain('Org A');
+        expect(pdfImageCount(pdf)).toBeGreaterThan(0);
+        expect(fetchedText(pdf)).toContain('Org A');
       }
     } finally {
       await request(ctx.app.getHttpServer()).delete(logoUrl).set('authorization', auth(aliceToken));

@@ -7,7 +7,12 @@ import { MIN_LOGO_BYTES, type LogoMimeType, type LogoSummary } from '@mystock/co
 import { AppError } from '../common/errors/app-error';
 import type { AppTransaction } from '../database/database.types';
 import { resultRows } from '../database/results';
-// The class is a DI token at runtime, so this cannot be a type-only import.
+// The classes are DI tokens and instanceof operands at runtime, so these cannot be type-only.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import {
+  DocumentPrinterService,
+  LogoNotRenderableError,
+} from '../documents/print/document-printer.service';
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { CATALOG_WRITERS, TenantAccessService } from '../tenancy/tenant-access.service';
 import { embedLogoImage } from './logo.embed';
@@ -29,23 +34,50 @@ export function sniffLogoMime(bytes: Uint8Array): LogoMimeType | null {
   return null;
 }
 
-/** Embeds the bytes exactly as a document renderer will, so an accepted upload is printable. */
-export async function assertLogoEmbeddable(bytes: Uint8Array, mime: LogoMimeType): Promise<void> {
+function unreadableImage(): AppError {
+  return new AppError(
+    'invalid_logo_image',
+    'The image could not be read. Re-export it as a PNG or JPEG file.',
+    400,
+  );
+}
+
+/**
+ * Two engines draw the mark: the browser prints the A4 documents (ADR-0019) and pdf-lib
+ * prints the label sheets. An upload clears both, because a rejected upload costs one
+ * retry while an unprintable mark costs every document of that tenant.
+ */
+export async function assertLogoEmbeddable(
+  bytes: Uint8Array,
+  mime: LogoMimeType,
+  printer: DocumentPrinterService,
+): Promise<void> {
   try {
     const pdf = await PDFDocument.create();
     await embedLogoImage(pdf, { mime, bytes });
   } catch {
+    throw unreadableImage();
+  }
+
+  try {
+    await printer.assertLogoRenderable({ mime, bytes });
+  } catch (error) {
+    if (error instanceof LogoNotRenderableError) throw unreadableImage();
+
     throw new AppError(
-      'invalid_logo_image',
-      'The image could not be read. Re-export it as a PNG or JPEG file.',
-      400,
+      'renderer_unavailable',
+      'Documents cannot be printed right now, so this image cannot be checked. Try again shortly.',
+      503,
     );
   }
 }
 
 @Injectable()
 export class OrganizationLogosService {
-  constructor(private readonly access: TenantAccessService) {}
+  constructor(
+    private readonly access: TenantAccessService,
+    private readonly printer: DocumentPrinterService,
+  ) {}
 
   async store(
     userId: string,
@@ -64,7 +96,7 @@ export class OrganizationLogosService {
       });
     }
 
-    await assertLogoEmbeddable(bytes, mime);
+    await assertLogoEmbeddable(bytes, mime, this.printer);
 
     return this.runAsWriter(userId, organizationId, async (tx) => {
       await tx.execute(sql`

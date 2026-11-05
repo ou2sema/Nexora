@@ -58,6 +58,7 @@ export const errors = {
   'errors.code.invalid_logo_image':
     'The image could not be read. Re-export it as a PNG or JPEG file.',
   'errors.code.logo_not_found': 'This organization has no logo.',
+  'errors.code.renderer_unavailable': 'Printing is unavailable right now. Try again in a moment.',
 
   'errors.server.supplierNameConflict': 'A supplier with this name already exists.',
   'errors.server.deviceSerialConflict': 'A device with this serial number is already registered.',
@@ -158,6 +159,8 @@ export const errors = {
   'errors.server.logoEmpty': 'The upload is empty.',
   'errors.server.logoNotAnImage': 'The upload is not a PNG or JPEG image.',
   'errors.server.logoContentTypeMismatch': 'The upload does not match its content type.',
+  'errors.server.logoRendererUnavailable':
+    'Printing is unavailable right now, so this image cannot be checked. Try again shortly.',
 
   'errors.auth.invalidCredentials': 'Invalid login credentials',
   'errors.auth.emailNotConfirmed': 'Email not confirmed',

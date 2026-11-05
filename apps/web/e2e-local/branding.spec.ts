@@ -62,8 +62,9 @@ function intrinsicWidth(image: Locator): Promise<number> {
 }
 
 /**
- * pdf-lib writes every placed image as an /Image XObject, and a document of this
- * otherwise draws no raster at all, so the count is the mark being on the page.
+ * The browser prints the mark as an /Image XObject — plus its soft mask when the PNG carries
+ * transparency — and an invoice of this size draws no other raster, so a non-zero count is the
+ * mark being on the page and zero is the mark having left it.
  */
 function imageObjects(pdf: Buffer): number {
   return (pdf.toString('latin1').match(/\/Subtype\s*\/Image/g) ?? []).length;
@@ -147,7 +148,7 @@ test.describe('organization branding', () => {
       .toBe(4);
 
     const invoiceId = await createInvoice(request);
-    expect(imageObjects(await invoicePdf(request, invoiceId))).toBe(1);
+    expect(imageObjects(await invoicePdf(request, invoiceId))).toBeGreaterThan(0);
 
     // Replacing the mark has to reach the rendered pixels. The response is cached
     // immutably, so a client that re-reads the same URL replays the first file.

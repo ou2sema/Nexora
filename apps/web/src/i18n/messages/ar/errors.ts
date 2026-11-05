@@ -57,6 +57,7 @@ export const errors: ErrorsMessages = {
   'errors.code.unsupported_logo_type': 'ارفع صورة PNG أو JPEG.',
   'errors.code.invalid_logo_image': 'تعذّرت قراءة الصورة. صدّرها من جديد بصيغة PNG أو JPEG.',
   'errors.code.logo_not_found': 'لا يوجد شعار لهذه المؤسسة.',
+  'errors.code.renderer_unavailable': 'الطباعة غير متاحة حاليا. أعد المحاولة بعد قليل.',
 
   'errors.server.supplierNameConflict': 'يوجد مورّد بهذا الاسم بالفعل.',
   'errors.server.deviceSerialConflict': 'تم تسجيل جهاز بهذا الرقم التسلسلي مسبقاً.',
@@ -147,6 +148,8 @@ export const errors: ErrorsMessages = {
   'errors.server.logoEmpty': 'الملف المرفوع فارغ.',
   'errors.server.logoNotAnImage': 'الملف المرفوع ليس صورة PNG أو JPEG.',
   'errors.server.logoContentTypeMismatch': 'الملف المرفوع لا يطابق نوع محتواه.',
+  'errors.server.logoRendererUnavailable':
+    'الطباعة غير متاحة حاليا، لذا لا يمكن التحقق من هذه الصورة. أعد المحاولة بعد قليل.',
 
   'errors.auth.invalidCredentials': 'بيانات الدخول غير صحيحة',
   'errors.auth.emailNotConfirmed': 'البريد الإلكتروني غير مؤكد',

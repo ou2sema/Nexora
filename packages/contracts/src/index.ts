@@ -62,6 +62,13 @@ export {
   warehouseCreateSchema,
   warehouseSchema,
 } from './catalog';
+export {
+  DOCUMENT_LOCALES,
+  documentLocaleSchema,
+  documentQuerySchema,
+  type DocumentLocale,
+  type DocumentQuery,
+} from './documents';
 export { errorEnvelopeSchema, type ErrorEnvelope } from './error-envelope';
 export {
   type ChangeMemberRoleInput,

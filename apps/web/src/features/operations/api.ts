@@ -33,6 +33,7 @@ import type {
 
 import { keepPreviousDataForOrganization } from '@/lib/organization-query-placeholder';
 import { useAccessToken } from '@/features/auth/auth-provider';
+import { useI18n } from '@/i18n/provider';
 import { apiDownload, apiRequest, newIdempotencyKey } from '@/lib/api-client';
 
 export interface SupplierFilters {
@@ -353,15 +354,22 @@ export function useCancelPurchaseReturn(organizationId: string) {
 
 export function useDownloadPurchaseOrderPdf(organizationId: string) {
   const token = useAccessToken();
+  const { locale } = useI18n();
+
   return (purchaseOrderId: string) =>
-    apiDownload(`/organizations/${organizationId}/purchase-orders/${purchaseOrderId}/pdf`, token);
+    apiDownload(
+      `/organizations/${organizationId}/purchase-orders/${purchaseOrderId}/pdf?locale=${locale}`,
+      token,
+    );
 }
 
 export function useDownloadPurchaseReturnPdf(organizationId: string) {
   const token = useAccessToken();
+  const { locale } = useI18n();
+
   return (purchaseOrderId: string, returnId: string) =>
     apiDownload(
-      `/organizations/${organizationId}/purchase-orders/${purchaseOrderId}/returns/${returnId}/pdf`,
+      `/organizations/${organizationId}/purchase-orders/${purchaseOrderId}/returns/${returnId}/pdf?locale=${locale}`,
       token,
     );
 }

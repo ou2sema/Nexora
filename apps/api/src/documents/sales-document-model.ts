@@ -5,6 +5,10 @@
  * different totals block, so the renderer only has to choose between them.
  * Amounts are integer millimes and every number here is read back from the
  * database, never from the browser.
+ *
+ * The words belong to the caller: `strings` (ADR-0019 decision 3) decides whether this model
+ * describes an English, French or Arabic document, while the numbers stay in the ASCII
+ * form the ledger holds and the template keeps them left-to-right.
  */
 
 import {
@@ -19,6 +23,13 @@ import {
   roundQuantity,
   sanitizeFileName,
 } from './document-format';
+import {
+  type DocumentStrings,
+  type PaymentMethod,
+  type PaymentStatus,
+  type SalesOrderStatus,
+  pickLabel,
+} from './document-catalog';
 
 export interface SalesDocumentLine {
   sku: string;
@@ -38,8 +49,10 @@ export interface SalesDocumentPayment {
 }
 
 export interface SalesDocument extends DocumentHeading {
+  /** The catalog the document was built from; the template reads its labels from here. */
+  strings: DocumentStrings;
   statusLabel: string;
-  watermark: 'DRAFT' | 'CANCELLED' | null;
+  watermark: string | null;
   customer: DocumentParty;
   depot: DocumentParty;
   meta: DocumentMeta[];
@@ -62,31 +75,11 @@ export interface CustomerDocumentInfo {
   taxId: string | null;
 }
 
-const PAYMENT_STATUS_LABELS: Record<string, string> = {
-  unpaid: 'Unpaid',
-  partial: 'Partially paid',
-  paid: 'Paid',
-};
-
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  cash: 'Cash',
-  bank_transfer: 'Bank transfer',
-  card_manual: 'Card (manual entry)',
-  credit: 'On account',
-};
-
-const ORDER_STATUS_LABELS: Record<string, string> = {
-  draft: 'Draft',
-  confirmed: 'Reserved',
-  fulfilled: 'Issued',
-  cancelled: 'Cancelled',
-};
-
 function moneyMinor(minor: number): string {
   return `${formatMillimesAscii(minor)} TND`;
 }
 
-function partyForCustomer(customer: CustomerDocumentInfo): DocumentParty {
+function partyForCustomer(customer: CustomerDocumentInfo, strings: DocumentStrings): DocumentParty {
   const cityLine = [customer.city, customer.countryCode].filter(Boolean).join(', ');
   return {
     name: customer.name,
@@ -95,7 +88,7 @@ function partyForCustomer(customer: CustomerDocumentInfo): DocumentParty {
       cityLine || null,
       customer.email,
       customer.phone,
-      customer.taxId ? `Tax ID: ${customer.taxId}` : null,
+      customer.taxId ? `${strings.partyFields.taxId}: ${customer.taxId}` : null,
     ].filter((detail): detail is string => Boolean(detail)),
   };
 }
@@ -118,6 +111,7 @@ function totalQuantity(lines: SalesDocumentLine[]): number {
 
 export interface SalesInvoiceDocumentInput {
   organizationName: string;
+  strings: DocumentStrings;
   invoice: {
     number: string;
     paymentStatus: string;
@@ -158,7 +152,7 @@ export interface SalesInvoiceDocumentInput {
 }
 
 export function buildSalesInvoiceDocument(input: SalesInvoiceDocumentInput): SalesDocument {
-  const { invoice } = input;
+  const { invoice, strings } = input;
   const lines: SalesDocumentLine[] = input.lines.map((line) => ({
     sku: line.productSku,
     description: line.productName,
@@ -171,53 +165,54 @@ export function buildSalesInvoiceDocument(input: SalesInvoiceDocumentInput): Sal
   }));
 
   const totals: DocumentTotalRow[] = [
-    { label: 'Total excl. tax', value: moneyMinor(invoice.netAmountMinor) },
-    { label: 'Tax', value: moneyMinor(invoice.taxAmountMinor) },
-    { label: 'Total incl. tax', value: moneyMinor(invoice.totalAmountMinor), strong: true },
-    { label: 'Paid', value: moneyMinor(invoice.paidAmountMinor) },
+    { label: strings.totals.totalExclTax, value: moneyMinor(invoice.netAmountMinor) },
+    { label: strings.totals.tax, value: moneyMinor(invoice.taxAmountMinor) },
     {
-      label: 'Remaining',
+      label: strings.totals.totalInclTax,
+      value: moneyMinor(invoice.totalAmountMinor),
+      strong: true,
+    },
+    { label: strings.totals.paid, value: moneyMinor(invoice.paidAmountMinor) },
+    {
+      label: strings.totals.remaining,
       value: moneyMinor(invoice.remainingAmountMinor),
       strong: invoice.remainingAmountMinor > 0,
     },
     {
-      label: 'Payment method',
+      label: strings.totals.paymentMethod,
       value: invoice.paymentMethod
-        ? (PAYMENT_METHOD_LABELS[invoice.paymentMethod] ?? invoice.paymentMethod)
+        ? pickLabel(strings.statuses.paymentMethod, invoice.paymentMethod as PaymentMethod)
         : '-',
     },
   ];
 
   return {
-    title: 'Invoice',
+    strings,
+    title: strings.titles.invoice,
     number: invoice.number,
-    statusLabel: PAYMENT_STATUS_LABELS[invoice.paymentStatus] ?? invoice.paymentStatus,
+    statusLabel: pickLabel(strings.statuses.payment, invoice.paymentStatus as PaymentStatus),
     watermark: null,
     organizationName: input.organizationName,
-    customer: partyForCustomer(invoice.customer),
+    customer: partyForCustomer(invoice.customer, strings),
     depot: {
       name: `${invoice.warehouseCode} / ${invoice.locationCode}`,
-      details: [
-        invoice.warehouseName,
-        invoice.locationName,
-        'Goods leave this location. Quote the invoice number on all documents.',
-      ],
+      details: [invoice.warehouseName, invoice.locationName, strings.instructions.goodsLeaveFrom],
     },
     meta: [
-      { label: 'Issue date', value: dateOnly(invoice.issuedAt) },
-      { label: 'Exit document', value: invoice.salesOrderNumber ?? '-' },
-      { label: 'Reference', value: invoice.reference ?? '-' },
-      { label: 'Sold by', value: invoice.createdByEmail ?? '-' },
+      { label: strings.meta.issueDate, value: dateOnly(invoice.issuedAt) },
+      { label: strings.meta.exitDocument, value: invoice.salesOrderNumber ?? '-' },
+      { label: strings.meta.reference, value: invoice.reference ?? '-' },
+      { label: strings.meta.soldBy, value: invoice.createdByEmail ?? '-' },
     ],
     columns: 'invoice',
     lines,
     totals,
     payments: input.payments.map((payment) => ({
-      methodLabel: PAYMENT_METHOD_LABELS[payment.method] ?? payment.method,
+      methodLabel: pickLabel(strings.statuses.paymentMethod, payment.method as PaymentMethod),
       amountMinor: payment.amountMinor,
       detail: payment.note ?? payment.recordedByEmail ?? dateOnly(payment.recordedAt),
     })),
-    note: invoice.notes ? { title: 'Notes', body: invoice.notes } : null,
+    note: invoice.notes ? { title: strings.notes.title, body: invoice.notes } : null,
     serials: buildSerials(lines),
     fileName: `nexora-${sanitizeFileName(invoice.number)}.pdf`,
   };
@@ -225,6 +220,7 @@ export function buildSalesInvoiceDocument(input: SalesInvoiceDocumentInput): Sal
 
 export interface IssueNoteDocumentInput {
   organizationName: string;
+  strings: DocumentStrings;
   invoice: {
     number: string;
     orderStatus: string | null;
@@ -243,7 +239,7 @@ export interface IssueNoteDocumentInput {
 }
 
 export function buildIssueNoteDocument(input: IssueNoteDocumentInput): SalesDocument {
-  const { invoice } = input;
+  const { invoice, strings } = input;
   const lines: SalesDocumentLine[] = input.lines.map((line) => ({
     sku: line.productSku,
     description: line.productName,
@@ -256,37 +252,43 @@ export function buildIssueNoteDocument(input: IssueNoteDocumentInput): SalesDocu
   }));
 
   const totals: DocumentTotalRow[] = [
-    { label: 'Lines', value: String(lines.length) },
-    { label: 'Total quantity', value: formatQuantityAscii(totalQuantity(lines)), strong: true },
+    { label: strings.totals.lines, value: String(lines.length) },
+    {
+      label: strings.totals.totalQuantity,
+      value: formatQuantityAscii(totalQuantity(lines)),
+      strong: true,
+    },
   ];
 
-  const standardNote =
-    'Every quantity on this note has left the depot. ' +
-    `This note is not a tax document: invoice ${invoice.number} carries the amounts.`;
+  const standardNote = strings.instructions.issueNoteStandard(invoice.number);
   const body = invoice.notes?.trim() ? `${invoice.notes.trim()} ${standardNote}` : standardNote;
 
   return {
-    title: 'Goods issue note',
+    strings,
+    title: strings.titles.goodsIssueNote,
     number: invoice.salesOrderNumber ?? invoice.number,
-    statusLabel: ORDER_STATUS_LABELS[invoice.orderStatus ?? 'fulfilled'] ?? 'Issued',
-    watermark: invoice.orderStatus === 'cancelled' ? 'CANCELLED' : null,
+    statusLabel: pickLabel(
+      strings.statuses.salesOrder,
+      (invoice.orderStatus ?? 'fulfilled') as SalesOrderStatus,
+    ),
+    watermark: invoice.orderStatus === 'cancelled' ? strings.watermarks.cancelled : null,
     organizationName: input.organizationName,
-    customer: partyForCustomer(invoice.customer),
+    customer: partyForCustomer(invoice.customer, strings),
     depot: {
       name: `${invoice.warehouseCode} / ${invoice.locationCode}`,
       details: [invoice.warehouseName, invoice.locationName],
     },
     meta: [
-      { label: 'Issue date', value: dateOnly(invoice.issuedAt) },
-      { label: 'Invoice', value: invoice.number },
-      { label: 'Reference', value: invoice.reference ?? '-' },
-      { label: 'Released by', value: invoice.createdByEmail ?? '-' },
+      { label: strings.meta.issueDate, value: dateOnly(invoice.issuedAt) },
+      { label: strings.meta.invoice, value: invoice.number },
+      { label: strings.meta.reference, value: invoice.reference ?? '-' },
+      { label: strings.meta.releasedBy, value: invoice.createdByEmail ?? '-' },
     ],
     columns: 'issue',
     lines,
     totals,
     payments: [],
-    note: { title: 'Notes', body },
+    note: { title: strings.notes.title, body },
     serials: buildSerials(lines),
     fileName: `nexora-${sanitizeFileName(invoice.salesOrderNumber ?? invoice.number)}-issue-note.pdf`,
   };

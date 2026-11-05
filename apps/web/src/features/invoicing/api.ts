@@ -16,6 +16,7 @@ import type {
 } from '@mystock/contracts';
 
 import { useAccessToken } from '@/features/auth/auth-provider';
+import { useI18n } from '@/i18n/provider';
 import { apiDownload, apiRequest, newIdempotencyKey } from '@/lib/api-client';
 import { keepPreviousDataForOrganization } from '@/lib/organization-query-placeholder';
 
@@ -194,19 +195,25 @@ export function useRecordInvoicePayment(organizationId: string) {
   );
 }
 
+/** The document is printed in the locale the reader is looking at, not the server's default. */
 export function useDownloadInvoicePdf(organizationId: string) {
   const token = useAccessToken();
+  const { locale } = useI18n();
 
   return (invoiceId: string) =>
-    apiDownload(`/organizations/${organizationId}/sales-invoices/${invoiceId}/pdf`, token);
+    apiDownload(
+      `/organizations/${organizationId}/sales-invoices/${invoiceId}/pdf?locale=${locale}`,
+      token,
+    );
 }
 
 export function useDownloadIssueNotePdf(organizationId: string) {
   const token = useAccessToken();
+  const { locale } = useI18n();
 
   return (invoiceId: string) =>
     apiDownload(
-      `/organizations/${organizationId}/sales-invoices/${invoiceId}/issue-note/pdf`,
+      `/organizations/${organizationId}/sales-invoices/${invoiceId}/issue-note/pdf?locale=${locale}`,
       token,
     );
 }

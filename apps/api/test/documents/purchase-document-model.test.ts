@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
+import type { DocumentLocale } from '@mystock/contracts';
+
 import {
   formatMillimesAscii,
   formatQuantityAscii,
   sanitizeText,
 } from '../../src/documents/document-format';
+import { documentStrings } from '../../src/documents/document-catalog';
 import {
   type SupplierDocumentInfo,
   buildPurchaseOrderDocument,
@@ -22,9 +25,10 @@ const supplier: SupplierDocumentInfo = {
   taxId: 'TN1234567',
 };
 
-function orderInput() {
+function orderInput(locale: DocumentLocale = 'en') {
   return {
     organizationName: 'Org A',
+    strings: documentStrings(locale),
     order: {
       number: 'PO-2026-0001',
       status: 'draft',
@@ -94,6 +98,24 @@ describe('purchase document model', () => {
     expect(document.serials).toEqual([]);
   });
 
+  it('labels the same order in French and in Arabic', () => {
+    const french = buildPurchaseOrderDocument(orderInput('fr'));
+    expect(french.title).toBe('Bon de commande');
+    expect(french.statusLabel).toBe('Brouillon');
+    expect(french.watermark).toBe('BROUILLON');
+    expect(french.meta[0]).toEqual({ label: 'Date de commande', value: '2026-10-31' });
+    expect(french.supplier.details).toContain('Identifiant fiscal: TN1234567');
+    expect(french.note).toEqual({ title: 'Notes', body: 'Deliver before noon.' });
+
+    const arabic = buildPurchaseOrderDocument(orderInput('ar'));
+    expect(arabic.title).toBe('أمر شراء');
+    expect(arabic.statusLabel).toBe('مسودة');
+    expect(arabic.watermark).toBe('مسودة');
+    expect(arabic.meta[0]?.label).toBe('تاريخ الطلب');
+    expect(arabic.supplier.details).toContain('المعرف الجبائي: TN1234567');
+    expect(arabic.fileName).toBe('nexora-PO-2026-0001.pdf');
+  });
+
   it('marks ordered and cancelled purchase orders without a draft watermark', () => {
     const ordered = buildPurchaseOrderDocument({
       ...orderInput(),
@@ -112,6 +134,7 @@ describe('purchase document model', () => {
   it('builds a posted return note with the source order, reason, and sorted serials', () => {
     const document = buildPurchaseReturnDocument({
       organizationName: 'Org A',
+      strings: documentStrings('en'),
       purchaseReturn: {
         number: 'PR-2026-0001',
         status: 'posted',
@@ -153,7 +176,7 @@ describe('purchase document model', () => {
     expect(document.serials).toEqual([{ sku: 'IPHONE-15', serials: ['SN-A', 'SN-B'] }]);
   });
 
-  it('formats millimes, quantities, and non-Latin text for standard PDF fonts', () => {
+  it('formats millimes, quantities, and the ASCII text the label sheets draw', () => {
     expect(formatMillimesAscii(0)).toBe('0.000');
     expect(formatMillimesAscii(999)).toBe('0.999');
     expect(formatMillimesAscii(1_234_567)).toBe('1,234.567');

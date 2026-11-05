@@ -5,13 +5,20 @@ Commands are copy-pasteable; paths are relative to the repository root.
 
 ## Prerequisites
 
-| Tool    | Version                       | Notes                                   |
-| ------- | ----------------------------- | --------------------------------------- |
-| Node.js | >= 22.12 (developed on 26.13) | `node --version`                        |
-| npm     | >= 10 (repo pins npm 11)      | `npm --version`                         |
-| Edge    | any recent build              | Local E2E reuses the installed browser  |
-| Java    | 17+ (developed on 27)         | Only needed for `npm run report:allure` |
-| Git     | any recent version            |                                         |
+| Tool     | Version                       | Notes                                                                                 |
+| -------- | ----------------------------- | ------------------------------------------------------------------------------------- |
+| Node.js  | >= 22.12 (developed on 26.13) | `node --version`                                                                      |
+| npm      | >= 10 (repo pins npm 11)      | `npm --version`                                                                       |
+| Edge     | any recent build              | Local E2E reuses the installed browser                                                |
+| Chromium | Playwright's build, 1.64.1    | `npx playwright-core install --with-deps chromium` — the API prints documents with it |
+| poppler  | any recent build              | `pdftotext` on `PATH`; only the document tests read a printed PDF back                |
+| Java     | 17+ (developed on 27)         | Only needed for `npm run report:allure`                                               |
+| Git      | any recent version            |                                                                                       |
+
+The Chromium row is new with ADR-0019: since Phase 15 the four A4 documents are printed by a
+browser the API owns, so every machine that runs the API or its unit tests needs one. Without it
+the API still boots, `/health/ready` answers `503`, and document routes return `503
+renderer_unavailable`.
 
 A Supabase project **is** required from Phase 2 onward: the app authenticates users and the
 API reads its database. The automated suites still need no hosted credentials — they run on
@@ -95,16 +102,21 @@ processes, which silently produces HTML 404s instead of API responses.
 Three public GET routes answer without a bearer token and skip the rate limiter, so infrastructure
 polling does not spend the budget that belongs to users:
 
-| Route               | Meaning                                             | Needs the database |
-| ------------------- | --------------------------------------------------- | ------------------ |
-| `GET /health`       | process is up (kept as the dashboard status source) | no                 |
-| `GET /health/live`  | liveness: the event loop answers                    | no                 |
-| `GET /health/ready` | readiness: `select 1` went through the pool         | yes                |
+| Route               | Meaning                                                       | Needs the database | Needs the browser |
+| ------------------- | ------------------------------------------------------------- | ------------------ | ----------------- |
+| `GET /health`       | process is up (kept as the dashboard status source)           | no                 | no                |
+| `GET /health/live`  | liveness: the event loop answers                              | no                 | no                |
+| `GET /health/ready` | readiness: `select 1` went through the pool and a print works | yes                | yes               |
 
 `/health/ready` returns `200` with
-`database: { "status": "up", "latencyMs": <number>, "timeoutMs": 2000 }`, or `503`
+`database: { "status": "up", "latencyMs": <number>, "timeoutMs": 2000 }` and
+`renderer: { "status": "up", "latencyMs": <number>, "timeoutMs": 5000 }`, or `503`
 `service_unavailable` whose `error.details.database` is `unreachable`, `timeout`, or `error` when
-the pool cannot answer within 2 seconds. The failure body carries only that classification, never
+the pool cannot answer within 2 seconds. Since ADR-0019 the same route answers `503` with
+`error.details.renderer` when Chromium cannot be reached within 5 seconds — a machine without a
+browser is a boot-time failure, not a 500 in front of a customer at the counter. The probe also
+warms the renderer, because the browser is created lazily. The failure body carries only that
+classification, never
 the driver message, so no host, port, or credential can leak. All three routes live outside the
 `api/v1` prefix (`/api/v1/health/live` and `/api/v1/health/ready` are 404), and the local E2E stack
 now waits on `/health/ready` before it declares itself usable.
@@ -970,8 +982,92 @@ machine. The ceiling itself is a Supavisor setting in the dashboard and is not r
 number is claimed here; what is measured is that the budget was reached. The affected requests recovered
 as soon as a slot freed, so the diagnosis is the pooler budget rather than this build. It is an operator
 decision in the Supabase dashboard — raise the pool size or stop whatever is holding idle sessions — and
-it is unrelated to the logo code path, which never opened more than its share. The PDFs, CSV exports and
-labels stay English (ADR-0014 decision 4).
+it is unrelated to the logo code path, which never opened more than its share. At the time the
+paragraph was written the PDFs, CSV exports and labels stayed English (ADR-0014 decision 4); Phase 15
+amended that for the four A4 document families, which now print in the requested locale, while CSV
+exports and the two label sheets remain English.
+
+## Document rendering engine verification
+
+Phase 15 implements ADR-0019 decision C. The four A4 families — purchase order, purchase return
+note, sales invoice, goods issue note — are now HTML/CSS documents printed by one warm Chromium the
+API owns (`apps/api/src/documents/print/`), and `pdf-layout.ts`, `purchase-documents.pdf.ts` and
+`sales-documents.pdf.ts` are deleted rather than flag-guarded. The two label sheets keep `pdf-lib`
+and `bwip-js`.
+
+```powershell
+npm run test --workspace @mystock/api -- test/documents test/api/purchase-documents.test.ts test/api/sales-documents.test.ts test/api/logos.test.ts test/health-readiness.test.ts
+```
+
+That command needs Chromium installed (`npx playwright-core install --with-deps chromium
+chromium-headless-shell`) and `pdftotext` on `PATH`; without either it fails with an actionable
+message rather than a skip.
+
+What the suites prove:
+
+- `test/documents/document-template.test.ts` (5) asserts the template structure in the HTML the
+  browser is handed — totals rows against the model, column widths summing to the 499.28 pt content
+  box, the `@page` margin boxes with `counter(page)`/`counter(pages)`, `@page :first` clearing the
+  continuation header, the fixed footer rule and watermark, `.iso { unicode-bidi: isolate }` wrapping
+  every ASCII run in the Arabic document and appearing nowhere in the English one, and the watermark
+  only on a document that is really draft or cancelled.
+- `test/documents/document-printer.test.ts` (5) drives a real browser: two renders of the same job
+  are byte-identical, `/FontFile2` is embedded and `/ObjStm` is absent, a wedged page is killed inside
+  its deadline and the next request prints from a fresh browser, five concurrent documents run on one
+  browser, `probe()` answers readiness without printing, and `assertLogoRenderable` accepts a mark the
+  browser draws and refuses bytes that decode to nothing.
+- `test/documents/rendered-document.test.ts` (3) maps an engine failure to `503 renderer_unavailable`
+  and lets every other error through untouched.
+- `test/api/{purchase,sales}-documents.test.ts` read the printed files back with `pdftotext`:
+  the same invoice in `en`, `fr` and `ar`, the French and Arabic label sets, `Page 1 of 2` /
+  `Page 2 of 2`, the totals, the serials, `/Title` in the document's own language, and
+  `AAAAAA+IBMPlexSansArabic-*` as the only embedded faces — so a document that quietly fell back to a
+  host font fails. `?locale=de` is refused with `400`.
+- `test/health-readiness.test.ts` covers the renderer probe shape and the `503` whose details name the
+  renderer.
+
+Measured on this machine (Windows 11, Node 26.13, one warm browser) on 2026-11-05, with the
+117,384-byte `logo-icon.png` badge embedded as the tenant mark:
+
+|                                                         |                                                                                                                      |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| one-page document                                       | 176,173 – 189,209 bytes (the same invoice is 179,331 en / 180,123 fr / 189,209 ar)                                   |
+| two-page purchase order                                 | 187,058 – 195,309 bytes                                                                                              |
+| render on a warm page                                   | 521 – 693 ms each; the first render after a launch 1,446 ms                                                          |
+| twelve documents on one browser                         | 12 renders, 1 launch, 0 failures                                                                                     |
+| deterministic bytes                                     | yes — two renders in the same printed second are one file (180,123 bytes both times)                                 |
+| embedded faces                                          | `AAAAAA+IBMPlexSansArabic-Regular`, `BAAAAA+IBMPlexSansArabic-Bold`, from `data:` URIs — the host font is never used |
+| readiness probe on a warm browser                       | 0 ms                                                                                                                 |
+| browser killed out from under the API (SIGKILL mid-job) | the in-flight request rejects in 1,595 ms, the next render starts a new browser in 1,595 ms and succeeds             |
+| page that stops answering (infinite script)             | the 750 ms deadline frees the request, teardown with `server.kill()` measures 744 ms, recovery render 1,858 ms       |
+| Arabic read back with `pdftotext -enc UTF-8`            | correct joined words in logical order; `X` digits, SKUs and `FI-2026-0007` stay left-to-right inside them            |
+
+Three findings are worth keeping:
+
+1. **`server.close()` cannot tear down a wedged browser.** It waits for a handshake over the
+   connection the frozen page owns and never returns; `server.kill()` returned in 744 ms on the same
+   process. The printer uses `kill()` for a timeout and for a `disconnected` event, and `close()` only
+   for a clean shutdown.
+2. **`/CreationDate` has second resolution**, so Chromium's output is byte-identical only inside one
+   second. The post-pass re-stamps the metadata to the render instant, and `useObjectStreams: false`
+   keeps `/FontFile2`, `/BaseFont`, `/Title` and `/Subtype /Image` in plain objects for the byte probes.
+3. **Arabic extraction is not verbatim.** `pdftotext` on this machine (Xpdf 4.00) inserts whitespace
+   inside justified presentation-form words and reports slash-separated ASCII in visual order, so the
+   Arabic assertions compare de-spaced text and match digits rather than whole identifiers. A reader
+   that reflows differently will still pass.
+
+**Gates (2026-11-05).** `npm run test` is 403 Vitest tests — 335 API across 42 files, 47 domain, 14
+contracts, 7 config — and `npm run typecheck`, `npm run format:check` and `npm run build` are clean;
+`npm run lint` reports 0 errors, with `logs/` added to the eslint ignores because that directory is
+gitignored scratch the CI checkout never sees. The self-contained local-stack suite is 54/54 (27 tests ×
+desktop and mobile) in 7.4 minutes on `E2E_PG_PORT=55442`; it now also switches the interface to French
+mid-flow and asserts the next download carries `?locale=fr`.
+
+Deployment consequence, for the operator: the machine that hosts the API now needs Chromium. Before
+the next restart on `:4100`, run `npx playwright-core install --with-deps chromium
+chromium-headless-shell` there — otherwise the API boots, `/health/ready` answers `503` with the
+renderer down, and every document route returns `503 renderer_unavailable`. This is the same browser
+the E2E suite already downloads, pinned to `playwright-core` 1.64.1 in the lockfile.
 
 ## Operator tasks
 
@@ -1281,21 +1377,28 @@ npm run test --workspace @mystock/api -- test/db
 
 ## Test suites
 
-| Command                                                         | What it runs                                                                                                                                                                                                                                                                                                                                                                            |
-| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run test`                                                  | 382 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, counter sales and invoices, sales document PDFs, organization logos, team access, platform administration, admin audit + retention, membership write hardening, health probes, schema guard, API shell, env, contracts, domain |
-| `npm run test:e2e`                                              | Playwright against the API and dev server (18 checks: 9 tests × desktop/mobile)                                                                                                                                                                                                                                                                                                         |
-| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                                                                                                                                                        |
-| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                                                                                                                                             |
-| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–14 flows on the self-contained stack (54 checks: 27 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`                                                                                                                                                                                                                                                     |
-| `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                                                                                                                                                       |
-| `npm run drill:virgin-database --workspace @mystock/api`        | Migrations + seed onto virgin local databases and both schema-guard boot paths (needs `npm run build` and a localhost `DATABASE_URL`)                                                                                                                                                                                                                                                   |
+| Command                                                         | What it runs                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run test`                                                  | 403 Vitest tests: RLS/seed, catalog, stock, devices, barcode workflows, real-PostgreSQL concurrency, operational workflows, returns, purchase documents, counter sales and invoices, sales document PDFs, the print engine and its templates, organization logos, team access, platform administration, admin audit + retention, membership write hardening, health probes, schema guard, API shell, env, contracts, domain |
+| `npm run test:e2e`                                              | Playwright against the API and dev server (18 checks: 9 tests × desktop/mobile)                                                                                                                                                                                                                                                                                                                                             |
+| `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                                                                                                                                                                                            |
+| `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–15 flows on the self-contained stack (54 checks: 27 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`; needs Chromium, because the API under test prints its own documents                                                                                                                                                                                                                    |
+| `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                                                                                                                                                                                           |
+| `npm run drill:virgin-database --workspace @mystock/api`        | Migrations + seed onto virgin local databases and both schema-guard boot paths (needs `npm run build` and a localhost `DATABASE_URL`)                                                                                                                                                                                                                                                                                       |
 
 The API suites (`apps/api/test/api`) run the real migrations on PGlite, sign JWTs with
 locally generated ES256 keys, and serve the trusted public key from a temporary JWKS
 endpoint. No hosted credentials and no network access are required. The concurrency suite
 (`apps/api/test/db/concurrency.test.ts`) uses embedded PostgreSQL because it needs multiple
 simultaneous connections.
+
+The API suite runs at most three workers at a time (`test.maxWorkers` in
+`apps/api/vitest.config.mts`). Each file brings its own database and, since ADR-0019, the
+document files bring a Chromium each, so the default `cpus - 1` oversubscribes an 8-core laptop
+badly enough that a render misses the engine's own deadline and a teardown hook times out. Vitest 4
+moved this setting out of `poolOptions.forks`, which v5 ignores with a deprecation warning, so a cap
+written there does nothing. With the cap the suite is 42 files and 335 tests in about 165 seconds.
 
 Playwright starts both servers itself (`webServer` in `apps/web/playwright.config.ts`)
 and reuses already-running instances locally. Reuse means a stale process can serve old
@@ -1329,10 +1432,16 @@ and every pull request:
 
 | Job         | Steps                                                                                                               |
 | ----------- | ------------------------------------------------------------------------------------------------------------------- |
-| `quality`   | `npm ci` → format check → lint → typecheck → unit tests → build                                                     |
+| `quality`   | `npm ci` → install Chromium + poppler → format check → lint → typecheck → unit tests → build                        |
 | `database`  | `npm ci` → build → Postgres service → virgin-database drill (migrations, seed, schema guard)                        |
 | `e2e`       | `npm ci` → install Chromium → Postgres service + migrations → write test `.env.local` → build → Playwright → upload |
 | `e2e-local` | `npm ci` → install Chromium → build → full local-stack Playwright suite → artifact upload                           |
+
+The `quality` job installs a browser (`npx playwright-core install --with-deps chromium
+chromium-headless-shell`) because the document suites print real PDFs with the engine the API
+ships, and `poppler-utils` because those suites read the printed text back with `pdftotext`. The
+`e2e` and `e2e-local` jobs already installed Chromium for Playwright; the API they boot uses that
+same download, since `@playwright/test` and `playwright-core` are both pinned to 1.64.1.
 
 The `e2e` job writes placeholder `VITE_` values (no real project, no real secrets) and
 uploads `test-results/` plus `allure-results/` only when the run fails. It also runs a
@@ -1377,6 +1486,23 @@ Remove-Item Env:\CI
 ```
 
 ## Troubleshooting
+
+**Document routes answer `503 renderer_unavailable`, or `/health/ready` reports the renderer down** —
+the machine running the API has no Chromium for the printer to start. The error message names the fix
+(`npx playwright install --with-deps chromium`, or `playwright-core` on the API alone); the browser is a
+runtime dependency of the API since ADR-0019, not just of the E2E suite. Nothing else about the app
+degrades — stock, reports and the label sheets keep working.
+
+**Document tests throw `pdftotext could not run`** — the test helper that reads printed PDFs needs the
+binary on `PATH`. Git for Windows ships `mingw64/bin/pdftotext.exe` (4.00 here); elsewhere install
+`poppler-utils`. The suite cannot decode Chromium's text output without a ToUnicode-aware reader, so it
+fails loudly rather than skipping.
+
+**The local E2E stack dies at start with `undefined` and `Node.js v26`** — the script binds an embedded
+PostgreSQL on `55432`, and a database left over from an earlier run holds that port; `embedded-postgres`
+rejects without a message, so the failure names nothing. Start the suite on another port instead of
+killing the orphan: `$env:E2E_PG_PORT = '55442'` (the variable is read by
+`apps/api/scripts/local-e2e-stack.mjs`).
 
 **Port 4100 already in use** — find and stop the owner:
 

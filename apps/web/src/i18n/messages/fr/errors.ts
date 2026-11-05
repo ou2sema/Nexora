@@ -62,6 +62,8 @@ export const errors: ErrorsMessages = {
   'errors.code.unsupported_logo_type': 'Téléversez une image PNG ou JPEG.',
   'errors.code.invalid_logo_image': 'Image illisible. Exportez-la de nouveau en PNG ou en JPEG.',
   'errors.code.logo_not_found': 'Cette organisation n’a pas de logo.',
+  'errors.code.renderer_unavailable':
+    "L'impression est indisponible pour le moment. Réessayez dans un instant.",
 
   'errors.server.supplierNameConflict': 'Un fournisseur portant ce nom existe déjà.',
   'errors.server.deviceSerialConflict': 'Un appareil avec ce numéro de série est déjà enregistré.',
@@ -176,6 +178,8 @@ export const errors: ErrorsMessages = {
   'errors.server.logoNotAnImage': 'Le téléversement n’est pas une image PNG ou JPEG.',
   'errors.server.logoContentTypeMismatch':
     'Le téléversement ne correspond pas à son type de contenu.',
+  'errors.server.logoRendererUnavailable':
+    "L'impression est indisponible pour le moment, cette image ne peut donc pas être vérifiée. Réessayez dans un instant.",
 
   'errors.auth.invalidCredentials': 'Identifiants de connexion invalides',
   'errors.auth.emailNotConfirmed': 'E-mail non confirmé',

@@ -143,6 +143,10 @@ const SERVER_MESSAGE_KEYS: Record<string, MessageKey> = {
   'The upload is not a PNG or JPEG image.': 'errors.server.logoNotAnImage',
   'The upload does not match its content type.': 'errors.server.logoContentTypeMismatch',
   'This organization has no logo.': 'errors.code.logo_not_found',
+  'Documents cannot be printed right now. Try again in a moment.':
+    'errors.code.renderer_unavailable',
+  'Documents cannot be printed right now, so this image cannot be checked. Try again shortly.':
+    'errors.server.logoRendererUnavailable',
   'Provide an Idempotency-Key header between 8 and 120 characters.':
     'errors.code.idempotency_key_required',
 };

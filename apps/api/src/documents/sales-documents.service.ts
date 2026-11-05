@@ -1,22 +1,28 @@
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
+import type { DocumentLocale } from '@mystock/contracts';
+
 import { AppError } from '../common/errors/app-error';
 import type { AppTransaction } from '../database/database.types';
 import { resultRows } from '../database/results';
 // The class is a DI token at runtime, so this cannot be a type-only import.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { TenantAccessService } from '../tenancy/tenant-access.service';
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import { DocumentPrinterService } from './print/document-printer.service';
+import { salesTemplate } from './print/document-template';
 import { readStoredLogo } from '../logos/logo.reader';
 import { toIso, toNumber } from '../operations/operations.utils';
+import { documentStrings } from './document-catalog';
 import {
   type CustomerDocumentInfo,
   type SalesInvoiceDocumentInput,
   buildIssueNoteDocument,
   buildSalesInvoiceDocument,
 } from './sales-document-model';
-import { renderSalesDocument } from './sales-documents.pdf';
 import type { RenderedDocument } from './rendered-document';
+import { renderForDownload } from './rendered-document';
 
 interface InvoiceDocumentRow {
   number: string;
@@ -105,22 +111,28 @@ function customerOf(row: InvoiceDocumentRow): CustomerDocumentInfo {
 
 @Injectable()
 export class SalesDocumentsService {
-  constructor(private readonly access: TenantAccessService) {}
+  constructor(
+    private readonly access: TenantAccessService,
+    private readonly printer: DocumentPrinterService,
+  ) {}
 
   async invoicePdf(
     userId: string,
     organizationId: string,
     invoiceId: string,
+    locale: DocumentLocale,
   ): Promise<RenderedDocument> {
     return this.access.runAsMember(userId, organizationId, async (tx) => {
       const organizationName = await this.organizationName(tx, organizationId);
       const logo = await readStoredLogo(tx, organizationId);
+      const strings = documentStrings(locale);
       const invoice = await this.findInvoice(tx, organizationId, invoiceId);
       const lines = await this.lines(tx, organizationId, invoiceId);
       const payments = await this.payments(tx, organizationId, invoiceId);
 
       const document = buildSalesInvoiceDocument({
         organizationName,
+        strings,
         invoice: {
           number: invoice.number,
           paymentStatus: invoice.payment_status,
@@ -151,7 +163,10 @@ export class SalesDocumentsService {
         })),
       });
 
-      return { pdf: await renderSalesDocument(document, logo), fileName: document.fileName };
+      return {
+        pdf: await renderForDownload(this.printer, salesTemplate(document, new Date()), logo),
+        fileName: document.fileName,
+      };
     });
   }
 
@@ -159,15 +174,18 @@ export class SalesDocumentsService {
     userId: string,
     organizationId: string,
     invoiceId: string,
+    locale: DocumentLocale,
   ): Promise<RenderedDocument> {
     return this.access.runAsMember(userId, organizationId, async (tx) => {
       const organizationName = await this.organizationName(tx, organizationId);
       const logo = await readStoredLogo(tx, organizationId);
+      const strings = documentStrings(locale);
       const invoice = await this.findInvoice(tx, organizationId, invoiceId);
       const lines = await this.lines(tx, organizationId, invoiceId);
 
       const document = buildIssueNoteDocument({
         organizationName,
+        strings,
         invoice: {
           number: invoice.number,
           orderStatus: invoice.order_status,
@@ -185,7 +203,10 @@ export class SalesDocumentsService {
         lines: lines.map(toDocumentLine),
       });
 
-      return { pdf: await renderSalesDocument(document, logo), fileName: document.fileName };
+      return {
+        pdf: await renderForDownload(this.printer, salesTemplate(document, new Date()), logo),
+        fileName: document.fileName,
+      };
     });
   }
 

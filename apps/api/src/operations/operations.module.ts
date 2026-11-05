@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { PurchaseDocumentsService } from '../documents/purchase-documents.service';
+import { DocumentPrintModule } from '../documents/print/print.module';
 import { SalesDocumentsService } from '../documents/sales-documents.service';
 import { CustomersController } from './customers.controller';
 import { CustomersService } from './customers.service';
@@ -14,6 +15,7 @@ import { SuppliersController } from './suppliers.controller';
 import { SuppliersService } from './suppliers.service';
 
 @Module({
+  imports: [DocumentPrintModule],
   controllers: [
     SuppliersController,
     CustomersController,

@@ -1,21 +1,28 @@
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
+import type { DocumentLocale } from '@mystock/contracts';
+
 import { AppError } from '../common/errors/app-error';
 import type { AppTransaction } from '../database/database.types';
 import { resultRows } from '../database/results';
 // The class is a DI token at runtime, so this cannot be a type-only import.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { TenantAccessService } from '../tenancy/tenant-access.service';
+// Same reason: the printer is the browser's owner, not an interface.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import { DocumentPrinterService } from './print/document-printer.service';
+import { purchaseTemplate } from './print/document-template';
 import { readStoredLogo } from '../logos/logo.reader';
 import { toIso, toNullableIso, toNumber } from '../operations/operations.utils';
+import { documentStrings } from './document-catalog';
 import {
   type SupplierDocumentInfo,
   buildPurchaseOrderDocument,
   buildPurchaseReturnDocument,
 } from './purchase-document-model';
-import { renderPurchaseDocument } from './purchase-documents.pdf';
 import type { RenderedDocument } from './rendered-document';
+import { renderForDownload } from './rendered-document';
 
 interface OrganizationRow {
   name: string;
@@ -91,16 +98,21 @@ function supplierOf(row: DocumentPartyColumns): SupplierDocumentInfo {
 
 @Injectable()
 export class PurchaseDocumentsService {
-  constructor(private readonly access: TenantAccessService) {}
+  constructor(
+    private readonly access: TenantAccessService,
+    private readonly printer: DocumentPrinterService,
+  ) {}
 
   async purchaseOrderPdf(
     userId: string,
     organizationId: string,
     purchaseOrderId: string,
+    locale: DocumentLocale,
   ): Promise<RenderedDocument> {
     return this.access.runAsMember(userId, organizationId, async (tx) => {
       const organization = await this.organizationName(tx, organizationId);
       const logo = await readStoredLogo(tx, organizationId);
+      const strings = documentStrings(locale);
 
       const rows = resultRows<PurchaseOrderDocumentRow>(
         await tx.execute(sql`
@@ -141,6 +153,7 @@ export class PurchaseDocumentsService {
 
       const document = buildPurchaseOrderDocument({
         organizationName: organization,
+        strings,
         order: {
           number: order.number,
           status: order.status,
@@ -163,7 +176,10 @@ export class PurchaseDocumentsService {
         })),
       });
 
-      return { pdf: await renderPurchaseDocument(document, logo), fileName: document.fileName };
+      return {
+        pdf: await renderForDownload(this.printer, purchaseTemplate(document, new Date()), logo),
+        fileName: document.fileName,
+      };
     });
   }
 
@@ -172,10 +188,12 @@ export class PurchaseDocumentsService {
     organizationId: string,
     purchaseOrderId: string,
     returnId: string,
+    locale: DocumentLocale,
   ): Promise<RenderedDocument> {
     return this.access.runAsMember(userId, organizationId, async (tx) => {
       const organization = await this.organizationName(tx, organizationId);
       const logo = await readStoredLogo(tx, organizationId);
+      const strings = documentStrings(locale);
 
       const rows = resultRows<PurchaseReturnDocumentRow>(
         await tx.execute(sql`
@@ -242,6 +260,7 @@ export class PurchaseDocumentsService {
 
       const document = buildPurchaseReturnDocument({
         organizationName: organization,
+        strings,
         purchaseReturn: {
           number: purchaseReturn.number,
           status: purchaseReturn.status,
@@ -267,7 +286,10 @@ export class PurchaseDocumentsService {
         })),
       });
 
-      return { pdf: await renderPurchaseDocument(document, logo), fileName: document.fileName };
+      return {
+        pdf: await renderForDownload(this.printer, purchaseTemplate(document, new Date()), logo),
+        fileName: document.fileName,
+      };
     });
   }
 

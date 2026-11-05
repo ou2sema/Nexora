@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import type { DocumentLocale } from '@mystock/contracts';
+
+import { documentStrings } from '../../src/documents/document-catalog';
 import {
   type IssueNoteDocumentInput,
   type SalesInvoiceDocumentInput,
@@ -29,9 +32,11 @@ const WALK_IN = {
 
 function invoiceInput(
   overrides: Partial<SalesInvoiceDocumentInput['invoice']> = {},
+  locale: DocumentLocale = 'en',
 ): SalesInvoiceDocumentInput {
   return {
     organizationName: 'SBS VISION',
+    strings: documentStrings(locale),
     invoice: {
       number: 'FI-2026-0007',
       paymentStatus: 'partial',
@@ -89,11 +94,13 @@ function invoiceInput(
 
 function issueNoteInput(
   overrides: Partial<IssueNoteDocumentInput['invoice']> = {},
+  locale: DocumentLocale = 'en',
 ): IssueNoteDocumentInput {
-  const input = invoiceInput();
+  const input = invoiceInput({}, locale);
   const { invoice } = input;
   return {
     organizationName: 'SBS VISION',
+    strings: documentStrings(locale),
     invoice: {
       number: invoice.number,
       orderStatus: 'fulfilled',
@@ -174,6 +181,32 @@ describe('sales invoice document', () => {
     expect(document.meta[1]).toEqual({ label: 'Exit document', value: '-' });
     expect(document.totals[5]).toEqual({ label: 'Payment method', value: '-' });
     expect(document.customer).toEqual({ name: 'Walk-in', details: [] });
+  });
+
+  it('labels the same invoice in French and in Arabic', () => {
+    const french = buildSalesInvoiceDocument(invoiceInput({}, 'fr'));
+    expect(french.strings.direction).toBe('ltr');
+    expect(french.title).toBe('Facture');
+    expect(french.statusLabel).toBe('Partiellement payée');
+    expect(french.meta[0]).toEqual({ label: "Date d'émission", value: '2026-11-02' });
+    expect(french.totals[0]).toEqual({ label: 'Total HT', value: '26.700 TND' });
+    expect(french.totals[5]).toEqual({
+      label: 'Mode de paiement',
+      value: 'Carte (saisie manuelle)',
+    });
+    expect(french.payments[0]?.methodLabel).toBe('Carte (saisie manuelle)');
+
+    const arabic = buildSalesInvoiceDocument(invoiceInput({}, 'ar'));
+    expect(arabic.strings.direction).toBe('rtl');
+    expect(arabic.title).toBe('فاتورة');
+    expect(arabic.statusLabel).toBe('مدفوعة جزئيا');
+    expect(arabic.totals[2]).toEqual({
+      label: 'المجموع مع الضريبة',
+      value: '30.082 TND',
+      strong: true,
+    });
+    expect(arabic.customer.details).toContain('المعرف الجبائي: TN9876543');
+    expect(arabic.fileName).toBe('nexora-FI-2026-0007.pdf');
   });
 
   it('is an invoice, never a receipt', () => {

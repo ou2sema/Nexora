@@ -14,6 +14,9 @@ export default tseslint.config(
       '**/allure-report/**',
       '**/playwright-report/**',
       '**/test-results/**',
+      // `logs/` is the gitignored scratch directory the spike and verification scripts are
+      // written to; CI never sees it, so linting it only makes the local gate disagree with CI.
+      'logs/**',
       'supabase/.temp/**',
     ],
   },

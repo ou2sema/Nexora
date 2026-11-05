@@ -187,10 +187,16 @@ async function expectPdfDownload(
   page: Page,
   trigger: () => Promise<void>,
   filenamePattern: RegExp,
+  locale: 'en' | 'fr' | 'ar' = 'en',
 ): Promise<void> {
   const downloadPromise = page.waitForEvent('download');
+  const printPromise = page.waitForRequest((request) =>
+    new URL(request.url()).pathname.endsWith('/pdf'),
+  );
   await trigger();
-  const download = await downloadPromise;
+  const [download, printRequest] = await Promise.all([downloadPromise, printPromise]);
+
+  expect(new URL(printRequest.url()).searchParams.get('locale')).toBe(locale);
   expect(download.suggestedFilename()).toMatch(filenamePattern);
 
   const path = await download.path();

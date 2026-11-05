@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 
 import {
+  type DocumentQuery,
   type OrderCancelInput,
   type PurchaseOrderCreateInput,
   type PurchaseOrderCreateResult,
@@ -28,6 +29,7 @@ import {
   type ReturnCancelResult,
   type ReturnListQuery,
   type ReturnPostResult,
+  documentQuerySchema,
   orderCancelSchema,
   purchaseOrderCreateSchema,
   purchaseOrderListQuerySchema,
@@ -93,11 +95,13 @@ export class PurchaseOrdersController {
   async purchaseOrderPdf(
     @CurrentUser() user: AuthenticatedUser,
     @Param(new ZodValidationPipe(purchaseOrderParamsSchema)) params: PurchaseOrderParams,
+    @Query(new ZodValidationPipe(documentQuerySchema)) query: DocumentQuery,
   ): Promise<StreamableFile> {
     const file = await this.documents.purchaseOrderPdf(
       user.id,
       params.organizationId,
       params.purchaseOrderId,
+      query.locale,
     );
     return this.stream(file);
   }
@@ -198,12 +202,14 @@ export class PurchaseOrdersController {
   async purchaseReturnPdf(
     @CurrentUser() user: AuthenticatedUser,
     @Param(new ZodValidationPipe(purchaseReturnParamsSchema)) params: PurchaseReturnParams,
+    @Query(new ZodValidationPipe(documentQuerySchema)) query: DocumentQuery,
   ): Promise<StreamableFile> {
     const file = await this.documents.purchaseReturnPdf(
       user.id,
       params.organizationId,
       params.purchaseOrderId,
       params.returnId,
+      query.locale,
     );
     return this.stream(file);
   }

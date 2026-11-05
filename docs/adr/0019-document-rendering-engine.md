@@ -1,6 +1,7 @@
 # ADR-0019 — Document rendering engine for French and Arabic documents
 
-- **Status:** proposed — no product code changes until the product owner has read this
+- **Status:** accepted — implemented on 2026-11-05; the product owner read this memo and gave the
+  go-ahead for Phase 15
 - **Date:** 2026-11-05
 - **Deciders:** product owner, engineering
 - **Amends:** ADR-0014 decision 4 (server-rendered artifacts stay English)
@@ -131,7 +132,7 @@ label sheets and any future email or archive path need a server-produced artifac
 print job produces depends on the dialog the operator is standing in front of. **Not a document
 engine.**
 
-## Decision (proposed)
+## Decision
 
 ### 1. Adopt Chromium for the four A4 document families
 
@@ -155,9 +156,9 @@ face — i.e. a bundled Arabic face adds 7–23 KB, not megabytes, even though t
 
 Ship one Latin + Arabic family under `apps/api/src/documents/fonts/`, chosen with the owner for its
 licence and its look, and assert the embedded base font name in the tests so a document that quietly
-fell back to a host font fails CI. One detail is still unmeasured: the spike loaded the font from a
-`file://` page, so the production renderer has to confirm the same embedding through a `data:` URI or
-a local request handler.
+fell back to a host font fails CI. The unmeasured detail here — whether the same embedding survives a
+`data:` URI instead of a `file://` page — settled in the implementation: it does, and the shipped faces
+are inlined base64 IBM Plex Sans Arabic (see "Settled after the decision").
 
 ### 3. Locale travels with the download request
 
@@ -217,26 +218,57 @@ moment a customer is waiting. The spike did not test crash or restart behaviour.
 - Re-rendering an archived document years later is only faithful if the template, fonts and
   browser version are pinned — the artifact itself is not stored, so the browser upgrade is a
   document-format change. Bundle fonts and pin the Playwright version in the lockfile.
-- Nothing in this ADR is implemented yet. The migration surface is the two document renderers
-  (288 lines) plus the parts of `pdf-layout.ts` they use, the locale plumbing through contracts and
-  routes, the logo probe, the 3 API test files that use the byte helpers (14 call sites), and the
-  download assertions in `apps/web/e2e-local/{operations,counter-sale,branding}.spec.ts`.
+- The migration surface was the two document renderers (288 lines) plus the parts of `pdf-layout.ts`
+  they used, the locale plumbing through contracts and routes, the logo probe, the 3 API test files that
+  use the byte helpers (14 call sites), and the download assertions in
+  `apps/web/e2e-local/{operations,counter-sale,branding}.spec.ts`. All of it landed in Phase 15; see the
+  implementation record below.
 - The label sheets keep today's defect for Arabic product names: they stay on pdf-lib by decision,
   so an Arabic product name still prints as a row of `?` on a sticker while it prints correctly on
   the invoice beside it. Fixing that is a separate, smaller decision.
 
-## Measured, not yet verified
+## Settled after the decision
 
-Three things this decision depends on that the spike could not settle on this machine:
+The three open measurements above were taken on the implemented engine on 2026-11-05; the full set of
+numbers is in docs/setup.md, "Document rendering engine verification".
 
-1. **`data:`-URI fonts.** Embedding a bundled TTF is proven (decision 2), but only through a
-   `file://` page. The production renderer must show the same `/FontFile2` + `AAAAAA+…` result
-   through an inlined `data:` URL, or serve the font from a local route.
-2. **Anything Linux.** No Docker and no WSL distribution here, so neither the Chromium Debian
-   dependencies the CI image already installs nor the font fallback on `ubuntu-latest` were run.
-   This is why decision 2 bundles fonts instead of trusting the host.
-3. **Failure behaviour.** A browser that crashes or leaks restarts mid-shift is a shop-floor
-   problem; nothing in the spike exercised kill, timeout or restart.
+1. **`data:`-URI fonts — settled.** The faces ship as base64 inside the page and embed exactly as they
+   did from `file://`: `/FontFile2` present, base fonts `AAAAAA+IBMPlexSansArabic-Regular` and
+   `BAAAAA+IBMPlexSansArabic-Bold`, and no host face in the file. The API tests assert that set, so a
+   document that fell back to Segoe UI or a Linux default fails the suite rather than shipping.
+2. **Linux — settled only by CI.** Still unrunnable from this machine, so the `quality` job now installs
+   Chromium and `poppler-utils` and the first Actions run after this commit is the check.
+3. **Failure behaviour — settled.** A page that stops answering is cut off by its own deadline, the
+   browser is SIGKILLed and the next request prints from a fresh one. Teardown detail the spike could
+   not foresee: `BrowserServer.close()` never returns for a wedged browser — it waits on the connection
+   the frozen page owns — while `server.kill()` returned in 744 ms on the same process, so `kill()` is
+   what the timeout path and the `disconnected` handler use. A browser SIGKILLed from outside is noticed
+   by the `disconnected` event: the in-flight request rejected in 1,595 ms and the next render succeeded
+   from a new launch. Recovery to a printed document measured ~1.9 s; readiness answers in 0 ms on a warm
+   browser and `503` when no browser can start.
+
+## Implementation record
+
+Shipped as decided, with three choices the spike had not made:
+
+- **A post-pass over the browser's bytes.** Chromium stamps `/CreationDate` with second resolution, so
+  output is deterministic only inside one second. `pdf-lib` re-stamps `/Title`, `/Creator`,
+  `/CreationDate` and `/ModificationDate` to the render instant with `useObjectStreams: false`, which
+  also keeps `/FontFile2`, `/BaseFont`, `/Title` and `/Subtype /Image` in plain objects for the byte
+  probes — object streams pack them away and break both.
+- **Concurrency is capped at three renders**, queueing beyond that, rather than one page at a time. A
+  counter printing an invoice while the back office exports a purchase order should not wait behind it.
+- **The unit suite runs three workers.** Each API test file brings its own database and, now, the document
+  files bring a Chromium each; at the default `cpus - 1` an 8-core box oversubscribes badly enough that a
+  render misses the engine's own deadline — the kill test measured 15.5 s of wall clock against a 750 ms
+  budget — and another file's teardown hook timed out. `test.maxWorkers = 3` in `apps/api/vitest.config.mts`
+  fixes both; Vitest 4 retired `poolOptions.forks`, so a cap written there is silently ignored by v5. With
+  the cap, 42 files and 335 API tests pass in 165 s.
+
+The retired code is deleted, not guarded: `pdf-layout.ts`, `purchase-documents.pdf.ts` and
+`sales-documents.pdf.ts` are gone, `document-format.ts` keeps the ASCII formatters and the WinAnsi
+sanitizer for the label path, and the byte-level test helpers now read printed text with `pdftotext`
+(`apps/api/test/api/pdf.ts`) while the label sheets keep content-stream geometry checks.
 
 ## Open questions for the product owner
 

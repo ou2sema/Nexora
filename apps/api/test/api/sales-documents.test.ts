@@ -1,30 +1,16 @@
-import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { PDFDocument } from 'pdf-lib';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import {
-  CONTENT_WIDTH,
-  LOGO_BOX_HEIGHT,
-  LOGO_BOX_WIDTH,
-  LOGO_TEXT_GAP,
-  MARGIN,
-  PAGE_HEIGHT,
-} from '../../src/documents/pdf-layout';
 import { LOCATIONS, ORGS, PRODUCTS, USERS, WAREHOUSES } from '../db/fixtures';
 import { LOGO_PNG } from './logo-image';
-import { type PdfRun, pdfGeometry, pdfImages, pdfParser, pdfText } from './pdf';
+import { pdfFontNames, pdfImageCount, pdfParser, pdfText } from './pdf';
 import { createTestContext, type TestContext } from './test-app';
 
 const YEAR = new Date().getFullYear();
 
-const TOTALS_LABELS = [
-  'Total excl. tax',
-  'Tax',
-  'Total incl. tax',
-  'Paid',
-  'Remaining',
-  'Payment method',
-];
+/** Chromium names an embedded subset with a six-letter prefix in front of the family. */
+const BUNDLED_FACE = /^[A-Z]{6}\+IBMPlexSansArabic-(Bold|Regular)$/;
 
 describe('sales document PDFs', () => {
   let ctx: TestContext;
@@ -125,6 +111,15 @@ describe('sales document PDFs', () => {
     return pdfText(pdf).replace(/\s+/g, ' ');
   }
 
+  /**
+   * Arabic extraction is not verbatim: the command re-flows a justified word across the
+   * whitespace it reports between presentation-form glyphs, so a catalog phrase only meets
+   * its extracted counterpart once both are de-spaced.
+   */
+  function squeezed(text: string): string {
+    return text.replace(/\s+/g, '');
+  }
+
   it('renders the invoice with the fiscal totals, payments, and serials', async () => {
     const customerId = await createCustomer();
 
@@ -155,6 +150,12 @@ describe('sales document PDFs', () => {
     const parsed = await PDFDocument.load(pdf);
     expect(parsed.getPageCount()).toBe(1);
     expect(parsed.getTitle()).toBe(`Invoice FI-${YEAR}-0001`);
+
+    // Only the faces shipped with the API may reach the page: a host font would make the
+    // same invoice look different on every machine that prints it.
+    const fonts = pdfFontNames(pdf);
+    expect(fonts).toHaveLength(2);
+    for (const font of fonts) expect(font).toMatch(BUNDLED_FACE);
 
     const text = fetchedText(pdf);
     expect(text).toContain('Org A');
@@ -202,62 +203,55 @@ describe('sales document PDFs', () => {
     }
   });
 
-  it('keeps the totals block inside its own rules', async () => {
+  it('prints the same invoice in French and in Arabic', async () => {
     const list = await request(ctx.app.getHttpServer())
       .get(invoicesUrl)
       .set('authorization', auth(aliceToken));
     const invoiceId = (list.body.items as { id: string }[])[0]!.id;
 
-    const response = await fetchPdf(`${invoicesUrl}/${invoiceId}/pdf`, aliceToken);
-    expect(response.status).toBe(200);
+    const french = await fetchPdf(`${invoicesUrl}/${invoiceId}/pdf?locale=fr`, aliceToken);
+    expect(french.status).toBe(200);
+    const frenchPdf = french.body as Buffer;
+    expect((await PDFDocument.load(frenchPdf)).getTitle()).toBe(`Facture FI-${YEAR}-0001`);
 
-    const pdf = response.body as Buffer;
-    const contentRight = MARGIN + CONTENT_WIDTH;
-    const { rules, runs } = pdfGeometry(pdf);
-
-    const scratch = await PDFDocument.create();
-    const regular = await scratch.embedFont(StandardFonts.Helvetica);
-    const bold = await scratch.embedFont(StandardFonts.HelveticaBold);
-    const rightEdge = (run: PdfRun) =>
-      run.x +
-      (run.size === 9.5 || run.size === 10.5 ? bold : regular).widthOfTextAtSize(
-        run.value,
-        run.size,
-      );
-
-    // The 7.5pt run with the same wording is the table column header, not a total.
-    const labels = runs.filter((run) => TOTALS_LABELS.includes(run.value) && run.size > 8);
-    expect(labels.length).toBe(TOTALS_LABELS.length);
-    const rows = labels.map((label) => ({
-      label,
-      value: runs.find((run) => run.y === label.y && run !== label),
-    }));
-    expect(rows.every((row) => row.value)).toBe(true);
-
-    const bandTop = Math.max(...labels.map((run) => run.y));
-    const bandBottom = Math.min(...labels.map((run) => run.y));
-    const bandRules = rules.filter((rule) => rule.y <= bandTop + 16 && rule.y >= bandBottom - 12);
-    expect(bandRules.length).toBeGreaterThan(0);
-
-    for (const rule of bandRules) {
-      expect(rule.toX).toBeCloseTo(contentRight, 1);
-      expect(rule.fromX).toBeGreaterThan(MARGIN + 100);
+    const frenchText = fetchedText(frenchPdf);
+    for (const phrase of [
+      'Facture',
+      'Partiellement payée',
+      "DATE D'ÉMISSION",
+      'Total HT',
+      'Mode de paiement',
+      'Virement bancaire',
+    ]) {
+      expect(frenchText).toContain(phrase);
     }
+    expect(frenchText).not.toContain('Total excl. tax');
 
-    const blockLeft = Math.max(...bandRules.map((rule) => rule.fromX));
-    const labelEdges = labels.map(rightEdge);
-    const valueEdges = rows.map((row) => rightEdge(row.value!));
-    for (const run of [...labels, ...rows.map((row) => row.value!)]) {
-      expect(run.x).toBeGreaterThanOrEqual(blockLeft);
+    const arabic = await fetchPdf(`${invoicesUrl}/${invoiceId}/pdf?locale=ar`, aliceToken);
+    expect(arabic.status).toBe(200);
+    const arabicPdf = arabic.body as Buffer;
+    expect((await PDFDocument.load(arabicPdf)).getTitle()).toBe(`فاتورة FI-${YEAR}-0001`);
+
+    const arabicText = squeezed(fetchedText(arabicPdf));
+    for (const phrase of [
+      'فاتورة',
+      'مدفوعة جزئيا',
+      'المعرف الجبائي',
+      'المجموع مع الضريبة',
+      'تحويل بنكي',
+    ]) {
+      expect(arabicText).toContain(squeezed(phrase));
     }
+    // A slash-separated tax number is reported in visual order, so only its digits are stable.
+    expect(arabicText).toContain('1180000');
+    expect(arabicText).not.toContain(squeezed('Total excl. tax'));
 
-    for (const edge of labelEdges) expect(edge).toBeCloseTo(labelEdges[0]!, 1);
-    for (const edge of valueEdges) expect(edge).toBeCloseTo(contentRight, 1);
+    const note = await fetchPdf(`${invoicesUrl}/${invoiceId}/issue-note/pdf?locale=ar`, aliceToken);
+    expect(note.status).toBe(200);
+    expect(squeezed(fetchedText(note.body as Buffer))).toContain(squeezed('سند خروج البضاعة'));
 
-    // Every label ends left of the amount it belongs to, so nothing sits outside a line.
-    for (const [index, row] of rows.entries()) {
-      expect(labelEdges[index]).toBeLessThan(row.value!.x);
-    }
+    const rejected = await fetchPdf(`${invoicesUrl}/${invoiceId}/pdf?locale=de`, aliceToken);
+    expect(rejected.status).toBe(400);
   });
 
   it('renders the issue note without any amount', async () => {
@@ -283,7 +277,7 @@ describe('sales document PDFs', () => {
     expect(text).toContain('INVOICE');
     expect(text).toContain(`FI-${YEAR}-0001`);
     expect(text).toContain('RELEASED BY');
-    expect(text).toContain('Serial / IMEI');
+    expect(text).toContain('SERIAL / IMEI');
     expect(text).toContain('SN-DOCPDF-0001');
     expect(text).toContain('Total quantity');
     expect(text).toContain('Every quantity on this note has left the depot');
@@ -351,7 +345,21 @@ describe('sales document PDFs', () => {
     expect(missing.body.error.code).toBe('sales_invoice_not_found');
   });
 
-  it('draws the tenant mark in the first-page header only', async () => {
+  it('draws the tenant mark on the invoice and the issue note', async () => {
+    const list = await request(ctx.app.getHttpServer())
+      .get(invoicesUrl)
+      .set('authorization', auth(aliceToken));
+    const invoiceId = (list.body.items as { id: string }[])[0]!.id;
+
+    const paths = [`${invoicesUrl}/${invoiceId}/pdf`, `${invoicesUrl}/${invoiceId}/issue-note/pdf`];
+
+    // An unbranded tenant gets a wordmark and nothing but a wordmark.
+    for (const path of paths) {
+      const unbranded = await fetchPdf(path, aliceToken);
+      expect(unbranded.status).toBe(200);
+      expect(pdfImageCount(unbranded.body as Buffer)).toBe(0);
+    }
+
     const logoUrl = `/api/v1/organizations/${ORGS.a}/logo`;
     const upload = await request(ctx.app.getHttpServer())
       .put(logoUrl)
@@ -361,31 +369,12 @@ describe('sales document PDFs', () => {
     expect(upload.status).toBe(200);
 
     try {
-      const list = await request(ctx.app.getHttpServer())
-        .get(invoicesUrl)
-        .set('authorization', auth(aliceToken));
-      const invoiceId = (list.body.items as { id: string }[])[0]!.id;
-
-      const response = await fetchPdf(`${invoicesUrl}/${invoiceId}/pdf`, aliceToken);
-      expect(response.status).toBe(200);
-
-      const pdf = response.body as Buffer;
-      const images = pdfImages(pdf);
-      expect(images).toHaveLength(1);
-      const mark = images[0]!;
-      expect(mark.width).toBeLessThanOrEqual(LOGO_BOX_WIDTH);
-      expect(mark.height).toBeLessThanOrEqual(LOGO_BOX_HEIGHT);
-      expect(mark.x).toBeGreaterThanOrEqual(MARGIN);
-      expect(mark.y).toBeGreaterThanOrEqual(PAGE_HEIGHT - MARGIN - LOGO_BOX_HEIGHT);
-      expect(mark.y + mark.height).toBeLessThanOrEqual(PAGE_HEIGHT - MARGIN);
-
-      // The identity text gives the mark its box and starts to the right of it.
-      const { runs } = pdfGeometry(pdf);
-      const orgName = runs.find((run) => run.value === 'Org A' && run.size === 15);
-      expect(orgName?.x).toBe(MARGIN + LOGO_BOX_WIDTH + LOGO_TEXT_GAP);
-
-      const issueNote = await fetchPdf(`${invoicesUrl}/${invoiceId}/issue-note/pdf`, aliceToken);
-      expect(pdfImages(issueNote.body as Buffer)).toHaveLength(1);
+      for (const path of paths) {
+        const response = await fetchPdf(path, aliceToken);
+        expect(response.status).toBe(200);
+        expect(pdfImageCount(response.body as Buffer)).toBeGreaterThan(0);
+        expect(fetchedText(response.body as Buffer)).toContain('Org A');
+      }
     } finally {
       await request(ctx.app.getHttpServer()).delete(logoUrl).set('authorization', auth(aliceToken));
     }

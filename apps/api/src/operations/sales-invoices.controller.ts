@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 
 import {
+  type DocumentQuery,
   type SalesInvoiceCreateInput,
   type SalesInvoiceCreateResult,
   type SalesInvoiceDetail,
@@ -19,6 +20,7 @@ import {
   type SalesInvoiceListResponse,
   type SalesInvoicePaymentCreateInput,
   type SalesInvoicePaymentResult,
+  documentQuerySchema,
   salesInvoiceCreateSchema,
   salesInvoiceListQuerySchema,
   salesInvoicePaymentCreateSchema,
@@ -97,8 +99,14 @@ export class SalesInvoicesController {
   async invoicePdf(
     @CurrentUser() user: AuthenticatedUser,
     @Param(new ZodValidationPipe(salesInvoiceParamsSchema)) params: SalesInvoiceParams,
+    @Query(new ZodValidationPipe(documentQuerySchema)) query: DocumentQuery,
   ): Promise<StreamableFile> {
-    const file = await this.documents.invoicePdf(user.id, params.organizationId, params.invoiceId);
+    const file = await this.documents.invoicePdf(
+      user.id,
+      params.organizationId,
+      params.invoiceId,
+      query.locale,
+    );
     return this.stream(file);
   }
 
@@ -106,11 +114,13 @@ export class SalesInvoicesController {
   async issueNotePdf(
     @CurrentUser() user: AuthenticatedUser,
     @Param(new ZodValidationPipe(salesInvoiceParamsSchema)) params: SalesInvoiceParams,
+    @Query(new ZodValidationPipe(documentQuerySchema)) query: DocumentQuery,
   ): Promise<StreamableFile> {
     const file = await this.documents.issueNotePdf(
       user.id,
       params.organizationId,
       params.invoiceId,
+      query.locale,
     );
     return this.stream(file);
   }

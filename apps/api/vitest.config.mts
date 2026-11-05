@@ -18,5 +18,9 @@ export default defineConfig({
     setupFiles: ['./test/setup-env.ts'],
     testTimeout: 20_000,
     hookTimeout: 30_000,
+    // Each API test file brings its own PGlite or embedded PostgreSQL, and since ADR-0019 the
+    // document files add a Chromium each. At the default `cpus - 1` workers an 8-core box
+    // oversubscribes: renders miss the engine's own deadlines and the logo probe 503s.
+    maxWorkers: 3,
   },
 });
