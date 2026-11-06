@@ -212,18 +212,29 @@ function isPhone(page: Page): boolean {
 }
 
 /**
- * The counter issues from one shelf, chosen as a single depot-and-location pair.
- * The option's own text is returned so the dialogs that name the shelf — the unit
- * picker, the basket, the completion screen — are asserted against what the field
- * offers rather than against a hardcoded label.
+ * The counter issues from one shelf. Its label is read off the field rather than
+ * hardcoded, because the shelf is what the dialogs, the basket and the completion
+ * screen name — and once a read has settled it, the field itself is gone.
  */
-async function chooseShelf(page: Page): Promise<string> {
+async function shelfOptionLabel(page: Page): Promise<string> {
   const value = `${WAREHOUSE_ID}|${LOCATION_ID}`;
-  const select = page.locator('#sale-selling-location');
-  await select.selectOption(value);
-  const label = (await select.locator(`option[value="${value}"]`).textContent())?.trim() ?? '';
+  const label =
+    (await page.locator(`#sale-selling-location option[value="${value}"]`).textContent())?.trim() ??
+    '';
   expect(label).not.toBe('');
   return label;
+}
+
+/** The manual path, for the tests that need a shelf before they need a scan. */
+async function chooseShelf(page: Page): Promise<string> {
+  const label = await shelfOptionLabel(page);
+  await page.locator('#sale-selling-location').selectOption(`${WAREHOUSE_ID}|${LOCATION_ID}`);
+  return label;
+}
+
+/** The one line the counter settles on instead of asking. */
+function shelfRow(page: Page, label: string): Locator {
+  return findSection(page).getByText(`Leaves from ${label}`);
 }
 
 function findSection(page: Page): Locator {
@@ -371,8 +382,8 @@ test.describe('counter sale', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Counter sale' })).toBeVisible();
     await expect(page.getByText('Nothing scanned yet')).toBeVisible();
 
-    // Nothing posts until a shelf is chosen, and the reason is said out loud.
-    const noShelf = page.getByText('Choose the location this sale leaves from');
+    // Nothing posts until a shelf is settled, and the reason is said out loud.
+    const noShelf = page.getByText('Choose the shelf this sale leaves from');
     await expect(noShelf).toBeVisible();
     await expect(isPhone(page) ? reviewButton(page) : confirmButton(page)).toBeDisabled();
 
@@ -410,7 +421,7 @@ test.describe('counter sale', () => {
     if (isPhone(page)) await basket.getByLabel(`Tax rate for ${CABLE_NAME}`).selectOption('19');
     await expect(basket.getByLabel(`Tax rate for ${CABLE_NAME}`)).toHaveValue('19');
     // Availability is read against the shelf the sale leaves from, not the depot total.
-    await expect(basket.getByText(/^2 of \d+ available · /)).toBeVisible();
+    await expect(basket.getByText(/^2 of \d+ available$/)).toBeVisible();
 
     // The catalogue price is what the line shows; the operator edits it on purpose.
     await basket.getByRole('button', { name: 'Adjust price' }).click();
@@ -444,7 +455,7 @@ test.describe('counter sale', () => {
     );
     await expectPdfDownload(
       page,
-      () => page.getByRole('button', { name: 'Bon de sortie PDF' }).click(),
+      () => page.getByRole('button', { name: 'Issue note PDF' }).click(),
       /^nexora-SO-\d{4}-\d{4}-issue-note\.pdf$/,
     );
 
@@ -474,11 +485,54 @@ test.describe('counter sale', () => {
     await expect(row.getByText('Partially paid')).toBeVisible();
   });
 
+  test('reads the selling shelf off the stock instead of asking for it', async ({
+    page,
+    request,
+  }) => {
+    await postReceipt(request, 5);
+    const serial = `SN-E2E-SHELF-${RUN}`;
+    await registerDevice(request, serial, '09');
+
+    await signIn(page);
+    await page.goto('/sale');
+
+    // The field is there to begin with — and nothing posts while the shelf is unset.
+    const shelf = await shelfOptionLabel(page);
+    await expect(page.locator('#sale-selling-location')).toBeVisible();
+    await expect(page.getByText('Choose the shelf this sale leaves from')).toBeVisible();
+    await expect(isPhone(page) ? reviewButton(page) : confirmButton(page)).toBeDisabled();
+
+    // A product that sits on exactly one shelf settles it: the read names the goods,
+    // the stock names where they are, and the operator names neither.
+    await scan(page, CABLE_CODE);
+    await confirmScan(page);
+    await expect(page.locator('#sale-selling-location')).toBeHidden();
+    await expect(shelfRow(page, shelf)).toBeVisible();
+    await expect(isPhone(page) ? reviewButton(page) : confirmButton(page)).toBeEnabled();
+
+    // The override stays one click away for the shelf the counter cannot read.
+    await findSection(page).getByRole('button', { name: 'Change shelf' }).click();
+    const select = page.locator('#sale-selling-location');
+    await expect(select).toBeVisible();
+    await expect(select).toHaveValue(`${WAREHOUSE_ID}|${LOCATION_ID}`);
+
+    // A serialized unit does the same thing from a clean counter: the device record
+    // carries its own shelf, so the scan is the answer.
+    await page.goto('/sale');
+    await expect(page.locator('#sale-selling-location')).toBeVisible();
+    await scan(page, serial);
+    await expect(findSection(page).getByRole('status')).toHaveText(
+      `${serial} added to the basket.`,
+    );
+    await expect(page.locator('#sale-selling-location')).toBeHidden();
+    await expect(shelfRow(page, shelf)).toBeVisible();
+  });
+
   test('holds a product read until the operator confirms it', async ({ page }) => {
     await armBeepCounter(page);
     await signIn(page);
     await page.goto('/sale');
-    await chooseShelf(page);
+    const shelf = await chooseShelf(page);
 
     // A read is an offer, not an order: refusing it leaves the basket as it was.
     await scanWithWedge(page, CABLE_CODE);
@@ -499,7 +553,10 @@ test.describe('counter sale', () => {
     if (isPhone(page)) {
       const summary = page.locator('#sale-mobile-summary');
       await expect(summary).toBeInViewport();
-      await expect(summary).toContainText('1 line / 3 units');
+      // The bar carries the shelf and the cost; the count stays with the basket it
+      // counts, so neither is said twice.
+      await expect(summary).toContainText(`Leaves from ${shelf}`);
+      await expect(basketSection(page)).toContainText('1 line · 3 units');
       await expect(reviewButton(page)).toBeEnabled();
       await expect(stepper(page).locator('[aria-current="step"]')).toContainText('Items');
 
@@ -540,7 +597,7 @@ test.describe('counter sale', () => {
 
     await scan(page, serialScanned);
     await expect(findSection(page).getByRole('status')).toHaveText(
-      `${serialScanned} added to the basket — verified at ${shelf}.`,
+      `${serialScanned} added to the basket.`,
     );
 
     // A serialized product code names the model, so the counter asks which unit leaves.
@@ -589,7 +646,7 @@ test.describe('counter sale', () => {
 
     await expectPdfDownload(
       page,
-      () => page.getByRole('button', { name: 'Bon de sortie PDF' }).click(),
+      () => page.getByRole('button', { name: 'Issue note PDF' }).click(),
       /^nexora-FI-\d{4}-\d{4}-issue-note\.pdf$/,
     );
   });

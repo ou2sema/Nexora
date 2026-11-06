@@ -20,7 +20,7 @@ import { useI18n } from '@/i18n/provider';
 import { useMediaQuery } from '@/lib/use-media-query';
 import { parseAmountToMinor, parseQuantity } from '@/lib/parse-amount';
 
-import { usePostSale, useRetrySafeIdempotencyKey } from './api';
+import { fetchProductShelves, usePostSale, useRetrySafeIdempotencyKey } from './api';
 import { BasketCard } from './basket-card';
 import {
   addDevice,
@@ -43,6 +43,7 @@ import { emptyManualCustomer, type SaleCustomer } from './customer-picker';
 import { DevicePickerDialog } from './device-picker-dialog';
 import { FindAddItems } from './find-add-items';
 import { pairLabel } from './selling-location';
+import { guessShelf, type ShelfGuess } from './shelf-guess';
 import { SaleComplete } from './sale-complete';
 import { SaleStepper, type SaleStep } from './sale-stepper';
 import { ScanConfirmDialog, type PendingScan } from './scan-confirm-dialog';
@@ -150,16 +151,28 @@ export function CounterSale({
     effectiveCoverage === 'partial' &&
     tenderedMinor > preview.totals.totalMinor;
 
+  const deviceShelfLabel = (device: DeviceSummary): string =>
+    pairLabel(warehouses, device.warehouseId, device.locationId) ??
+    `${device.warehouseCode} · ${device.locationCode}`;
+
   const appendDevice = (device: DeviceSummary, origin: BasketOrigin): void => {
     if (device.status !== 'in_stock') {
       setScanError(t('sale.device.notInStock', { serial: device.serialNumber }));
       return;
     }
-    if (device.warehouseId !== warehouseId || device.locationId !== locationId) {
+
+    // The unit names the shelf for as long as none has been chosen. Once the
+    // operator has chosen one, a unit sitting elsewhere belongs to a different
+    // sale: one invoice issues from exactly one shelf.
+    const deviceShelf = { warehouseId: device.warehouseId, locationId: device.locationId };
+    if (
+      locationChosen &&
+      (device.warehouseId !== warehouseId || device.locationId !== locationId)
+    ) {
       setScanError(
         t('sale.device.wrongLocation', {
           serial: device.serialNumber,
-          location: `${device.warehouseCode} / ${device.locationCode}`,
+          location: deviceShelfLabel(device),
         }),
       );
       return;
@@ -169,6 +182,8 @@ export function CounterSale({
       return;
     }
 
+    if (!locationChosen) setPair(deviceShelf);
+
     setLines((current) =>
       addDevice(
         current,
@@ -177,12 +192,31 @@ export function CounterSale({
         { taxRate: defaultTaxRate, origin },
       ),
     );
-    setNotice(
-      t('sale.device.added', {
-        serial: device.serialNumber,
-        location: locationName ?? t('sale.noDepotSelected'),
-      }),
-    );
+    setNotice(t('sale.device.added', { serial: device.serialNumber }));
+  };
+
+  /**
+   * The read says where the goods sit, so the counter takes the shelf from it while
+   * the operator has not named one. A chosen shelf is never moved under a basket,
+   * and a product that sits on several shelves is deliberately left unanswered.
+   */
+  const adoptShelf = async (productId: string): Promise<'adopted' | 'several' | 'kept'> => {
+    if (locationChosen) return 'kept';
+
+    let guess: ShelfGuess;
+    try {
+      guess = guessShelf(await fetchProductShelves(organizationId, token, productId));
+    } catch {
+      // A shelf the counter cannot read is not a scan that failed: the field is
+      // still on the screen and says what it needs to say.
+      return 'kept';
+    }
+
+    if (guess.status === 'several') return 'several';
+    if (guess.status === 'unknown') return 'kept';
+
+    setPair(guess.shelf);
+    return 'adopted';
   };
 
   const handleCapture = async (capture: ScanCapture): Promise<void> => {
@@ -205,10 +239,17 @@ export function CounterSale({
 
       const product = scanned.product;
       if (product.isSerialized) {
-        // A serialized model leaves as a unit, never as a quantity line.
+        // A serialized model leaves as a unit, never as a quantity line, so the
+        // shelf has to be settled before there is a unit list to show.
+        if ((await adoptShelf(product.id)) === 'several') {
+          setNotice(t('sale.location.several', { product: product.name }));
+          return;
+        }
         setPickerProduct(product);
         return;
       }
+
+      await adoptShelf(product.id);
 
       // Nothing enters the basket from a read until the operator confirms it:
       // the camera keeps seeing the label and the wedge fires on its own trigger.
@@ -355,15 +396,24 @@ export function CounterSale({
 
   const postError = sale.error ? errorMessage(sale.error, 'sale.post.failed') : null;
 
-  const blockingReason = !canWrite
-    ? t('sale.viewerReadOnly')
+  const blockingKey = !canWrite
+    ? 'sale.viewerReadOnly'
     : !locationChosen
-      ? t('sale.location.required')
+      ? 'sale.location.required'
       : preview.problems.some((problem) => problem.reason === 'empty')
-        ? t('sale.post.basketEmpty')
+        ? 'sale.post.basketEmpty'
         : !preview.ready
-          ? t('sale.post.fixLines')
+          ? 'sale.post.fixLines'
           : null;
+
+  const blockingReason = blockingKey === null ? null : t(blockingKey);
+
+  // The phone's docked bar keeps the shelf sentence, so its reason line only has to
+  // say what that line cannot: a viewer's role, an empty basket, a line to fix.
+  const barReason =
+    blockingKey === null || blockingKey === 'sale.location.required'
+      ? t('sale.review.includesTax', { tax: formatMoney(preview.totals.taxMinor) })
+      : blockingReason;
 
   if (posted) {
     return (
@@ -410,7 +460,6 @@ export function CounterSale({
       lines={lines}
       warehouseId={warehouseId}
       locationId={locationId}
-      locationName={locationName}
       canEdit={canWrite}
       totals={preview.lineAmounts}
       problems={preview.problems}
@@ -439,7 +488,7 @@ export function CounterSale({
       lines={lines}
       lineAmounts={preview.lineAmounts}
       totals={preview.totals}
-      totalQuantity={preview.totalQuantity}
+      locationName={locationName}
       showLines={!isDesktop}
       method={method}
       onMethodChange={setMethod}
@@ -539,22 +588,17 @@ export function CounterSale({
       >
         <div className="flex items-center gap-3 px-4 py-3 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))]">
           <div className="min-w-0 flex-1">
+            {/* The basket card counts the lines right above the bar, so the bar spends
+                its one spare line on the shelf the scan settled. */}
             <p className="truncate text-xs text-slate-500">
-              {t('sale.basket.count', {
-                lines: plural('common.noun.lines', lines.length),
-                units: plural('common.noun.units', preview.totalQuantity),
-              })}
+              {locationName === null
+                ? t('sale.location.required')
+                : t('sale.location.leavesFrom', { location: locationName })}
             </p>
             <p dir="ltr" className="font-mono text-base font-semibold text-slate-900">
               {formatMoney(preview.totals.totalMinor)}
             </p>
-            {blockingReason ? (
-              <p className="truncate text-[11px] text-slate-500">{blockingReason}</p>
-            ) : (
-              <p className="truncate text-[11px] text-slate-500">
-                {t('sale.review.includesTax', { tax: formatMoney(preview.totals.taxMinor) })}
-              </p>
-            )}
+            <p className="truncate text-[11px] text-slate-500">{barReason}</p>
           </div>
           <Button type="button" className="shrink-0" disabled={!canPost} onClick={review}>
             {t('sale.review.action')}

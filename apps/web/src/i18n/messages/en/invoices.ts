@@ -54,7 +54,7 @@ export const invoices = {
   'invoice.detail.docsHint':
     'Both are rendered from the stored invoice, so the copy the customer keeps and the copy the depot keeps cannot disagree.',
   'invoice.detail.downloadInvoice': 'Invoice PDF',
-  'invoice.detail.downloadIssueNote': 'Bon de sortie PDF',
+  'invoice.detail.downloadIssueNote': 'Issue note PDF',
   'invoice.detail.downloaded': '{filename} saved.',
   'invoice.detail.pdfFailed': 'The document could not be downloaded.',
 } as const;

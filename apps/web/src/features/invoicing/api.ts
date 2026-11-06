@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 
+import { MAX_PAGE_SIZE } from '@mystock/contracts';
+
 import type {
   CustomerCreateInput,
   CustomerListResponse,
@@ -13,6 +15,8 @@ import type {
   SalesInvoiceListResponse,
   SalesInvoicePaymentCreateInput,
   SalesInvoicePaymentResult,
+  StockLevelListResponse,
+  StockLevelSummary,
 } from '@mystock/contracts';
 
 import { useAccessToken } from '@/features/auth/auth-provider';
@@ -157,6 +161,29 @@ export function useSalesInvoice(organizationId: string | null, invoiceId: string
       ),
     enabled: Boolean(organizationId) && Boolean(invoiceId),
   });
+}
+
+/**
+ * Every shelf holding this product, which is what lets the counter read the
+ * issuing shelf off the stock instead of asking the operator to name it.
+ */
+export async function fetchProductShelves(
+  organizationId: string,
+  token: string,
+  productId: string,
+): Promise<StockLevelSummary[]> {
+  const params = new URLSearchParams({
+    productId,
+    page: '1',
+    pageSize: String(MAX_PAGE_SIZE),
+  });
+
+  const response = await apiRequest<StockLevelListResponse>(
+    `/organizations/${organizationId}/stock-levels?${params.toString()}`,
+    { token },
+  );
+
+  return response.items;
 }
 
 /**

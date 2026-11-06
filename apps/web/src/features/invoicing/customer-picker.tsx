@@ -110,7 +110,7 @@ export function CustomerPicker({
                 {value.customer.name}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                {detailsOf(value.customer) ?? t('sale.customer.noDetails')}
+                {detailsOf(value.customer) ?? t('sale.customer.noContact')}
               </p>
               {value.customer.email && (
                 <p dir="ltr" className="mt-0.5 text-xs text-slate-500">
@@ -182,7 +182,7 @@ export function CustomerPicker({
                   >
                     <p className="text-sm font-medium text-slate-900">{customer.name}</p>
                     <p className="mt-0.5 text-xs text-slate-500">
-                      {detailsOf(customer) ?? t('sale.customer.noDetails')}
+                      {detailsOf(customer) ?? t('sale.customer.noContact')}
                     </p>
                   </button>
                 </li>
@@ -198,12 +198,9 @@ export function CustomerPicker({
                 htmlFor="sale-customer-name"
                 className="flex items-baseline justify-between gap-2 text-xs font-medium text-slate-600"
               >
-                <span>
-                  {t('sale.customer.name')}{' '}
-                  <span aria-hidden="true" className="text-rose-600">
-                    *
-                  </span>
-                </span>
+                <span>{t('sale.customer.name')}</span>
+                {/* One marker for the requirement rather than an asterisk beside a
+                    word that says the same thing. */}
                 <span className="text-[11px] text-slate-400">{t('sale.customer.nameHint')}</span>
               </label>
               <input
@@ -211,6 +208,7 @@ export function CustomerPicker({
                 type="text"
                 value={manual?.name ?? ''}
                 maxLength={160}
+                aria-required={true}
                 aria-invalid={errorKey !== null}
                 className={cn(fieldClass, 'mt-1', errorKey !== null && 'border-rose-400')}
                 onChange={(event) =>

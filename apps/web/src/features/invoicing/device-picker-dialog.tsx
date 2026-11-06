@@ -55,6 +55,7 @@ export function DevicePickerDialog({
 
   const here = (devices.data?.items ?? []).filter((device) => device.locationId === locationId);
   const open = Boolean(product);
+  const shelfChosen = warehouseId !== '' && locationId !== '';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -64,13 +65,16 @@ export function DevicePickerDialog({
             ? t('sale.device.pickTitle', { product: product.name })
             : t('sale.device.picking')}
         </DialogTitle>
+        {/* The count is stated only when there is something to count: when the
+            shelf is empty the body below says so, and saying it twice reads as
+            two different facts. */}
         <DialogDescription>
-          {product
+          {product && shelfChosen && here.length > 0
             ? plural('sale.device.inStock', here.length, { location: locationLabel })
-            : t('sale.device.pickDescriptionEmpty')}
+            : t('sale.device.pickDescription')}
         </DialogDescription>
 
-        {!warehouseId || !locationId ? (
+        {!shelfChosen ? (
           <p role="alert" className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
             {t('sale.device.locationRequired')}
           </p>
@@ -113,14 +117,14 @@ export function DevicePickerDialog({
                         {device.serialNumber}
                       </p>
                       <p className="mt-0.5 break-all text-xs text-slate-500">
-                        {device.locationCode}
+                        {/* Every unit here is on the same shelf, so the row names the
+                            unit and the day it arrived, not the shelf again. */}
                         {device.imei && (
                           <>
-                            {' · '}
                             <span dir="ltr">{device.imei}</span>
+                            {' · '}
                           </>
                         )}
-                        {' · '}
                         {formatDate(device.receivedAt)}
                       </p>
                     </div>

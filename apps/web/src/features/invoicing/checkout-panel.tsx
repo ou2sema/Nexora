@@ -1,4 +1,5 @@
 import { ChevronDown, Loader2, UserRound } from 'lucide-react';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 
 import type { CustomerSummary, PaymentMethod } from '@mystock/contracts';
@@ -52,9 +53,22 @@ function Details({ action, children }: DetailsProps) {
   );
 }
 
+interface CustomerBlockProps {
+  organizationId: string;
+  value: SaleCustomer;
+  canWrite: boolean;
+  errorKey: MessageKey | null;
+  onChange: (customer: SaleCustomer) => void;
+  onSelected: (customer: CustomerSummary) => void;
+}
+
 /**
  * The buyer, condensed to what the invoice prints. The desk rail has no room for
  * a directory search, so the full picker lives inside this disclosure.
+ *
+ * The disclosure is controlled because the missing-buyer reason has to be said once:
+ * while the picker is closed, this line is the only place it can appear; while it is
+ * open, the alert sits under the name field the operator is looking at.
  */
 function CustomerBlock({
   organizationId,
@@ -63,15 +77,9 @@ function CustomerBlock({
   errorKey,
   onChange,
   onSelected,
-}: {
-  organizationId: string;
-  value: SaleCustomer;
-  canWrite: boolean;
-  errorKey: MessageKey | null;
-  onChange: (customer: SaleCustomer) => void;
-  onSelected: (customer: CustomerSummary) => void;
-}) {
+}: CustomerBlockProps) {
   const { t } = useI18n();
+  const [editing, setEditing] = useState(false);
   const directory = value.mode === 'directory' ? value.customer : null;
   const manualName = value.mode === 'manual' ? value.name.trim() : '';
   const contact = directory ? [directory.email, directory.phone].filter(Boolean).join(' · ') : '';
@@ -109,26 +117,39 @@ function CustomerBlock({
               {t('sale.customer.change')}
             </Button>
           </div>
-        ) : (
-          // The picker's own error hides inside the disclosure, so this line is the
-          // only reason a collapsed buyer block can be refused.
+        ) : editing ? null : (
           <p className={cn('mt-2 text-sm', errorKey ? 'text-rose-700' : 'text-slate-500')}>
             {errorKey ? t(errorKey) : t('sale.customer.walkIn')}
           </p>
         )}
       </div>
 
-      <Details action={t('sale.customer.editAction')}>
-        <CustomerPicker
-          organizationId={organizationId}
-          value={value}
-          canWrite={canWrite}
-          onChange={onChange}
-          onSelected={onSelected}
-          errorKey={errorKey}
-          embedded
-        />
-      </Details>
+      <details
+        className="group rounded-xl border border-slate-200 bg-white"
+        open={editing}
+        onToggle={(event) => setEditing(event.currentTarget.open)}
+      >
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-slate-700 marker:hidden">
+          <span className="flex items-center gap-2">
+            <ChevronDown
+              aria-hidden="true"
+              className="size-4 rotate-[-90deg] text-slate-400 transition group-open:rotate-0"
+            />
+            {t('sale.customer.editAction')}
+          </span>
+        </summary>
+        <div className="border-t border-slate-100 px-4 py-4">
+          <CustomerPicker
+            organizationId={organizationId}
+            value={value}
+            canWrite={canWrite}
+            onChange={onChange}
+            onSelected={onSelected}
+            errorKey={editing ? errorKey : null}
+            embedded
+          />
+        </div>
+      </details>
     </div>
   );
 }
@@ -340,29 +361,30 @@ export function Payment({
         </p>
       )}
 
-      <dl className="space-y-1.5 text-sm">
-        <div className="flex items-baseline justify-between gap-3">
-          <dt className="text-slate-500">{t('sale.payment.recorded')}</dt>
-          <dd dir="ltr" className="font-mono text-slate-900">
-            {formatMoney(coverage === 'full' ? totalMinor : Math.min(receivedMinor, totalMinor))}
-          </dd>
-        </div>
-        <div className="flex items-baseline justify-between gap-3">
-          <dt className="text-slate-500">{t('sale.payment.remaining')}</dt>
-          <dd dir="ltr" className="font-mono text-slate-900">
-            {formatMoney(remainingMinor)}
-          </dd>
-        </div>
-      </dl>
+      {/* Paying in full leaves nothing to say about the balance that the total line
+          below does not say better, so these two rows only appear once the counter
+          takes less than the invoice is worth. */}
+      {coverage === 'partial' && (
+        <dl className="space-y-1.5 text-sm">
+          <div className="flex items-baseline justify-between gap-3">
+            <dt className="text-slate-500">{t('sale.payment.recorded')}</dt>
+            <dd dir="ltr" className="font-mono text-slate-900">
+              {formatMoney(Math.min(receivedMinor, totalMinor))}
+            </dd>
+          </div>
+          <div className="flex items-baseline justify-between gap-3">
+            <dt className="text-slate-500">{t('sale.payment.remaining')}</dt>
+            <dd dir="ltr" className="font-mono text-slate-900">
+              {formatMoney(remainingMinor)}
+            </dd>
+          </div>
+        </dl>
+      )}
 
+      {/* Cash handed over above the total is change, and the row above says it in
+          numbers, so the hint only has to say what the invoice becomes. */}
       <p className="text-xs text-slate-500">
-        {t(
-          coverage === 'full'
-            ? isCash
-              ? 'sale.payment.hintFullCash'
-              : 'sale.payment.hintFull'
-            : 'sale.payment.hintPartial',
-        )}
+        {t(coverage === 'full' ? 'sale.payment.hintFull' : 'sale.payment.hintPartial')}
       </p>
     </div>
   );
@@ -452,15 +474,17 @@ export function SaleDetails({
 }
 
 interface ConfirmActionProps {
-  totalMinor: number;
   canSubmit: boolean;
   pending: boolean;
   hint: string | null;
 }
 
-/** The single action that writes to the ledger, priced with the total it books. */
-export function ConfirmAction({ totalMinor, canSubmit, pending, hint }: ConfirmActionProps) {
-  const { t, formatMoney } = useI18n();
+/**
+ * The single action that writes to the ledger. The amount it books is not repeated
+ * here: the total line directly above is the one place the screen states it.
+ */
+export function ConfirmAction({ canSubmit, pending, hint }: ConfirmActionProps) {
+  const { t } = useI18n();
 
   return (
     <div className="space-y-2">
@@ -471,10 +495,6 @@ export function ConfirmAction({ totalMinor, canSubmit, pending, hint }: ConfirmA
           <span aria-hidden="true">✓</span>
         )}
         <span>{t('sale.post.action')}</span>
-        <span aria-hidden="true">·</span>
-        <span dir="ltr" className="font-mono">
-          {formatMoney(totalMinor)}
-        </span>
       </Button>
       {hint && <p className="text-xs text-slate-500">{hint}</p>}
     </div>
@@ -491,7 +511,8 @@ interface CheckoutPanelProps {
   lines: BasketLine[];
   lineAmounts: Record<string, InvoiceLineAmounts>;
   totals: InvoiceTotals;
-  totalQuantity: number;
+  /** `Tunis · Main store`, or null while the counter has not settled the shelf. */
+  locationName: string | null;
   /** The phone review step lists the lines; the desk rail already shows them above. */
   showLines: boolean;
   method: PaymentMethod;
@@ -532,7 +553,7 @@ export function CheckoutPanel({
   lines,
   lineAmounts,
   totals,
-  totalQuantity,
+  locationName,
   showLines,
   method,
   onMethodChange,
@@ -554,7 +575,7 @@ export function CheckoutPanel({
   hint,
   error,
 }: CheckoutPanelProps) {
-  const { t, plural } = useI18n();
+  const { t } = useI18n();
 
   return (
     <form
@@ -570,12 +591,13 @@ export function CheckoutPanel({
     >
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-lg font-semibold text-slate-900">{t('sale.checkout.title')}</h2>
-        <p className="text-xs text-slate-500">
-          {t('sale.basket.count', {
-            lines: plural('common.noun.lines', lines.length),
-            units: plural('common.noun.units', totalQuantity),
-          })}
-        </p>
+        {/* The count belongs to the basket card and the total to the lines below, so
+            this header carries only the shelf the scan settled on. */}
+        {locationName !== null && (
+          <p className="truncate text-xs text-slate-500">
+            {t('sale.location.leavesFrom', { location: locationName })}
+          </p>
+        )}
       </div>
 
       <CustomerBlock
@@ -622,12 +644,7 @@ export function CheckoutPanel({
 
       <Totals totals={totals} />
 
-      <ConfirmAction
-        totalMinor={totals.totalMinor}
-        canSubmit={canSubmit}
-        pending={pending}
-        hint={hint}
-      />
+      <ConfirmAction canSubmit={canSubmit} pending={pending} hint={hint} />
     </form>
   );
 }

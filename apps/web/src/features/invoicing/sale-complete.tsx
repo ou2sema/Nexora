@@ -62,7 +62,7 @@ export function SaleComplete({
           {t('sale.done.summary', {
             buyer: buyerName ?? t('sale.done.walkIn'),
             units: plural('common.noun.units', result.totalQuantity),
-            location: locationName ?? t('sale.noDepotSelected'),
+            location: locationName ?? t('sale.noShelf'),
           })}
         </p>
       </div>

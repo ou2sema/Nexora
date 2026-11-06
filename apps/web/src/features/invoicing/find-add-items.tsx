@@ -1,4 +1,4 @@
-import { CheckCircle2, Package, Plus, Smartphone, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, MapPin, Package, Plus, Smartphone, TriangleAlert } from 'lucide-react';
 
 import { useMemo, useState } from 'react';
 
@@ -59,6 +59,7 @@ export function FindAddItems({
 }: FindAddItemsProps) {
   const { t, plural, formatMoney } = useI18n();
   const [query, setQuery] = useState('');
+  const [changingShelf, setChangingShelf] = useState(false);
 
   const levels = useStockLevels(organizationId, {
     search: '',
@@ -116,13 +117,40 @@ export function FindAddItems({
       </div>
 
       <div className="mt-4 space-y-3">
-        <SellingLocationSelect
-          warehouses={warehouses}
-          warehouseId={warehouseId}
-          locationId={locationId}
-          canWrite={canWrite}
-          onChange={onLocationChange}
-        />
+        {/* The scan usually settles the shelf, so once it is known the field
+            collapses into the one line it proves. `Change shelf` brings the
+            select back for the cases the read cannot answer. */}
+        {locationName === null || changingShelf ? (
+          <SellingLocationSelect
+            warehouses={warehouses}
+            warehouseId={warehouseId}
+            locationId={locationId}
+            canWrite={canWrite}
+            onChange={(nextWarehouseId, nextLocationId) => {
+              setChangingShelf(false);
+              onLocationChange(nextWarehouseId, nextLocationId);
+            }}
+          />
+        ) : (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+            <p className="flex min-w-0 items-center gap-2 text-sm text-slate-700">
+              <MapPin aria-hidden="true" className="size-4 shrink-0 text-indigo-500" />
+              <span className="truncate">
+                {t('sale.location.leavesFrom', { location: locationName })}
+              </span>
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={!canWrite}
+              className="shrink-0 text-indigo-700"
+              onClick={() => setChangingShelf(true)}
+            >
+              {t('sale.location.change')}
+            </Button>
+          </div>
+        )}
 
         <ScanBox
           active={canWrite && scannerReady}
@@ -155,9 +183,7 @@ export function FindAddItems({
       <div className="mt-5">
         <div className="flex items-baseline justify-between gap-3">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-            {t('sale.quickAdd.title', {
-              location: locationName ?? t('sale.quickAdd.noDepot'),
-            })}
+            {t('sale.quickAdd.title')}
           </h3>
           {locationName !== null && (
             <p className="text-xs text-slate-500">
@@ -194,14 +220,13 @@ export function FindAddItems({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-slate-900">{product.name}</p>
                   <p className="mt-0.5 text-xs text-slate-500">
+                    {/* The shelf is in the heading above, so the row only counts. */}
                     {product.isSerialized
                       ? t('sale.quickAdd.devicesAvailable', {
                           devices: plural('common.noun.devices', level.available),
-                          location: locationName ?? level.locationCode,
                         })
                       : t('sale.quickAdd.unitsInStock', {
                           units: plural('common.noun.units', level.onHand),
-                          location: locationName ?? level.locationCode,
                         })}
                   </p>
                 </div>

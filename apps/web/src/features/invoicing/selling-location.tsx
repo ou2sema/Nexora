@@ -57,10 +57,8 @@ export function SellingLocationSelect({
     if (!warehouse.isActive) continue;
     for (const location of warehouse.locations) {
       if (!location.isActive) continue;
-      options.push({
-        value: pairValue(warehouse.id, location.id),
-        label: `${warehouse.name || warehouse.code} · ${location.name || location.code}`,
-      });
+      const label = pairLabel(warehouses, warehouse.id, location.id);
+      if (label) options.push({ value: pairValue(warehouse.id, location.id), label });
     }
   }
 

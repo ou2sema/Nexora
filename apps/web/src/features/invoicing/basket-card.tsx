@@ -35,8 +35,6 @@ interface BasketCardProps {
   lines: BasketLine[];
   warehouseId: string;
   locationId: string;
-  /** `Tunis · Main store`, the shelf the invoice issues from. */
-  locationName: string | null;
   canEdit: boolean;
   totals: Record<string, InvoiceLineAmounts>;
   problems: BasketProblem[];
@@ -196,20 +194,19 @@ interface LineAvailabilityProps {
   line: BasketLine;
   warehouseId: string;
   locationId: string;
-  locationName: string | null;
 }
 
 /**
- * Availability at the depot the invoice will issue from, read from the same
+ * Availability at the shelf the invoice will issue from, read from the same
  * `stock_levels` view the ledger exposes. It is a warning, not a gate: the
- * reservation inside the sale transaction is what decides.
+ * reservation inside the sale transaction is what decides. The shelf itself is
+ * named once, above, so the line only ever speaks of "this shelf".
  */
 function LineAvailability({
   organizationId,
   line,
   warehouseId,
   locationId,
-  locationName,
 }: LineAvailabilityProps) {
   const { t, formatQuantity } = useI18n();
 
@@ -226,9 +223,7 @@ function LineAvailability({
     return (
       <p className="flex items-center justify-end gap-1.5 text-xs text-emerald-700">
         <CheckCircle2 aria-hidden="true" className="size-3.5" />
-        {t('sale.basket.deviceVerified', {
-          location: locationName ?? t('sale.noDepotSelected'),
-        })}
+        {t('sale.basket.deviceVerified')}
       </p>
     );
   }
@@ -259,7 +254,6 @@ function LineAvailability({
       {t('sale.basket.ofAvailable', {
         requested: formatQuantity(requested),
         available: formatQuantity(level.available),
-        location: locationName ?? t('sale.noDepotSelected'),
       })}
     </p>
   );
@@ -267,7 +261,6 @@ function LineAvailability({
 
 interface BasketRowProps extends LineControlsProps {
   organizationId: string;
-  locationName: string | null;
   warehouseId: string;
   locationId: string;
   onRemove: (key: string) => void;
@@ -283,7 +276,6 @@ function BasketRow({
   organizationId,
   warehouseId,
   locationId,
-  locationName,
 }: BasketRowProps) {
   const { t, formatMoney } = useI18n();
   const linePriceMinor = effectivePriceMinor(line);
@@ -356,7 +348,6 @@ function BasketRow({
             line={line}
             warehouseId={warehouseId}
             locationId={locationId}
-            locationName={locationName}
           />
         </div>
         <Button
@@ -385,7 +376,6 @@ export function BasketCard({
   lines,
   warehouseId,
   locationId,
-  locationName,
   canEdit,
   totals,
   problems,
@@ -435,16 +425,10 @@ export function BasketCard({
               organizationId={organizationId}
               warehouseId={warehouseId}
               locationId={locationId}
-              locationName={locationName}
             />
           ))}
         </div>
       )}
-
-      <p className="flex items-start gap-2 border-t border-slate-100 px-5 py-4 text-xs text-slate-500">
-        <CheckCircle2 aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
-        {t('sale.basket.taxNote')}
-      </p>
     </section>
   );
 }
