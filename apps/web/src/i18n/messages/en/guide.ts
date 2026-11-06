@@ -55,13 +55,13 @@ export const guide = {
   'guide.scan.step1':
     'Use the camera or the field. Nexora tries the code as a device serial or IMEI first, then as a barcode, then as a product SKU, then as an internal code.',
   'guide.scan.step2':
-    'To receive, choose the purchase order line, confirm the quantity and post it — the receipt becomes a movement into that location.',
+    'To receive, pick the purchase order that arrived and scan the goods. Each read queues one unit on its line — a serial number queues the unit itself — and the destination comes from the order, so nothing is retyped.',
   'guide.scan.step3':
     'To count, start a count on a location, enter what you actually see, then post it. Only the differences become movements.',
   'guide.scan.step4':
     'Labels print from the same screen: a product label carries its barcode, a device label carries its serial.',
   'guide.scan.watch':
-    'The same code scanned twice within about a second is ignored on purpose, so a scanner that sends the code twice does not double the stock. A count never sets a quantity — it posts the difference it found.',
+    'A reader that fires twice sends the code twice; the console ignores that echo, so one physical scan never becomes two units. The next box, read a moment later, is the next unit. A count never sets a quantity — it posts the difference it found.',
 
   'guide.stock.title': 'Stock, movements and reservations',
   'guide.stock.purpose':
@@ -84,7 +84,7 @@ export const guide = {
     'Outgoing orders go draft → confirmed → fulfilled. Confirming reserves the units, fulfilling issues them.',
   'guide.orders.step2': 'Cancelling a confirmed order releases what it had reserved.',
   'guide.orders.step3':
-    'Purchase orders go draft → ordered, then received line by line in the scanning console; a partly received order stays open until every line is in.',
+    'Purchase orders go draft → ordered, then the delivery is received at the scanning console: pick the order, scan the goods, post. An order stays open until every queued line is fully in.',
   'guide.orders.step4':
     'Returns close the loop: a purchase return sends units back to the supplier, a sales return puts them back on the shelf.',
   'guide.orders.watch':

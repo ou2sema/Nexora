@@ -1,5 +1,5 @@
 import { Camera, CameraOff, CheckCircle2, ClipboardCheck, ScanLine, XCircle } from 'lucide-react';
-import { type FormEvent, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import type { ProductSummary, ScanResult, StockCount, StockCountSummary } from '@mystock/contracts';
 
@@ -7,16 +7,18 @@ import { Button } from '@/components/ui/button';
 import { useWarehouses } from '@/features/catalog/api';
 import { useOrganization } from '@/features/organizations/organization-provider';
 import { useAccessToken } from '@/features/auth/auth-provider';
-import { usePostStockMovement } from '@/features/stock/api';
 import { useI18n } from '@/i18n/provider';
 import { fieldClass } from '@/lib/form-field';
+import { ApiError } from '@/lib/api-client';
+import { useScanBeep } from '@/lib/use-scan-beep';
 import { CameraScanner } from '@/features/scanning/camera-scanner';
 import { LabelDialog, type LabelTarget } from '@/features/scanning/label-dialog';
 import { CountLinesSection } from '@/features/scanning/count-lines-section';
 import { CountWorkflowPanel, type CountMode } from '@/features/scanning/count-workflow-panel';
 import { OpenCountsPanel } from '@/features/scanning/open-counts-panel';
-import { ReceivePanel } from '@/features/scanning/receive-panel';
+import { ReceiveDock, useReceiveDock } from '@/features/scanning/receive-dock';
 import { ScanResultCard } from '@/features/scanning/scan-result-card';
+import { type ScanCapture, useScanWedge } from '@/features/scanning/scan-wedge';
 import {
   scanCode,
   useDiscardStockCount,
@@ -28,6 +30,12 @@ import {
 } from '@/features/scanning/api';
 
 type Mode = 'receive' | 'count';
+
+/**
+ * A reader that fires twice sends its whole burst again inside a few hundred milliseconds.
+ * Anything slower than that is the operator reading the next box, which is a second unit.
+ */
+const SCAN_ECHO_MS = 300;
 
 function parseQuantity(value: string): number | null {
   const normalized = value.trim().replace(',', '.');
@@ -56,10 +64,11 @@ export function ScanningPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [labelTargets, setLabelTargets] = useState<LabelTarget[] | null>(null);
   const lastScan = useRef<{ code: string; at: number } | null>(null);
+  const codeRef = useRef<HTMLInputElement>(null);
+  const beep = useScanBeep();
 
   const [warehouseId, setWarehouseId] = useState('');
   const [locationId, setLocationId] = useState('');
-  const [receiveQuantity, setReceiveQuantity] = useState('1');
   const [countQuantity, setCountQuantity] = useState('1');
   const [countMode, setCountMode] = useState<CountMode>('increment');
   const [activeCountId, setActiveCountId] = useState<string | null>(null);
@@ -69,7 +78,7 @@ export function ScanningPage() {
   const openCounts = useStockCounts(organizationId, { status: 'open', page: 1, pageSize: 20 });
   const activeCount = useStockCount(organizationId, activeCountId);
 
-  const receive = usePostStockMovement(organizationId ?? '');
+  const dock = useReceiveDock(organizationId);
   const startCount = useStartStockCount(organizationId ?? '');
   const recordCount = useRecordStockCount(organizationId ?? '');
   const postCount = usePostStockCount(organizationId ?? '');
@@ -92,7 +101,7 @@ export function ScanningPage() {
     setLocationId(nextLocationId);
   };
 
-  const handleScan = async (raw: string, options: { quiet?: boolean } = {}) => {
+  const handleScan = async (raw: string) => {
     const code = raw.trim();
     if (!code || !organizationId) return;
 
@@ -101,7 +110,7 @@ export function ScanningPage() {
     if (
       previous &&
       previous.code.toLowerCase() === code.toLowerCase() &&
-      now - previous.at < 1_500
+      now - previous.at < SCAN_ECHO_MS
     ) {
       setNotice(t('scan.notice.duplicate', { code }));
       return;
@@ -109,73 +118,47 @@ export function ScanningPage() {
     lastScan.current = { code, at: now };
 
     setScanError(null);
-    if (!options.quiet) setNotice(null);
+    setNotice(null);
     try {
       const scanned = await scanCode(organizationId, token, code);
       setResult(scanned);
-      if (!options.quiet) {
-        setNotice(
-          scanned.kind === 'device'
-            ? t('scan.notice.device', { serial: scanned.device.serialNumber })
-            : t('scan.notice.product', { product: scanned.product.name }),
-        );
-      }
+      setNotice(
+        scanned.kind === 'device'
+          ? t('scan.notice.device', { serial: scanned.device.serialNumber })
+          : t('scan.notice.product', { product: scanned.product.name }),
+      );
+      if (mode === 'receive') dock.onResolved(scanned);
     } catch (error) {
+      // A code the server cannot resolve is, at the dock, the serial of a unit that has
+      // never been registered. It belongs to the order line being collected, not to the
+      // error line — and the dock says which.
+      if (
+        mode === 'receive' &&
+        error instanceof ApiError &&
+        error.code === 'scan_not_found' &&
+        dock.onUnknown(code)
+      ) {
+        return;
+      }
+
       setResult(null);
       setScanError(errorMessage(error, 'scan.error.resolveFailed'));
     }
   };
 
-  const submitManual = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const code = manualCode.trim();
-    if (!code) return;
+  /** Every read arrives through here once: a wedge burst, a camera frame, or a typed code. */
+  const readCode = (capture: ScanCapture) => {
+    beep();
     setManualCode('');
-    void handleScan(code);
+    void handleScan(capture.rawValue);
   };
 
-  const submitReceive = () => {
-    if (!scannedProduct) return;
-    if (scannedProduct.isSerialized) {
-      setNotice(t('scan.notice.serializedReceive'));
-      return;
-    }
-    const quantity = parseQuantity(receiveQuantity);
-    if (quantity === null || quantity <= 0) {
-      setScanError(t('scan.error.receiptQuantity'));
-      return;
-    }
-    if (!warehouseId || !locationId) {
-      setScanError(t('scan.error.receiptLocation'));
-      return;
-    }
-
-    setScanError(null);
-    receive.mutate(
-      {
-        productId: scannedProduct.id,
-        warehouseId,
-        locationId,
-        type: 'receipt',
-        quantity,
-        reason: 'Scan receiving',
-      },
-      {
-        onSuccess: (posted) => {
-          setNotice(
-            t('scan.notice.received', {
-              quantity: formatQuantity(quantity),
-              product: scannedProduct.name,
-              onHand: formatQuantity(posted.onHand),
-            }),
-          );
-          lastScan.current = null;
-          void handleScan(scannedProduct.barcode ?? scannedProduct.sku, { quiet: true });
-        },
-        onError: (error) => setScanError(errorMessage(error, 'scan.error.receiptFailed')),
-      },
-    );
-  };
+  useScanWedge({
+    active: true,
+    targetRef: codeRef,
+    getManualValue: () => manualCode,
+    onCapture: readCode,
+  });
 
   const submitStartCount = () => {
     if (!warehouseId || !locationId) {
@@ -265,11 +248,7 @@ export function ScanningPage() {
   };
 
   const busy =
-    receive.isPending ||
-    startCount.isPending ||
-    recordCount.isPending ||
-    postCount.isPending ||
-    discardCount.isPending;
+    startCount.isPending || recordCount.isPending || postCount.isPending || discardCount.isPending;
 
   return (
     <div className="space-y-6">
@@ -351,12 +330,13 @@ export function ScanningPage() {
           </div>
         )}
 
-        <form className="mt-4 flex flex-col gap-2 sm:flex-row" onSubmit={submitManual}>
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <label htmlFor="scan-code" className="sr-only">
             {t('scan.codeLabel')}
           </label>
           <input
             id="scan-code"
+            ref={codeRef}
             value={manualCode}
             dir="ltr"
             placeholder={t('scan.codePlaceholder')}
@@ -364,11 +344,19 @@ export function ScanningPage() {
             className={`${fieldClass} mt-0 flex-1`}
             onChange={(event) => setManualCode(event.target.value)}
           />
-          <Button type="submit" disabled={!manualCode.trim()}>
+          <Button
+            type="button"
+            disabled={!manualCode.trim()}
+            onClick={() => {
+              const code = manualCode.trim();
+              setManualCode('');
+              void handleScan(code);
+            }}
+          >
             <ScanLine aria-hidden="true" className="size-4" />
             {t('scan.lookup')}
           </Button>
-        </form>
+        </div>
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
@@ -405,19 +393,7 @@ export function ScanningPage() {
 
         <aside className="space-y-6">
           {mode === 'receive' ? (
-            <ReceivePanel
-              warehouses={warehouses.data ?? []}
-              warehouseId={warehouseId}
-              locationId={locationId}
-              onLocationChange={changeLocation}
-              quantity={receiveQuantity}
-              onQuantityChange={setReceiveQuantity}
-              product={scannedProduct}
-              canWrite={canWrite}
-              posting={receive.isPending}
-              busy={busy}
-              onSubmit={submitReceive}
-            />
+            <ReceiveDock dock={dock} canWrite={canWrite} />
           ) : (
             <>
               <CountWorkflowPanel

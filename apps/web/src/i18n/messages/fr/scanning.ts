@@ -3,9 +3,9 @@ import type { ScanningMessages } from '../en/scanning';
 export const scanning: ScanningMessages = {
   'scan.title': 'Scan',
   'scan.subtitle':
-    'Scannez ou saisissez un code-barres, un numéro de série ou un SKU, puis réceptionnez du stock ou lancez un inventaire sur un emplacement de stockage.',
+    'Un seul champ de scan, deux usages : mettre une livraison de côté pour sa commande d’achat, ou compter un emplacement de stockage.',
   'scan.tabsLabel': 'Flux de scan',
-  'scan.tabs.receive': 'Réceptionner du stock',
+  'scan.tabs.receive': 'Réceptionner une livraison',
   'scan.tabs.count': 'Inventaire',
   'scan.readOnly':
     'Votre rôle de lecteur permet de consulter les codes scannés, mais pas de réceptionner du stock ni d’enregistrer des comptages.',
@@ -37,10 +37,6 @@ export const scanning: ScanningMessages = {
   'scan.notice.duplicate': 'Scan en double ignoré : {code}',
   'scan.notice.device': 'Appareil {serial} résolu.',
   'scan.notice.product': '{product} résolu.',
-  'scan.notice.serializedReceive':
-    'Les unités sérialisées sont réceptionnées depuis la page Appareils afin que chaque numéro de série soit traçable.',
-  'scan.notice.received':
-    'Réception de {quantity} × {product}. Le stock physique est désormais de {onHand}.',
   'scan.notice.countStarted':
     'Inventaire démarré. Scannez des produits pour enregistrer les quantités comptées.',
   'scan.notice.countSelected': 'Inventaire ouvert sélectionné.',
@@ -50,11 +46,6 @@ export const scanning: ScanningMessages = {
   'scan.mode.absolute': 'absolu',
   'scan.mode.increment': 'incrément',
   'scan.error.resolveFailed': 'Le code n’a pas pu être résolu.',
-  'scan.error.receiptQuantity':
-    'Saisissez une quantité reçue supérieure à zéro avec au maximum quatre décimales.',
-  'scan.error.receiptLocation':
-    'Choisissez l’entrepôt et l’emplacement de stockage qui ont reçu le stock.',
-  'scan.error.receiptFailed': 'La réception n’a pas pu être enregistrée.',
   'scan.error.countLocation': 'Choisissez l’entrepôt et l’emplacement de stockage à compter.',
   'scan.error.countStartFailed': 'L’inventaire n’a pas pu être démarré.',
   'scan.error.countQuantity':
@@ -80,13 +71,52 @@ export const scanning: ScanningMessages = {
   'scan.count.post': 'Valider l’inventaire',
   'scan.count.discard': 'Abandonner l’inventaire',
   'scan.count.itemSummary': '{lines} · {date}',
-  'scan.receive.title': 'Réceptionner vers',
-  'scan.receive.description':
-    'Une réception augmente le stock physique d’un emplacement. Les produits sérialisés doivent plutôt être enregistrés comme appareils.',
-  'scan.receive.post': 'Enregistrer la réception',
-  'scan.receive.posting': 'Enregistrement…',
-  'scan.receive.serializedBefore': 'Ce produit est sérialisé. Enregistrez l’unité depuis ',
-  'scan.receive.serializedAfter': ' afin que son historique reste traçable.',
+  'scan.dock.title': 'Quai de réception',
+  'scan.dock.description':
+    'Choisissez la commande livrée, puis scannez la marchandise. Chaque lecture met une unité de côté sur sa ligne ; une seule validation enregistre toute la palette.',
+  'scan.dock.orderLabel': 'Commande d’achat',
+  'scan.dock.orderPlaceholder': 'Choisissez une commande ouverte',
+  'scan.dock.loading': 'Chargement de la commande…',
+  'scan.dock.none': 'Aucune commande n’attend de réception. Établissez-en une depuis',
+  'scan.dock.noneShort': 'Rien à réceptionner : aucune commande d’achat n’est ouverte.',
+  'scan.dock.noOrder': 'Choisissez d’abord la commande d’achat livrée.',
+  'scan.dock.orderLoadFailed':
+    'Cette commande n’a pas pu être chargée. Sélectionnez-la de nouveau.',
+  'scan.dock.goesTo': 'Arrive dans {location}.',
+  'scan.dock.remaining': '{count} à réceptionner · {queued} prêts',
+  'scan.dock.unitsNow': 'Unités reçues maintenant',
+  'scan.dock.serialHelp':
+    'Scannez chaque unité ; le numéro de série et son IMEI peuvent arriver en une seule lecture.',
+  'scan.dock.collectingHere': 'Les scans de numéro de série vont sur cette ligne.',
+  'scan.dock.clearLine': 'Vider cette ligne',
+  'scan.dock.removeSerial': 'Retirer {serial}',
+  'scan.dock.post': 'Enregistrer la réception · {quantity} · {lines}',
+  'scan.dock.posting': 'Enregistrement…',
+  'scan.dock.posted': '{number} est maintenant {status}. Quantité reçue : {quantity}.',
+  'scan.dock.empty': 'Rien n’est mis de côté à enregistrer.',
+  'scan.dock.queued': '{product} : {quantity} reçue sur {remaining}.',
+  'scan.dock.serialQueued': '{code} mis de côté pour {product} : {queued} sur {remaining}.',
+  'scan.dock.imeiQueued': 'IMEI {code} rattaché au numéro de série {product} lu avant lui.',
+  'scan.dock.duplicate': '{code} est déjà mis de côté.',
+  'scan.dock.full': '{product} est entièrement livré : plus rien à mettre de côté.',
+  'scan.dock.collecting':
+    '{product} est sérialisé : {queued} sur {remaining}. Scannez chaque unité.',
+  'scan.dock.notOnOrder': '{product} ne figure pas sur {number}.',
+  'scan.dock.alreadyRegistered':
+    '{serial} est déjà enregistré : il n’est pas mis de côté une seconde fois.',
+  'scan.dock.alreadyRegisteredBare': '{serial} est enregistré sur un produit absent de {number}.',
+  'scan.dock.units.zero': '{count} unités',
+  'scan.dock.units.one': '{count} unité',
+  'scan.dock.units.two': '{count} unités',
+  'scan.dock.units.few': '{count} unités',
+  'scan.dock.units.many': '{count} unités',
+  'scan.dock.units.other': '{count} unités',
+  'scan.dock.lines.zero': '{count} lignes',
+  'scan.dock.lines.one': '{count} ligne',
+  'scan.dock.lines.two': '{count} lignes',
+  'scan.dock.lines.few': '{count} lignes',
+  'scan.dock.lines.many': '{count} lignes',
+  'scan.dock.lines.other': '{count} lignes',
   'scan.count.recordTitle': 'Enregistrer un produit compté',
   'scan.count.startTitle': 'Démarrer un inventaire',
   'scan.count.recordDescription':

@@ -895,6 +895,34 @@ nothing at all while the desktop rail did. Gates: `format:check`, `lint`, `typec
 clean; 413 Vitest tests (345 API across 43 files, 47 domain, 14 contracts, 7 config); the headed
 local-stack suite 70/70 (35 tests × desktop/mobile) in 8.6 minutes on `E2E_PG_PORT=55499`.
 
+**Receiving dock on the scan console (2026-11-06).** The question that opened it was which business
+work the console and the purchase-order screen each did, and where they repeated it. Receiving asked
+the operator for four things the goods and the order already know — the order, the line, the location
+and the quantity — and the panel refused serialized products outright, sending the operator to
+`/devices` to register a phone by hand before the receipt could post. The receive tab is now a dock:
+choose the delivery once, then read the goods. One read of a quantity line queues one unit against the
+line that product is on; the typed box overrides it when a carton holds four; a serialized line
+collects each unit as it arrives and joins an IMEI read to the serial before it, so a pallet of phones
+is read without the keyboard being touched; the destination comes off the order and is never asked; and
+one post sends the whole pallet through `app.receive_purchase_order`. `receive-panel.tsx` is deleted.
+Nothing below the interface moved — the RPC was already the only door, and over-receipt, serial count
+mismatch and an already-registered serial are still refused there rather than trimmed.
+**Two defects only a headed run could show.** First, the console ignored the same code for 1.5 seconds
+after one read, which is right for a double-firing reader and wrong for a dock where five identical
+boxes are five reads: the window is now `SCAN_ECHO_MS = 300`, and `guide.scan.watch` says what it
+actually does. Second, `reduceWedgeKey` discards everything it accumulated when a single gap exceeds
+`WEDGE_BURST_MS`, so a read whose keystrokes drifted submitted only its **tail** — the API log shows
+`/scan?code=0002` for `ms-a-0002` — and the dock, told a code resolves to nothing, claimed that tail as
+a serial number for the phone line. The wedge now trusts the field it typed into: when the burst is the
+end of a longer value, the whole value is the code. Real hardware is faster than 60 ms between keys, so
+only synthetic typing and a laggy Bluetooth reader expose this.
+Gates: `format:check`, `lint`, `typecheck` and `build` clean; 413 Vitest tests; the headed local-stack
+suite 72/72 (36 tests × desktop/mobile) in 9.2 minutes on `E2E_PG_PORT=55499`. The ledger delta behind
+the receipt is asserted through `/stock-levels` from the API, not through the scan card — the card only
+ever shows what its own scan returned, and an earlier draft read a stale one and reported an on-hand
+quantity that never existed. `/guide` was rewritten where it had become false: `guide.scan.step2` and
+`guide.orders.step3` now describe the dock instead of the panel that is gone.
+
 **Hosted counter sale (2026-11-03).** The operator posted the first counter sale through the
 signed-in app against the hosted project, and a read-only query of the hosted database confirms the
 whole trail: one `sales_invoices` row `FI-2026-0001`, `paid`/`cash`, net 14.900 TND with 0% tax, one

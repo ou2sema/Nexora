@@ -58,13 +58,13 @@ export const guide: GuideMessages = {
   'guide.scan.step1':
     'Utilisez la caméra ou le champ de saisie. Nexora teste d’abord le code comme numéro de série ou IMEI d’un appareil, puis comme code-barres, comme SKU produit, puis comme code interne.',
   'guide.scan.step2':
-    'Pour réceptionner, choisissez la ligne de la commande d’achat, confirmez la quantité et enregistrez — la réception devient un mouvement vers cet emplacement.',
+    'Pour réceptionner, choisissez la commande livrée, puis scannez la marchandise. Chaque lecture met une unité de côté sur sa ligne — un numéro de série met l’unité elle-même — et la destination vient de la commande, donc rien n’est ressaisi.',
   'guide.scan.step3':
     'Pour compter, démarrez un comptage sur un emplacement, saisissez ce que vous voyez réellement, puis validez. Seules les différences deviennent des mouvements.',
   'guide.scan.step4':
     'Les étiquettes s’impriment depuis le même écran : l’étiquette produit porte son code-barres, l’étiquette appareil porte son numéro de série.',
   'guide.scan.watch':
-    'Un même code scanné deux fois en environ une seconde est ignoré volontairement : un lecteur qui envoie deux fois le code ne double pas le stock. Un comptage ne fixe jamais une quantité — il enregistre la différence qu’il a trouvée.',
+    'Un lecteur qui déclenche deux fois envoie le code deux fois ; la console ignore cet écho, donc un seul scan physique ne devient jamais deux unités. Le carton suivant, lu un instant après, est l’unité suivante. Un comptage ne fixe jamais une quantité — il enregistre la différence qu’il a trouvée.',
 
   'guide.stock.title': 'Stock, mouvements et réservations',
   'guide.stock.purpose':
@@ -87,7 +87,7 @@ export const guide: GuideMessages = {
     'Les commandes de sortie passent de brouillon à confirmée puis servie. La confirmation réserve les unités, le service les sort.',
   'guide.orders.step2': 'Annuler une commande confirmée libère ce qu’elle avait réservé.',
   'guide.orders.step3':
-    'Les commandes d’achat passent de brouillon à envoyée, puis sont réceptionnées ligne par ligne dans la console de scan ; une commande partiellement reçue reste ouverte jusqu’à la dernière ligne.',
+    'Les commandes d’achat passent de brouillon à envoyée, puis la livraison est réceptionnée dans la console de scan : choisissez la commande, scannez, validez. Une commande partiellement reçue reste ouverte jusqu’à la dernière ligne.',
   'guide.orders.step4':
     'Les retours ferment la boucle : un retour fournisseur renvoie des unités, un retour client les remet en stock.',
   'guide.orders.watch':

@@ -106,6 +106,15 @@ export function useScanWedge({ active, targetRef, getManualValue, onCapture }: S
         return;
       }
 
+      // A laggy reader or a hand-typed code leaves gaps wide enough that the burst
+      // window keeps only its tail. The field has seen every character, so when the
+      // burst is the end of a longer value, the whole value is the code.
+      const typed = manualValueRef.current().trim();
+      if (typed.length > outcome.code.length && typed.endsWith(outcome.code)) {
+        emit(typed, 'manual', event);
+        return;
+      }
+
       emit(outcome.code, 'usb', event);
     };
 
