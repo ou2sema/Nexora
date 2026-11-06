@@ -17,6 +17,10 @@ export const counterSale: CounterSaleMessages = {
   'sale.scan.productAdded': 'أُضيف {product} إلى السلة.',
   'sale.scan.pickDevice': '{product} مُسلسَل — اختر الوحدة التي ستخرج من المستودع.',
   'sale.scan.unknownCode': 'لم يمكن التعرّف على هذا الرمز.',
+  'sale.manual.action': 'إدخال يدوي',
+
+  'sale.depot.title': 'مستودع الصرف',
+  'sale.depot.hint': 'يُفحص التوافر على هذا الرفّ وتصدر الفاتورة منه، فاخترهما قبل أول مسح.',
 
   'sale.confirm.title': 'إضافة {product}؟',
   'sale.confirm.hint': 'لا يدخل أي بند إلى السلة قبل أن تؤكد القراءة.',
@@ -105,7 +109,6 @@ export const counterSale: CounterSaleMessages = {
     'المشتري العابر لا يحتاج بطاقة في الدليل: ما يسمّي به المستودع المشتري هو ما يُطبع في الفاتورة.',
   'sale.customer.nameRequired': 'اختر عميلًا من الدليل أو سجّل اسم المشتري.',
 
-  'sale.checkout.title': 'التحصّل',
   'sale.checkout.depot': 'المستودع',
   'sale.checkout.issueFrom': 'الإصدار من',
   'sale.checkout.reference': 'المرجع',
@@ -119,10 +122,18 @@ export const counterSale: CounterSaleMessages = {
     'كل ما لم يُتحصَّل يبقى في الفاتورة كالمبلغ المتبقي؛ البيع بالآجل يُسجَّل غير مدفوع، لا كوثيقة ثانية.',
   'sale.payment.invalid': 'أدخل مبلغًا بالمليم، أو اتركه فارغًا.',
   'sale.payment.exceedsTotal': 'المبلغ المُتحصّل أكبر من الإجمالي مع الضريبة.',
+  'sale.post.needsDepot': 'اختر المستودع والموقع اللذين يخرج منهما البيع.',
   'sale.post.action': 'تثبيت البيع',
   'sale.post.basketEmpty': 'امسح أو أضف سطرًا واحدًا على الأقل قبل تثبيت البيع.',
   'sale.post.fixLines': 'صحّح الأسطر المُظللة قبل تثبيت البيع.',
   'sale.post.failed': 'تعذّر تثبيت البيع.',
+
+  'sale.review.title': 'مراجعة البيع',
+  'sale.review.hint':
+    'تحقّق من المشتري والمستودع والمُتحصّل. التأكيد يكتب الفاتورة ويُخرج المخزون.',
+  'sale.review.items': 'الأصناف',
+  'sale.review.depot': 'الصرف من',
+  'sale.review.confirm': 'تأكيد البيع',
 
   'sale.posted.title': 'أُصدرت الفاتورة {number}',
   'sale.posted.lines': 'خرج من المستودع {lines} / {quantity}.',

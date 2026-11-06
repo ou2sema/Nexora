@@ -39,11 +39,12 @@ export const guide = {
     'The sale screen turns a basket into a numbered commercial invoice in one step, and takes the stock out at the same time.',
   'guide.sale.step1':
     'Scan or search each product. A hardware scanner behaves like a keyboard: the code arrives without a click, a short beep confirms the read, and a confirmation names the product and asks how many units go in the basket.',
-  'guide.sale.step2': 'Name the buyer — a walk-in sale, or a customer you pick or create.',
+  'guide.sale.step2':
+    'Open the review and name the buyer — a walk-in sale, or a customer you pick or create — then check the depot and the lines.',
   'guide.sale.step3':
     'Record the payment. You can take part of it now and leave the rest on account.',
   'guide.sale.step4':
-    'Post the sale. The invoice number (FI-2026-0001) is given by the system, counted per organization and year.',
+    'Confirm the sale there. The invoice number (FI-2026-0001) is given by the system, counted per organization and year.',
   'guide.sale.step5':
     'Download the invoice, and the goods issue note as well when serialized devices left the depot.',
   'guide.sale.watch':

@@ -42,11 +42,11 @@ export const guide: GuideMessages = {
   'guide.sale.step1':
     'Scannez ou recherchez chaque produit. Un lecteur physique se comporte comme un clavier : le code arrive sans clic, un bip court confirme la lecture, puis une fenêtre nomme le produit et demande la quantité à mettre au panier.',
   'guide.sale.step2':
-    'Nommez l’acheteur — une vente au comptoir, ou un client que vous choisissez ou créez.',
+    'Ouvrez le récapitulatif et nommez l’acheteur — une vente au comptoir, ou un client que vous choisissez ou créez — puis contrôlez le dépôt et les lignes.',
   'guide.sale.step3':
     'Enregistrez le paiement. Vous pouvez encaisser une partie maintenant et laisser le reste sur le compte du client.',
   'guide.sale.step4':
-    'Validez la vente. Le numéro de facture (FI-2026-0001) est donné par le système, compté par organisation et par année.',
+    'Confirmez la vente dans ce récapitulatif. Le numéro de facture (FI-2026-0001) est donné par le système, compté par organisation et par année.',
   'guide.sale.step5':
     'Téléchargez la facture, ainsi que le bon de sortie si des appareils suivis par numéro de série ont quitté le dépôt.',
   'guide.sale.watch':

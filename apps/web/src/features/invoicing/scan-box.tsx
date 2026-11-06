@@ -1,4 +1,4 @@
-import { Camera, ScanLine } from 'lucide-react';
+import { Camera, Keyboard, ScanLine } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,8 @@ interface ScanBoxProps {
   busy?: boolean;
   disabled?: boolean;
   onCapture: (capture: ScanCapture) => void;
+  /** Opens the product list for an item that is on the shelf but not on the label. */
+  onManualEntry: () => void;
 }
 
 /**
@@ -30,7 +32,13 @@ interface ScanBoxProps {
  * keyboard wedge, the phone camera through `CameraScanner`, and a code typed by
  * hand through the same field. All three leave as one `ScanCapture`.
  */
-export function ScanBox({ active, busy = false, disabled = false, onCapture }: ScanBoxProps) {
+export function ScanBox({
+  active,
+  busy = false,
+  disabled = false,
+  onCapture,
+  onManualEntry,
+}: ScanBoxProps) {
   const { t } = useI18n();
   const beep = useScanBeep();
   const [code, setCode] = useState('');
@@ -103,22 +111,32 @@ export function ScanBox({ active, busy = false, disabled = false, onCapture }: S
             onKeyDown={handleKeyDown}
           />
         </div>
-        <div className="flex gap-2">
-          <Button type="button" onClick={submitTyped} disabled={disabled || busy || !code.trim()}>
-            <ScanLine aria-hidden="true" className="size-4" />
-            {t('sale.scan.add')}
-          </Button>
-          <Button
-            type="button"
-            variant={cameraOn ? 'secondary' : 'ghost'}
-            aria-pressed={cameraOn}
-            disabled={disabled}
-            onClick={() => setCameraOn((current) => !current)}
-          >
-            <Camera aria-hidden="true" className="size-4" />
-            {t(cameraOn ? 'scan.camera.stop' : 'scan.camera.start')}
-          </Button>
-        </div>
+        <Button type="button" onClick={submitTyped} disabled={disabled || busy || !code.trim()}>
+          <ScanLine aria-hidden="true" className="size-4" />
+          {t('sale.scan.add')}
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant={cameraOn ? 'secondary' : 'ghost'}
+          aria-pressed={cameraOn}
+          disabled={disabled}
+          onClick={() => setCameraOn((current) => !current)}
+        >
+          <Camera aria-hidden="true" className="size-4" />
+          {t(cameraOn ? 'scan.camera.stop' : 'scan.camera.start')}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={disabled || busy}
+          onClick={onManualEntry}
+        >
+          <Keyboard aria-hidden="true" className="size-4" />
+          {t('sale.manual.action')}
+        </Button>
       </div>
 
       <p className="hidden text-xs text-slate-500 sm:block">{t('sale.scan.hint')}</p>

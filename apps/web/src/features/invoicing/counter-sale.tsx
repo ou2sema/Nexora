@@ -2,16 +2,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { CheckCircle2, Loader2, ReceiptText } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { z } from 'zod';
 
 import type {
   DeviceSummary,
-  PaymentMethod,
   ProductSummary,
   SalesInvoiceCreateResult,
   WarehouseSummary,
 } from '@mystock/contracts';
-import { paymentMethodSchema } from '@mystock/contracts';
 
 import { Button } from '@/components/ui/button';
 import { WarehouseLocationFields } from '@/components/ui/warehouse-location-fields';
@@ -19,7 +16,7 @@ import { useAccessToken } from '@/features/auth/auth-provider';
 import { useProducts } from '@/features/catalog/api';
 import { scanCode } from '@/features/scanning/api';
 import type { ScanCapture } from '@/features/scanning/scan-wedge';
-import type { MessageKey, MessageValues } from '@/i18n/messages';
+import type { MessageKey } from '@/i18n/messages';
 import { useI18n } from '@/i18n/provider';
 import { fieldClass } from '@/lib/form-field';
 import { parseAmountToMinor, parseQuantity } from '@/lib/parse-amount';
@@ -38,42 +35,15 @@ import {
   toInvoiceLines,
   updateLine,
 } from './basket';
-import { CustomerPicker, emptyManualCustomer, type SaleCustomer } from './customer-picker';
+import { emptyManualCustomer, type SaleCustomer } from './customer-picker';
 import { DevicePickerDialog } from './device-picker-dialog';
 import { InvoicePdfButtons } from './invoice-pdf-buttons';
-import { paymentMethodKeys, paymentStatusKeys } from './labels';
-import { ProductSearch } from './product-search';
+import { paymentStatusKeys } from './labels';
+import { ProductSearchDialog } from './product-search';
+import { SaleReviewDialog } from './sale-review-dialog';
+import { buildSaleSchema, emptySale, type SaleValues } from './sale-form';
 import { ScanBox } from './scan-box';
 import { ScanConfirmDialog, type PendingScan } from './scan-confirm-dialog';
-
-type Translator = (key: MessageKey, values?: MessageValues) => string;
-
-function buildSaleSchema(t: Translator) {
-  return z.object({
-    warehouseId: z.string().min(1, t('common.selectWarehouse')),
-    locationId: z.string().min(1, t('common.selectLocation')),
-    paymentAmount: z
-      .string()
-      .trim()
-      .refine((value) => value === '' || parseAmountToMinor(value) !== null, {
-        message: t('sale.payment.invalid'),
-      }),
-    paymentMethod: paymentMethodSchema,
-    reference: z.string().trim().max(120),
-    notes: z.string().trim().max(2000),
-  });
-}
-
-type SaleValues = z.infer<ReturnType<typeof buildSaleSchema>>;
-
-const emptySale: SaleValues = {
-  warehouseId: '',
-  locationId: '',
-  paymentAmount: '',
-  paymentMethod: 'cash',
-  reference: '',
-  notes: '',
-};
 
 interface CounterSaleProps {
   organizationId: string;
@@ -118,6 +88,9 @@ export function CounterSale({
   const [notice, setNotice] = useState<string | null>(null);
   const [customerError, setCustomerError] = useState<MessageKey | null>(null);
   const [posted, setPosted] = useState<SalesInvoiceCreateResult | null>(null);
+  const [manualEntryOpen, setManualEntryOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   // Scans are resolved one at a time: a second code arriving mid-resolution would
   // otherwise read a basket that has not been updated yet.
@@ -148,6 +121,23 @@ export function CounterSale({
   const locationLabel = selectedWarehouse
     ? `${selectedWarehouse.code} / ${selectedLocation?.code ?? ''}`
     : t('sale.noDepotSelected');
+
+  // A popup covers the counter, so the wedge stops listening and the camera stops
+  // reading while one is open: a scan belongs to the page, not to the dialog.
+  const dialogOpen =
+    pendingScan !== null || pickerProduct !== null || manualEntryOpen || reviewOpen;
+  const depotChosen = warehouseId !== '' && locationId !== '';
+
+  // Why the counter will not open the review yet, in the order the operator fixes it.
+  const blockedHint: MessageKey | null = !canWrite
+    ? 'sale.viewerReadOnly'
+    : !depotChosen
+      ? 'sale.post.needsDepot'
+      : !preview.ready
+        ? preview.problems.some((problem) => problem.reason === 'empty')
+          ? 'sale.post.basketEmpty'
+          : 'sale.post.fixLines'
+        : null;
 
   const postError = sale.error ? errorMessage(sale.error, 'sale.post.failed') : null;
 
@@ -250,6 +240,7 @@ export function CounterSale({
   const post = handleSubmit(async (values) => {
     setScanError(null);
     setNotice(null);
+    setPaymentError(null);
 
     if (customer.mode === 'manual' && customer.name.trim() === '') {
       setCustomerError('sale.customer.nameRequired');
@@ -259,7 +250,7 @@ export function CounterSale({
 
     const paidAmountMinor = parseAmountToMinor(values.paymentAmount) ?? 0;
     if (paidAmountMinor > preview.totals.totalMinor) {
-      setScanError(t('sale.payment.exceedsTotal'));
+      setPaymentError(t('sale.payment.exceedsTotal'));
       return;
     }
 
@@ -287,6 +278,7 @@ export function CounterSale({
       // The sale is on the ledger, so this key is spent. The depot stays chosen:
       // the next sale leaves from the same shelf.
       rotate();
+      setReviewOpen(false);
       setPosted(result);
       setLines([]);
       setCustomer(emptyManualCustomer);
@@ -313,13 +305,40 @@ export function CounterSale({
 
   return (
     <>
-      {/* One flat flow: on a phone the sections stack in the order the counter is
-          worked — scan, basket, buyer, checkout, and the manual search last — and
-          the second column only appears from `lg` up. */}
-      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-start lg:gap-6">
+      {/* The counter is worked in one column: where the stock leaves from, then the
+          code, then the basket. Everything the operator used to hunt for in a second
+          column — buyer, amounts, money — is reviewed in a popup before posting. */}
+      <div className="flex flex-col gap-4">
+        <section
+          aria-labelledby="sale-depot-heading"
+          className="rounded-xl border border-slate-200 bg-white p-4"
+        >
+          <h2 id="sale-depot-heading" className="text-sm font-semibold text-slate-900">
+            {t('sale.depot.title')}
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">{t('sale.depot.hint')}</p>
+
+          <div className="mt-3">
+            <WarehouseLocationFields
+              idPrefix="sale"
+              warehouses={warehouses}
+              warehouseField={register('warehouseId')}
+              locationField={register('locationId')}
+              selectedWarehouseId={warehouseId}
+              warehouseLabel={t('sale.checkout.depot')}
+              locationLabel={t('sale.checkout.issueFrom')}
+            />
+          </div>
+          {(errors.warehouseId || errors.locationId) && (
+            <p role="alert" className="mt-2 text-xs text-rose-700">
+              {errors.warehouseId?.message ?? errors.locationId?.message}
+            </p>
+          )}
+        </section>
+
         <section
           aria-labelledby="sale-counter-heading"
-          className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 lg:col-start-1 lg:row-start-1"
+          className="rounded-xl border border-slate-200 bg-white p-4"
         >
           <h2 id="sale-counter-heading" className="text-sm font-semibold text-slate-900">
             {t('sale.scan.title')}
@@ -327,10 +346,14 @@ export function CounterSale({
 
           <div className="mt-3">
             <ScanBox
-              active={canWrite && pendingScan === null}
+              active={canWrite && !dialogOpen}
               busy={busy || sale.isPending}
               disabled={!canWrite}
               onCapture={(capture) => void handleCapture(capture)}
+              onManualEntry={() => {
+                setScanError(null);
+                setManualEntryOpen(true);
+              }}
             />
           </div>
 
@@ -375,7 +398,7 @@ export function CounterSale({
           )}
         </section>
 
-        <div className="min-w-0 rounded-xl border border-slate-200 bg-white lg:col-start-1 lg:row-start-2">
+        <div className="rounded-xl border border-slate-200 bg-white">
           <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
               <ReceiptText aria-hidden="true" className="size-4 text-slate-500" />
@@ -404,163 +427,6 @@ export function CounterSale({
             onRemove={(key) => setLines((current) => removeLine(current, key))}
           />
         </div>
-
-        <div className="min-w-0 lg:col-start-2 lg:row-start-1">
-          <CustomerPicker
-            organizationId={organizationId}
-            value={customer}
-            canWrite={canWrite}
-            onChange={(next) => {
-              setCustomerError(null);
-              setCustomer(next);
-            }}
-            onSelected={(selected) => setCustomer({ mode: 'directory', customer: selected })}
-            errorKey={customerError}
-          />
-        </div>
-
-        <form
-          id="sale-post-form"
-          noValidate
-          className="min-w-0 space-y-4 rounded-xl border border-slate-200 bg-white p-4 lg:col-start-2 lg:row-start-2"
-          onSubmit={post}
-        >
-          <h2 className="text-sm font-semibold text-slate-900">{t('sale.checkout.title')}</h2>
-
-          <WarehouseLocationFields
-            idPrefix="sale"
-            warehouses={warehouses}
-            warehouseField={register('warehouseId')}
-            locationField={register('locationId')}
-            selectedWarehouseId={warehouseId}
-            warehouseLabel={t('sale.checkout.depot')}
-            locationLabel={t('sale.checkout.issueFrom')}
-          />
-          {(errors.warehouseId || errors.locationId) && (
-            <p role="alert" className="text-xs text-rose-700">
-              {errors.warehouseId?.message ?? errors.locationId?.message}
-            </p>
-          )}
-
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <dt className="text-slate-500">{t('sale.totals.net')}</dt>
-            <dd className="text-end font-mono text-slate-900">
-              {formatMoney(preview.totals.netMinor)}
-            </dd>
-            <dt className="text-slate-500">{t('sale.totals.tax')}</dt>
-            <dd className="text-end font-mono text-slate-900">
-              {formatMoney(preview.totals.taxMinor)}
-            </dd>
-            <dt className="font-semibold text-slate-700">{t('sale.totals.total')}</dt>
-            <dd className="text-end font-mono font-semibold text-slate-900">
-              {formatMoney(preview.totals.totalMinor)}
-            </dd>
-          </dl>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label
-                htmlFor="sale-payment-amount"
-                className="block text-xs font-medium text-slate-600"
-              >
-                {t('sale.payment.amount')}
-              </label>
-              <input
-                id="sale-payment-amount"
-                type="text"
-                inputMode="decimal"
-                dir="ltr"
-                placeholder="0.000"
-                className={`${fieldClass} mt-0 font-mono`}
-                aria-invalid={Boolean(errors.paymentAmount)}
-                {...register('paymentAmount')}
-              />
-              {errors.paymentAmount && (
-                <p role="alert" className="mt-1 text-xs text-rose-700">
-                  {errors.paymentAmount.message}
-                </p>
-              )}
-            </div>
-            <div>
-              <label
-                htmlFor="sale-payment-method"
-                className="block text-xs font-medium text-slate-600"
-              >
-                {t('sale.payment.method')}
-              </label>
-              <select
-                id="sale-payment-method"
-                className={fieldClass}
-                {...register('paymentMethod')}
-              >
-                {(Object.keys(paymentMethodKeys) as PaymentMethod[]).map((method) => (
-                  <option key={method} value={method}>
-                    {t(paymentMethodKeys[method])}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <p className="text-xs text-slate-500">{t('sale.payment.hint')}</p>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="sale-reference" className="block text-xs font-medium text-slate-600">
-                {t('sale.checkout.reference')}
-              </label>
-              <input
-                id="sale-reference"
-                type="text"
-                dir="ltr"
-                className={fieldClass}
-                {...register('reference')}
-              />
-            </div>
-            <div>
-              <label htmlFor="sale-notes" className="block text-xs font-medium text-slate-600">
-                {t('sale.checkout.notes')}
-              </label>
-              <input id="sale-notes" type="text" className={fieldClass} {...register('notes')} />
-            </div>
-          </div>
-
-          {postError && (
-            <p role="alert" className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-800">
-              {postError}
-            </p>
-          )}
-
-          {/* Below `lg` the sticky summary bar owns this action; two identical buttons
-              on one screen would leave the operator guessing which one posts. */}
-          <Button
-            type="submit"
-            className="max-lg:hidden"
-            disabled={!canWrite || sale.isPending || !preview.ready}
-          >
-            {sale.isPending && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
-            {t('sale.post.action')}
-          </Button>
-          {!canWrite && <p className="text-xs text-slate-500">{t('sale.viewerReadOnly')}</p>}
-          {canWrite && !preview.ready && (
-            <p className="text-xs text-slate-500">
-              {preview.problems.some((problem) => problem.reason === 'empty')
-                ? t('sale.post.basketEmpty')
-                : t('sale.post.fixLines')}
-            </p>
-          )}
-        </form>
-
-        <div className="min-w-0 lg:col-start-1 lg:row-start-3">
-          <ProductSearch
-            organizationId={organizationId}
-            disabled={!canWrite || busy}
-            onAddProduct={addFromSearch}
-            onPickDevice={(product) => {
-              setScanError(null);
-              setPickerProduct(product);
-            }}
-          />
-        </div>
       </div>
 
       <ScanConfirmDialog
@@ -583,16 +449,51 @@ export function CounterSale({
         onPick={(device) => appendDevice(device, 'picker')}
       />
 
-      {/* A phone never shows the whole counter at once, so what the basket holds and
-          what it costs ride at the bottom of the screen beside the posting action. */}
-      <div aria-hidden="true" className="h-24 lg:hidden" />
+      <ProductSearchDialog
+        organizationId={organizationId}
+        open={manualEntryOpen}
+        onOpenChange={setManualEntryOpen}
+        notice={notice}
+        onAddProduct={addFromSearch}
+        onPickDevice={(product) => {
+          setScanError(null);
+          setPickerProduct(product);
+        }}
+      />
+
+      <SaleReviewDialog
+        organizationId={organizationId}
+        open={reviewOpen}
+        onOpenChange={setReviewOpen}
+        canWrite={canWrite}
+        lines={lines}
+        preview={preview}
+        locationLabel={locationLabel}
+        customer={customer}
+        customerErrorKey={customerError}
+        onCustomerChange={(next) => {
+          setCustomerError(null);
+          setCustomer(next);
+        }}
+        onCustomerSelected={(selected) => setCustomer({ mode: 'directory', customer: selected })}
+        register={register}
+        errors={errors}
+        isPending={sale.isPending}
+        postError={paymentError ?? postError}
+        onSubmit={post}
+      />
+
+      {/* What the basket holds, what it costs and the one action that reviews and
+          posts it ride at the bottom of the screen: the counter is worked from there
+          on a phone, and the same strip keeps a desktop operator from hunting. */}
+      <div aria-hidden="true" className="h-24" />
       <div
-        id="sale-mobile-summary"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden"
+        id="sale-summary-bar"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur"
       >
         <div className="flex items-center gap-3 px-4 py-3 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))]">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs text-slate-500">
+          <div className="min-w-0 shrink-0">
+            <p className="text-xs text-slate-500">
               {t('sale.basket.count', {
                 lines: plural('common.noun.lines', lines.length),
                 quantity: plural('common.noun.units', preview.totalQuantity),
@@ -602,12 +503,21 @@ export function CounterSale({
               {formatMoney(preview.totals.totalMinor)}
             </p>
           </div>
+          {blockedHint && (
+            <p role="status" className="min-w-0 flex-1 truncate text-xs text-amber-700">
+              {t(blockedHint)}
+            </p>
+          )}
           <Button
-            type="submit"
-            form="sale-post-form"
-            className="shrink-0"
-            disabled={!canWrite || sale.isPending || !preview.ready}
+            type="button"
+            className={blockedHint ? 'shrink-0' : 'ms-auto shrink-0'}
+            onClick={() => {
+              setPaymentError(null);
+              setReviewOpen(true);
+            }}
+            disabled={blockedHint !== null}
           >
+            {sale.isPending && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
             {t('sale.post.action')}
           </Button>
         </div>
