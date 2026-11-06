@@ -84,7 +84,7 @@ export function ScanConfirmDialog({ scan, onOpenChange, onConfirm }: ScanConfirm
             <dt className="text-slate-500">{t('sale.confirm.unitPrice')}</dt>
             <dd className="text-end font-mono text-slate-900">
               {scan?.unitPriceMinor === null || scan?.unitPriceMinor === undefined
-                ? t('sale.search.noPrice')
+                ? t('sale.price.noPrice')
                 : formatMoney(scan.unitPriceMinor)}
             </dd>
             {(scan?.alreadyInBasket ?? 0) > 0 && (

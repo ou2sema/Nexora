@@ -1,4 +1,4 @@
-import { Pencil, Plus, Search, UserRound } from 'lucide-react';
+import { ChevronDown, Pencil, Plus, Search, UserRound } from 'lucide-react';
 import { useState } from 'react';
 
 import type { CustomerSummary } from '@mystock/contracts';
@@ -31,6 +31,8 @@ interface CustomerPickerProps {
   onSelected: (customer: CustomerSummary) => void;
   /** Shown while the buyer was neither chosen nor named. */
   errorKey?: MessageKey | null;
+  /** Inside the checkout panel, where the card and its heading already exist. */
+  embedded?: boolean;
 }
 
 /** The identification line printed on the invoice: matricule, city, phone. */
@@ -53,6 +55,7 @@ export function CustomerPicker({
   onChange,
   onSelected,
   errorKey = null,
+  embedded = false,
 }: CustomerPickerProps) {
   const { t, errorMessage } = useI18n();
   const [search, setSearch] = useState('');
@@ -72,14 +75,20 @@ export function CustomerPicker({
   const manual = value.mode === 'manual' ? value : null;
 
   return (
-    <section
-      aria-labelledby="sale-customer-heading"
-      className="rounded-xl border border-slate-200 bg-white p-4"
+    <div
+      aria-labelledby={embedded ? undefined : 'sale-customer-heading'}
+      className={embedded ? 'space-y-3' : 'rounded-xl border border-slate-200 bg-white p-4'}
     >
       <div className="flex items-center justify-between gap-3">
-        <h2 id="sale-customer-heading" className="text-sm font-semibold text-slate-900">
-          {t('sale.customer.title')}
-        </h2>
+        {embedded ? (
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            {t('sale.customer.chooseExisting')}
+          </p>
+        ) : (
+          <h2 id="sale-customer-heading" className="text-sm font-semibold text-slate-900">
+            {t('sale.customer.title')}
+          </h2>
+        )}
         <Button
           type="button"
           variant="secondary"
@@ -183,13 +192,19 @@ export function CustomerPicker({
             <p className="text-xs text-slate-500">{t('sale.customer.searchEmpty')}</p>
           ) : null}
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="space-y-3">
             <div>
               <label
                 htmlFor="sale-customer-name"
-                className="block text-xs font-medium text-slate-600"
+                className="flex items-baseline justify-between gap-2 text-xs font-medium text-slate-600"
               >
-                {t('sale.customer.name')}
+                <span>
+                  {t('sale.customer.name')}{' '}
+                  <span aria-hidden="true" className="text-rose-600">
+                    *
+                  </span>
+                </span>
+                <span className="text-[11px] text-slate-400">{t('sale.customer.nameHint')}</span>
               </label>
               <input
                 id="sale-customer-name"
@@ -197,7 +212,7 @@ export function CustomerPicker({
                 value={manual?.name ?? ''}
                 maxLength={160}
                 aria-invalid={errorKey !== null}
-                className={cn(fieldClass, 'mt-0', errorKey !== null && 'border-rose-400')}
+                className={cn(fieldClass, 'mt-1', errorKey !== null && 'border-rose-400')}
                 onChange={(event) =>
                   onChange({
                     mode: 'manual',
@@ -208,52 +223,67 @@ export function CustomerPicker({
                 }
               />
             </div>
-            <div>
-              <label
-                htmlFor="sale-customer-email"
-                className="block text-xs font-medium text-slate-600"
-              >
-                {t('sale.customer.email')}
-              </label>
-              <input
-                id="sale-customer-email"
-                type="email"
-                dir="ltr"
-                value={manual?.email ?? ''}
-                className={`${fieldClass} mt-0`}
-                onChange={(event) =>
-                  onChange({
-                    mode: 'manual',
-                    name: manual?.name ?? '',
-                    email: event.target.value,
-                    phone: manual?.phone ?? '',
-                  })
-                }
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="sale-customer-phone"
-                className="block text-xs font-medium text-slate-600"
-              >
-                {t('sale.customer.phone')}
-              </label>
-              <input
-                id="sale-customer-phone"
-                type="tel"
-                dir="ltr"
-                value={manual?.phone ?? ''}
-                className={`${fieldClass} mt-0`}
-                onChange={(event) =>
-                  onChange({
-                    mode: 'manual',
-                    name: manual?.name ?? '',
-                    email: manual?.email ?? '',
-                    phone: event.target.value,
-                  })
-                }
-              />
-            </div>
+
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium text-slate-600 marker:hidden">
+                <ChevronDown
+                  aria-hidden="true"
+                  className="size-3.5 rotate-[-90deg] text-slate-400 transition group-open:rotate-0"
+                />
+                {t('sale.customer.contact')}
+                <span className="text-[11px] font-normal text-slate-400">
+                  {t('sale.customer.contactOptional')}
+                </span>
+              </summary>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="sale-customer-email"
+                    className="block text-xs font-medium text-slate-600"
+                  >
+                    {t('sale.customer.email')}
+                  </label>
+                  <input
+                    id="sale-customer-email"
+                    type="email"
+                    dir="ltr"
+                    value={manual?.email ?? ''}
+                    className={cn(fieldClass, 'mt-1')}
+                    onChange={(event) =>
+                      onChange({
+                        mode: 'manual',
+                        name: manual?.name ?? '',
+                        email: event.target.value,
+                        phone: manual?.phone ?? '',
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="sale-customer-phone"
+                    className="block text-xs font-medium text-slate-600"
+                  >
+                    {t('sale.customer.phone')}
+                  </label>
+                  <input
+                    id="sale-customer-phone"
+                    type="tel"
+                    dir="ltr"
+                    value={manual?.phone ?? ''}
+                    className={cn(fieldClass, 'mt-1')}
+                    onChange={(event) =>
+                      onChange({
+                        mode: 'manual',
+                        name: manual?.name ?? '',
+                        email: manual?.email ?? '',
+                        phone: event.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            </details>
           </div>
 
           {errorKey && (
@@ -284,6 +314,6 @@ export function CustomerPicker({
           setSearch('');
         }}
       />
-    </section>
+    </div>
   );
 }

@@ -1,31 +1,27 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { CheckCircle2, Loader2, ReceiptText } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
 
 import type {
+  CustomerSummary,
   DeviceSummary,
   PaymentMethod,
   ProductSummary,
   SalesInvoiceCreateResult,
   WarehouseSummary,
 } from '@mystock/contracts';
-import { paymentMethodSchema } from '@mystock/contracts';
 
 import { Button } from '@/components/ui/button';
-import { WarehouseLocationFields } from '@/components/ui/warehouse-location-fields';
 import { useAccessToken } from '@/features/auth/auth-provider';
 import { useProducts } from '@/features/catalog/api';
 import { scanCode } from '@/features/scanning/api';
 import type { ScanCapture } from '@/features/scanning/scan-wedge';
-import type { MessageKey, MessageValues } from '@/i18n/messages';
+import type { MessageKey } from '@/i18n/messages';
 import { useI18n } from '@/i18n/provider';
-import { fieldClass } from '@/lib/form-field';
+import { useMediaQuery } from '@/lib/use-media-query';
 import { parseAmountToMinor, parseQuantity } from '@/lib/parse-amount';
 
 import { usePostSale, useRetrySafeIdempotencyKey } from './api';
-import { BasketTable } from './basket-table';
+import { BasketCard } from './basket-card';
 import {
   addDevice,
   addProduct,
@@ -38,42 +34,25 @@ import {
   toInvoiceLines,
   updateLine,
 } from './basket';
-import { CustomerPicker, emptyManualCustomer, type SaleCustomer } from './customer-picker';
+import {
+  CheckoutPanel,
+  paidAmountMinor as paidForCoverage,
+  type PaymentCoverage,
+} from './checkout-panel';
+import { emptyManualCustomer, type SaleCustomer } from './customer-picker';
 import { DevicePickerDialog } from './device-picker-dialog';
-import { InvoicePdfButtons } from './invoice-pdf-buttons';
-import { paymentMethodKeys, paymentStatusKeys } from './labels';
-import { ProductSearch } from './product-search';
-import { ScanBox } from './scan-box';
+import { FindAddItems } from './find-add-items';
+import { pairLabel } from './selling-location';
+import { SaleComplete } from './sale-complete';
+import { SaleStepper, type SaleStep } from './sale-stepper';
 import { ScanConfirmDialog, type PendingScan } from './scan-confirm-dialog';
 
-type Translator = (key: MessageKey, values?: MessageValues) => string;
-
-function buildSaleSchema(t: Translator) {
-  return z.object({
-    warehouseId: z.string().min(1, t('common.selectWarehouse')),
-    locationId: z.string().min(1, t('common.selectLocation')),
-    paymentAmount: z
-      .string()
-      .trim()
-      .refine((value) => value === '' || parseAmountToMinor(value) !== null, {
-        message: t('sale.payment.invalid'),
-      }),
-    paymentMethod: paymentMethodSchema,
-    reference: z.string().trim().max(120),
-    notes: z.string().trim().max(2000),
-  });
+/** What the confirmation screen needs beyond what the RPC returns. */
+interface PostedSale {
+  result: SalesInvoiceCreateResult;
+  buyerName: string | null;
+  tenderedMinor: number | null;
 }
-
-type SaleValues = z.infer<ReturnType<typeof buildSaleSchema>>;
-
-const emptySale: SaleValues = {
-  warehouseId: '',
-  locationId: '',
-  paymentAmount: '',
-  paymentMethod: 'cash',
-  reference: '',
-  notes: '',
-};
 
 interface CounterSaleProps {
   organizationId: string;
@@ -88,6 +67,9 @@ interface CounterSaleProps {
  * rate. The invoice number, the amounts, the availability and the stock movement
  * itself belong to `app.create_sales_invoice`, which posts them in one
  * transaction and is the only place stock actually leaves the ledger.
+ *
+ * A desk works the whole counter on one screen; a phone works it in three steps,
+ * because the basket, the review and the receipt do not fit together at 412 px.
  */
 export function CounterSale({
   organizationId,
@@ -96,11 +78,13 @@ export function CounterSale({
   onOpenInvoice,
 }: CounterSaleProps) {
   const { t, plural, errorMessage, formatMoney } = useI18n();
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
   const token = useAccessToken();
   const sale = usePostSale(organizationId);
   const { key: idempotencyKey, rotate } = useRetrySafeIdempotencyKey();
-  const saleSchema = useMemo(() => buildSaleSchema(t), [t]);
 
+  // The shelf list the counter offers, and the catalogue price a serialized unit
+  // inherits — a device record carries no price of its own.
   const products = useProducts(organizationId, {
     search: '',
     status: 'active',
@@ -108,57 +92,70 @@ export function CounterSale({
     pageSize: 100,
   });
 
+  const [pair, setPair] = useState({ warehouseId: '', locationId: '' });
   const [lines, setLines] = useState<BasketLine[]>([]);
   const [customer, setCustomer] = useState<SaleCustomer>(emptyManualCustomer);
   const [defaultTaxRate, setDefaultTaxRate] = useState('');
+  const [method, setMethod] = useState<PaymentMethod>('cash');
+  const [coverage, setCoverage] = useState<PaymentCoverage>('full');
+  const [amountValue, setAmountValue] = useState('');
+  const [reference, setReference] = useState('');
+  const [notes, setNotes] = useState('');
   const [pickerProduct, setPickerProduct] = useState<ProductSummary | null>(null);
   const [pendingScan, setPendingScan] = useState<PendingScan | null>(null);
   const [busy, setBusy] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [customerError, setCustomerError] = useState<MessageKey | null>(null);
-  const [posted, setPosted] = useState<SalesInvoiceCreateResult | null>(null);
+  const [step, setStep] = useState<SaleStep>('items');
+  const [posted, setPosted] = useState<PostedSale | null>(null);
 
   // Scans are resolved one at a time: a second code arriving mid-resolution would
   // otherwise read a basket that has not been updated yet.
   const resolving = useRef(false);
 
   const preview = useMemo(() => previewBasket(lines), [lines]);
+  const shelf = useMemo(() => products.data?.items ?? [], [products.data]);
+  const { warehouseId, locationId } = pair;
+  const locationName = pairLabel(warehouses, warehouseId, locationId);
+  // A dialog covering the counter must not keep the wedge listening: the same
+  // label still in frame would queue a second read behind it.
+  const scannerReady =
+    canWrite && !busy && pendingScan === null && pickerProduct === null && !sale.isPending;
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    getValues,
-    watch,
-    formState: { errors },
-  } = useForm<SaleValues>({ resolver: zodResolver(saleSchema), defaultValues: emptySale });
+  // A credit sale receives nothing at the counter, so "pay in full" would book a
+  // payment that never happened; the coverage of a credit sale is always partial.
+  const isCredit = method === 'credit';
+  const effectiveCoverage: PaymentCoverage = isCredit ? 'partial' : coverage;
+  const tenderedMinor = parseAmountToMinor(amountValue);
 
-  const warehouseId = watch('warehouseId');
-  const locationId = watch('locationId');
+  const locationChosen = warehouseId !== '' && locationId !== '';
+  const canPost = canWrite && preview.ready && locationChosen;
 
   useEffect(() => {
     setPosted(null);
+    setStep('items');
   }, [organizationId]);
 
-  const selectedWarehouse = warehouses.find((warehouse) => warehouse.id === warehouseId);
-  const selectedLocation = selectedWarehouse?.locations.find(
-    (location) => location.id === locationId,
-  );
-  const locationLabel = selectedWarehouse
-    ? `${selectedWarehouse.code} / ${selectedLocation?.code ?? ''}`
-    : t('sale.noDepotSelected');
+  // The phone is a step machine; a desk shows every step at once. Coming back to
+  // the desk layout must not strand the operator on a step the desk has no room for.
+  useEffect(() => {
+    if (isDesktop && step !== 'done') setStep('items');
+  }, [isDesktop, step]);
 
-  const postError = sale.error ? errorMessage(sale.error, 'sale.post.failed') : null;
+  const amountError =
+    amountValue.trim() === '' || tenderedMinor !== null ? null : t('sale.payment.invalid');
+  const overTotal =
+    tenderedMinor !== null &&
+    effectiveCoverage === 'partial' &&
+    tenderedMinor > preview.totals.totalMinor;
 
   const appendDevice = (device: DeviceSummary, origin: BasketOrigin): void => {
-    const values = getValues();
-
     if (device.status !== 'in_stock') {
       setScanError(t('sale.device.notInStock', { serial: device.serialNumber }));
       return;
     }
-    if (device.warehouseId !== values.warehouseId || device.locationId !== values.locationId) {
+    if (device.warehouseId !== warehouseId || device.locationId !== locationId) {
       setScanError(
         t('sale.device.wrongLocation', {
           serial: device.serialNumber,
@@ -176,11 +173,16 @@ export function CounterSale({
       addDevice(
         current,
         device,
-        products.data?.items.find((product) => product.id === device.productId),
+        shelf.find((product) => product.id === device.productId),
         { taxRate: defaultTaxRate, origin },
       ),
     );
-    setNotice(t('sale.device.added', { serial: device.serialNumber }));
+    setNotice(
+      t('sale.device.added', {
+        serial: device.serialNumber,
+        location: locationName ?? t('sale.noDepotSelected'),
+      }),
+    );
   };
 
   const handleCapture = async (capture: ScanCapture): Promise<void> => {
@@ -205,7 +207,6 @@ export function CounterSale({
       if (product.isSerialized) {
         // A serialized model leaves as a unit, never as a quantity line.
         setPickerProduct(product);
-        setNotice(t('sale.scan.pickDevice', { product: product.name }));
         return;
       }
 
@@ -235,30 +236,64 @@ export function CounterSale({
         quantity,
       }),
     );
-    setNotice(t('sale.scan.productAdded', { product: scan.product.name }));
+    setNotice(
+      t('sale.scan.productAdded', {
+        product: scan.product.name,
+        units: plural('common.noun.units', quantity),
+      }),
+    );
     setPendingScan(null);
   };
 
-  const addFromSearch = (product: ProductSummary) => {
+  const addFromShelf = (product: ProductSummary) => {
     setScanError(null);
+    setNotice(null);
     setLines((current) =>
-      addProduct(current, product, { taxRate: defaultTaxRate, origin: 'search' }),
+      addProduct(current, product, { taxRate: defaultTaxRate, origin: 'manual' }),
     );
-    setNotice(t('sale.scan.productAdded', { product: product.name }));
+    setNotice(
+      t('sale.scan.productAdded', {
+        product: product.name,
+        units: plural('common.noun.units', 1),
+      }),
+    );
   };
 
-  const post = handleSubmit(async (values) => {
+  const openPicker = (product: ProductSummary) => {
+    setScanError(null);
+    setNotice(null);
+    setPickerProduct(product);
+  };
+
+  const review = () => {
+    setCustomerError(
+      customer.mode === 'manual' && customer.name.trim() === ''
+        ? 'sale.customer.nameRequired'
+        : null,
+    );
+    setStep('payment');
+  };
+
+  const post = async () => {
     setScanError(null);
     setNotice(null);
 
-    if (customer.mode === 'manual' && customer.name.trim() === '') {
+    if (!canPost) return;
+
+    const buyerName =
+      customer.mode === 'directory'
+        ? customer.customer.name
+        : customer.name.trim() === ''
+          ? null
+          : customer.name.trim();
+    if (customer.mode === 'manual' && buyerName === null) {
       setCustomerError('sale.customer.nameRequired');
+      setStep('items');
       return;
     }
     setCustomerError(null);
 
-    const paidAmountMinor = parseAmountToMinor(values.paymentAmount) ?? 0;
-    if (paidAmountMinor > preview.totals.totalMinor) {
+    if (overTotal) {
       setScanError(t('sale.payment.exceedsTotal'));
       return;
     }
@@ -266,349 +301,264 @@ export function CounterSale({
     try {
       const result = await sale.mutateAsync({
         input: {
-          warehouseId: values.warehouseId,
-          locationId: values.locationId,
+          warehouseId,
+          locationId,
           ...(customer.mode === 'directory'
             ? { customerId: customer.customer.id }
             : {
-                customerName: customer.name.trim() || null,
+                customerName: buyerName,
                 customerEmail: customer.email.trim() || null,
                 customerPhone: customer.phone.trim() || null,
               }),
           lines: toInvoiceLines(lines),
-          paidAmountMinor,
-          paymentMethod: values.paymentMethod,
-          reference: values.reference.trim() || null,
-          notes: values.notes.trim() || null,
+          paidAmountMinor: paidForCoverage(
+            effectiveCoverage,
+            preview.totals.totalMinor,
+            tenderedMinor,
+          ),
+          paymentMethod: method,
+          reference: reference.trim() || null,
+          notes: notes.trim() || null,
         },
         idempotencyKey,
       });
 
-      // The sale is on the ledger, so this key is spent. The depot stays chosen:
-      // the next sale leaves from the same shelf.
+      // The sale is on the ledger, so this key is spent. The depot and the buyer
+      // stay: the next sale leaves from the same shelf, to the same regular.
       rotate();
-      setPosted(result);
+      setPosted({
+        result,
+        buyerName,
+        tenderedMinor:
+          effectiveCoverage === 'full' && method === 'cash'
+            ? (tenderedMinor ?? result.totalAmountMinor)
+            : null,
+      });
       setLines([]);
       setCustomer(emptyManualCustomer);
-      reset({ ...emptySale, warehouseId: values.warehouseId, locationId: values.locationId });
+      setAmountValue('');
+      setReference('');
+      setNotes('');
+      setCoverage('full');
+      setStep('done');
     } catch {
-      // sale.error renders below the totals.
+      // sale.error renders above the confirm action.
     }
-  });
+  };
+
+  const startNewSale = () => {
+    setPosted(null);
+    setNotice(null);
+    setScanError(null);
+    setStep('items');
+  };
+
+  const postError = sale.error ? errorMessage(sale.error, 'sale.post.failed') : null;
+
+  const blockingReason = !canWrite
+    ? t('sale.viewerReadOnly')
+    : !locationChosen
+      ? t('sale.location.required')
+      : preview.problems.some((problem) => problem.reason === 'empty')
+        ? t('sale.post.basketEmpty')
+        : !preview.ready
+          ? t('sale.post.fixLines')
+          : null;
 
   if (posted) {
     return (
-      <PostedSale
-        organizationId={organizationId}
-        result={posted}
-        onDismiss={() => {
-          setPosted(null);
-          setNotice(null);
-          setScanError(null);
-        }}
-        onOpenInvoice={onOpenInvoice}
-      />
+      <div className="space-y-4">
+        {!isDesktop && <SaleStepper current="done" />}
+        <SaleComplete
+          organizationId={organizationId}
+          result={posted.result}
+          buyerName={posted.buyerName}
+          locationName={locationName}
+          tenderedMinor={posted.tenderedMinor}
+          onNewSale={startNewSale}
+          onOpenInvoice={onOpenInvoice}
+        />
+      </div>
+    );
+  }
+
+  const findPanel = (
+    <FindAddItems
+      organizationId={organizationId}
+      products={shelf}
+      shelfLoading={products.isPending}
+      warehouses={warehouses}
+      warehouseId={warehouseId}
+      locationId={locationId}
+      canWrite={canWrite}
+      busy={busy || sale.isPending}
+      scannerReady={scannerReady}
+      notice={notice}
+      scanError={scanError}
+      onLocationChange={(nextWarehouseId, nextLocationId) =>
+        setPair({ warehouseId: nextWarehouseId, locationId: nextLocationId })
+      }
+      onCapture={(capture) => void handleCapture(capture)}
+      onAddProduct={addFromShelf}
+      onPickDevice={openPicker}
+    />
+  );
+
+  const basketPanel = (
+    <BasketCard
+      organizationId={organizationId}
+      lines={lines}
+      warehouseId={warehouseId}
+      locationId={locationId}
+      locationName={locationName}
+      canEdit={canWrite}
+      totals={preview.lineAmounts}
+      problems={preview.problems}
+      onPatch={(key, patch) => {
+        setScanError(null);
+        setNotice(null);
+        setLines((current) => updateLine(current, key, patch));
+      }}
+      onRemove={(key) => setLines((current) => removeLine(current, key))}
+    />
+  );
+
+  const checkoutPanel = (
+    <CheckoutPanel
+      organizationId={organizationId}
+      canWrite={canWrite}
+      customer={customer}
+      customerError={customerError}
+      onCustomerChange={(next) => {
+        setCustomerError(null);
+        setCustomer(next);
+      }}
+      onCustomerSelected={(selected: CustomerSummary) =>
+        setCustomer({ mode: 'directory', customer: selected })
+      }
+      lines={lines}
+      lineAmounts={preview.lineAmounts}
+      totals={preview.totals}
+      totalQuantity={preview.totalQuantity}
+      showLines={!isDesktop}
+      method={method}
+      onMethodChange={setMethod}
+      coverage={effectiveCoverage}
+      onCoverageChange={setCoverage}
+      amountValue={amountValue}
+      amountMinor={tenderedMinor}
+      onAmountChange={setAmountValue}
+      amountError={overTotal ? t('sale.payment.exceedsTotal') : amountError}
+      taxRateValue={defaultTaxRate}
+      onTaxRateChange={setDefaultTaxRate}
+      referenceValue={reference}
+      onReferenceChange={setReference}
+      notesValue={notes}
+      onNotesChange={setNotes}
+      onSubmit={() => void post()}
+      pending={sale.isPending}
+      canSubmit={canPost}
+      hint={blockingReason}
+      error={postError}
+    />
+  );
+
+  if (isDesktop) {
+    return (
+      <>
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+          <div className="min-w-0 space-y-6">
+            {findPanel}
+            {basketPanel}
+          </div>
+          <div className="sticky top-6 min-w-0">{checkoutPanel}</div>
+        </div>
+
+        <CounterDialogs
+          pendingScan={pendingScan}
+          onCloseScan={() => setPendingScan(null)}
+          onConfirmScan={confirmScan}
+          pickerProduct={pickerProduct}
+          onClosePicker={() => setPickerProduct(null)}
+          organizationId={organizationId}
+          warehouseId={warehouseId}
+          locationId={locationId}
+          locationName={locationName}
+          onPickDevice={(device) => appendDevice(device, 'picker')}
+        />
+      </>
+    );
+  }
+
+  if (step === 'payment') {
+    return (
+      <div className="space-y-4">
+        <SaleStepper current="payment" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="-ms-2 text-indigo-700"
+          onClick={() => setStep('items')}
+        >
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          {t('sale.basket.title')}
+        </Button>
+        {checkoutPanel}
+      </div>
     );
   }
 
   return (
     <>
-      {/* One flat flow: on a phone the sections stack in the order the counter is
-          worked — scan, basket, buyer, checkout, and the manual search last — and
-          the second column only appears from `lg` up. */}
-      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-start lg:gap-6">
-        <section
-          aria-labelledby="sale-counter-heading"
-          className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 lg:col-start-1 lg:row-start-1"
-        >
-          <h2 id="sale-counter-heading" className="text-sm font-semibold text-slate-900">
-            {t('sale.scan.title')}
-          </h2>
-
-          <div className="mt-3">
-            <ScanBox
-              active={canWrite && pendingScan === null}
-              busy={busy || sale.isPending}
-              disabled={!canWrite}
-              onCapture={(capture) => void handleCapture(capture)}
-            />
-          </div>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-[10rem_1fr] sm:items-end">
-            <div>
-              <label
-                htmlFor="sale-default-tax"
-                className="block text-xs font-medium text-slate-600"
-              >
-                {t('sale.defaultTax.label')}
-              </label>
-              <input
-                id="sale-default-tax"
-                type="text"
-                inputMode="decimal"
-                dir="ltr"
-                value={defaultTaxRate}
-                placeholder="0"
-                disabled={!canWrite}
-                className={`${fieldClass} mt-0 font-mono`}
-                onChange={(event) => setDefaultTaxRate(event.target.value)}
-              />
-            </div>
-            <p className="hidden text-xs text-slate-500 sm:block">{t('sale.defaultTax.hint')}</p>
-          </div>
-
-          {busy && (
-            <p role="status" className="mt-3 flex items-center gap-2 text-sm text-slate-600">
-              <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-              {t('sale.scan.resolving')}
-            </p>
-          )}
-          {notice && !busy && (
-            <p role="status" className="mt-3 text-sm text-emerald-700">
-              {notice}
-            </p>
-          )}
-          {scanError && (
-            <p role="alert" className="mt-3 text-sm text-rose-700">
-              {scanError}
-            </p>
-          )}
-        </section>
-
-        <div className="min-w-0 rounded-xl border border-slate-200 bg-white lg:col-start-1 lg:row-start-2">
-          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-              <ReceiptText aria-hidden="true" className="size-4 text-slate-500" />
-              {t('sale.basket.title')}
-            </h2>
-            <p className="text-xs text-slate-500">
-              {t('sale.basket.count', {
-                lines: plural('common.noun.lines', lines.length),
-                quantity: plural('common.noun.units', preview.totalQuantity),
-              })}
-            </p>
-          </div>
-
-          <BasketTable
-            organizationId={organizationId}
-            lines={lines}
-            warehouseId={warehouseId}
-            locationId={locationId}
-            canEdit={canWrite}
-            totals={preview.lineAmounts}
-            problems={preview.problems}
-            onPatch={(key, patch) => {
-              setScanError(null);
-              setLines((current) => updateLine(current, key, patch));
-            }}
-            onRemove={(key) => setLines((current) => removeLine(current, key))}
-          />
-        </div>
-
-        <div className="min-w-0 lg:col-start-2 lg:row-start-1">
-          <CustomerPicker
-            organizationId={organizationId}
-            value={customer}
-            canWrite={canWrite}
-            onChange={(next) => {
-              setCustomerError(null);
-              setCustomer(next);
-            }}
-            onSelected={(selected) => setCustomer({ mode: 'directory', customer: selected })}
-            errorKey={customerError}
-          />
-        </div>
-
-        <form
-          id="sale-post-form"
-          noValidate
-          className="min-w-0 space-y-4 rounded-xl border border-slate-200 bg-white p-4 lg:col-start-2 lg:row-start-2"
-          onSubmit={post}
-        >
-          <h2 className="text-sm font-semibold text-slate-900">{t('sale.checkout.title')}</h2>
-
-          <WarehouseLocationFields
-            idPrefix="sale"
-            warehouses={warehouses}
-            warehouseField={register('warehouseId')}
-            locationField={register('locationId')}
-            selectedWarehouseId={warehouseId}
-            warehouseLabel={t('sale.checkout.depot')}
-            locationLabel={t('sale.checkout.issueFrom')}
-          />
-          {(errors.warehouseId || errors.locationId) && (
-            <p role="alert" className="text-xs text-rose-700">
-              {errors.warehouseId?.message ?? errors.locationId?.message}
-            </p>
-          )}
-
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <dt className="text-slate-500">{t('sale.totals.net')}</dt>
-            <dd className="text-end font-mono text-slate-900">
-              {formatMoney(preview.totals.netMinor)}
-            </dd>
-            <dt className="text-slate-500">{t('sale.totals.tax')}</dt>
-            <dd className="text-end font-mono text-slate-900">
-              {formatMoney(preview.totals.taxMinor)}
-            </dd>
-            <dt className="font-semibold text-slate-700">{t('sale.totals.total')}</dt>
-            <dd className="text-end font-mono font-semibold text-slate-900">
-              {formatMoney(preview.totals.totalMinor)}
-            </dd>
-          </dl>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label
-                htmlFor="sale-payment-amount"
-                className="block text-xs font-medium text-slate-600"
-              >
-                {t('sale.payment.amount')}
-              </label>
-              <input
-                id="sale-payment-amount"
-                type="text"
-                inputMode="decimal"
-                dir="ltr"
-                placeholder="0.000"
-                className={`${fieldClass} mt-0 font-mono`}
-                aria-invalid={Boolean(errors.paymentAmount)}
-                {...register('paymentAmount')}
-              />
-              {errors.paymentAmount && (
-                <p role="alert" className="mt-1 text-xs text-rose-700">
-                  {errors.paymentAmount.message}
-                </p>
-              )}
-            </div>
-            <div>
-              <label
-                htmlFor="sale-payment-method"
-                className="block text-xs font-medium text-slate-600"
-              >
-                {t('sale.payment.method')}
-              </label>
-              <select
-                id="sale-payment-method"
-                className={fieldClass}
-                {...register('paymentMethod')}
-              >
-                {(Object.keys(paymentMethodKeys) as PaymentMethod[]).map((method) => (
-                  <option key={method} value={method}>
-                    {t(paymentMethodKeys[method])}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <p className="text-xs text-slate-500">{t('sale.payment.hint')}</p>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="sale-reference" className="block text-xs font-medium text-slate-600">
-                {t('sale.checkout.reference')}
-              </label>
-              <input
-                id="sale-reference"
-                type="text"
-                dir="ltr"
-                className={fieldClass}
-                {...register('reference')}
-              />
-            </div>
-            <div>
-              <label htmlFor="sale-notes" className="block text-xs font-medium text-slate-600">
-                {t('sale.checkout.notes')}
-              </label>
-              <input id="sale-notes" type="text" className={fieldClass} {...register('notes')} />
-            </div>
-          </div>
-
-          {postError && (
-            <p role="alert" className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-800">
-              {postError}
-            </p>
-          )}
-
-          {/* Below `lg` the sticky summary bar owns this action; two identical buttons
-              on one screen would leave the operator guessing which one posts. */}
-          <Button
-            type="submit"
-            className="max-lg:hidden"
-            disabled={!canWrite || sale.isPending || !preview.ready}
-          >
-            {sale.isPending && <Loader2 aria-hidden="true" className="size-4 animate-spin" />}
-            {t('sale.post.action')}
-          </Button>
-          {!canWrite && <p className="text-xs text-slate-500">{t('sale.viewerReadOnly')}</p>}
-          {canWrite && !preview.ready && (
-            <p className="text-xs text-slate-500">
-              {preview.problems.some((problem) => problem.reason === 'empty')
-                ? t('sale.post.basketEmpty')
-                : t('sale.post.fixLines')}
-            </p>
-          )}
-        </form>
-
-        <div className="min-w-0 lg:col-start-1 lg:row-start-3">
-          <ProductSearch
-            organizationId={organizationId}
-            disabled={!canWrite || busy}
-            onAddProduct={addFromSearch}
-            onPickDevice={(product) => {
-              setScanError(null);
-              setPickerProduct(product);
-            }}
-          />
-        </div>
+      <div className="space-y-4">
+        <SaleStepper current="items" />
+        {findPanel}
+        {basketPanel}
       </div>
 
-      <ScanConfirmDialog
-        scan={pendingScan}
-        onOpenChange={(open) => {
-          if (!open) setPendingScan(null);
-        }}
-        onConfirm={confirmScan}
-      />
-
-      <DevicePickerDialog
+      <CounterDialogs
+        pendingScan={pendingScan}
+        onCloseScan={() => setPendingScan(null)}
+        onConfirmScan={confirmScan}
+        pickerProduct={pickerProduct}
+        onClosePicker={() => setPickerProduct(null)}
         organizationId={organizationId}
-        product={pickerProduct}
         warehouseId={warehouseId}
         locationId={locationId}
-        locationLabel={locationLabel}
-        onOpenChange={(open) => {
-          if (!open) setPickerProduct(null);
-        }}
-        onPick={(device) => appendDevice(device, 'picker')}
+        locationName={locationName}
+        onPickDevice={(device) => appendDevice(device, 'picker')}
       />
 
       {/* A phone never shows the whole counter at once, so what the basket holds and
-          what it costs ride at the bottom of the screen beside the posting action. */}
-      <div aria-hidden="true" className="h-24 lg:hidden" />
+          what it costs ride at the bottom of the screen beside the review action. */}
+      <div aria-hidden="true" className="h-24" />
       <div
         id="sale-mobile-summary"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur"
       >
         <div className="flex items-center gap-3 px-4 py-3 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))]">
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs text-slate-500">
               {t('sale.basket.count', {
                 lines: plural('common.noun.lines', lines.length),
-                quantity: plural('common.noun.units', preview.totalQuantity),
+                units: plural('common.noun.units', preview.totalQuantity),
               })}
             </p>
-            <p className="font-mono text-base font-semibold text-slate-900">
+            <p dir="ltr" className="font-mono text-base font-semibold text-slate-900">
               {formatMoney(preview.totals.totalMinor)}
             </p>
+            {blockingReason ? (
+              <p className="truncate text-[11px] text-slate-500">{blockingReason}</p>
+            ) : (
+              <p className="truncate text-[11px] text-slate-500">
+                {t('sale.review.includesTax', { tax: formatMoney(preview.totals.taxMinor) })}
+              </p>
+            )}
           </div>
-          <Button
-            type="submit"
-            form="sale-post-form"
-            className="shrink-0"
-            disabled={!canWrite || sale.isPending || !preview.ready}
-          >
-            {t('sale.post.action')}
+          <Button type="button" className="shrink-0" disabled={!canPost} onClick={review}>
+            {t('sale.review.action')}
+            <ArrowRight aria-hidden="true" className="size-4" />
           </Button>
         </div>
       </div>
@@ -616,80 +566,52 @@ export function CounterSale({
   );
 }
 
-interface PostedSaleProps {
+interface CounterDialogsProps {
   organizationId: string;
-  result: SalesInvoiceCreateResult;
-  onDismiss: () => void;
-  onOpenInvoice: (invoiceId: string) => void;
+  warehouseId: string;
+  locationId: string;
+  locationName: string | null;
+  pendingScan: PendingScan | null;
+  onCloseScan: () => void;
+  onConfirmScan: (scan: PendingScan, quantity: number) => void;
+  pickerProduct: ProductSummary | null;
+  onClosePicker: () => void;
+  onPickDevice: (device: DeviceSummary) => void;
 }
 
-/** The confirmation of a posted sale carries the amounts the server computed, never the preview. */
-function PostedSale({ organizationId, result, onDismiss, onOpenInvoice }: PostedSaleProps) {
-  const { t, plural, formatMoney } = useI18n();
-
+/** The two reads that interrupt the counter: a product to confirm, a unit to choose. */
+function CounterDialogs({
+  organizationId,
+  warehouseId,
+  locationId,
+  locationName,
+  pendingScan,
+  onCloseScan,
+  onConfirmScan,
+  pickerProduct,
+  onClosePicker,
+  onPickDevice,
+}: CounterDialogsProps) {
   return (
-    <section
-      aria-labelledby="sale-posted-heading"
-      className="rounded-xl border border-emerald-200 bg-emerald-50 p-6"
-    >
-      <h2
-        id="sale-posted-heading"
-        className="flex items-center gap-2 text-lg font-semibold text-emerald-900"
-      >
-        <CheckCircle2 aria-hidden="true" className="size-5" />
-        <span dir="ltr">{t('sale.posted.title', { number: result.number })}</span>
-      </h2>
-
-      <p className="mt-2 text-sm text-emerald-900">
-        {t('sale.posted.lines', {
-          lines: plural('common.noun.lines', result.lineCount),
-          quantity: plural('common.noun.units', result.totalQuantity),
-        })}
-      </p>
-      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-        <dt className="text-emerald-800">{t('sale.totals.net')}</dt>
-        <dd className="text-end font-mono text-emerald-900">
-          {formatMoney(result.netAmountMinor)}
-        </dd>
-        <dt className="text-emerald-800">{t('sale.totals.tax')}</dt>
-        <dd className="text-end font-mono text-emerald-900">
-          {formatMoney(result.taxAmountMinor)}
-        </dd>
-        <dt className="font-semibold text-emerald-900">{t('sale.totals.total')}</dt>
-        <dd className="text-end font-mono font-semibold text-emerald-900">
-          {formatMoney(result.totalAmountMinor)}
-        </dd>
-      </dl>
-      <p className="mt-2 text-sm text-emerald-800">
-        {t('sale.posted.payment', {
-          status: t(paymentStatusKeys[result.paymentStatus]),
-          paid: formatMoney(result.paidAmountMinor),
-          remaining: formatMoney(result.remainingAmountMinor),
-        })}
-      </p>
-      <p className="mt-1 text-xs text-emerald-800">
-        {t(result.orderId ? 'sale.posted.issued' : 'sale.posted.devicesOnly')}
-      </p>
-      {result.duplicate && (
-        <p className="mt-2 text-xs text-amber-800">{t('sale.posted.replayed')}</p>
-      )}
-
-      <div className="mt-4 space-y-3">
-        <InvoicePdfButtons organizationId={organizationId} invoiceId={result.invoiceId} />
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => onOpenInvoice(result.invoiceId)}
-          >
-            {t('sale.posted.view')}
-          </Button>
-          <Button type="button" onClick={onDismiss}>
-            {t('sale.posted.newSale')}
-          </Button>
-        </div>
-      </div>
-    </section>
+    <>
+      <ScanConfirmDialog
+        scan={pendingScan}
+        onOpenChange={(open) => {
+          if (!open) onCloseScan();
+        }}
+        onConfirm={onConfirmScan}
+      />
+      <DevicePickerDialog
+        organizationId={organizationId}
+        product={pickerProduct}
+        warehouseId={warehouseId}
+        locationId={locationId}
+        locationLabel={locationName ?? ''}
+        onOpenChange={(open) => {
+          if (!open) onClosePicker();
+        }}
+        onPick={onPickDevice}
+      />
+    </>
   );
 }

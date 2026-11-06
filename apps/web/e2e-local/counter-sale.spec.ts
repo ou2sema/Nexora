@@ -206,26 +206,54 @@ async function expectPdfDownload(
   expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
 }
 
-async function chooseDepot(page: Page): Promise<void> {
-  await page.locator('#sale-warehouse').selectOption(WAREHOUSE_ID);
-  await page.locator('#sale-location').selectOption(LOCATION_ID);
-}
-
-function scanSection(page: Page): Locator {
-  return page
-    .locator('section')
-    .filter({ has: page.getByRole('heading', { name: 'Scan the label' }) });
+function isPhone(page: Page): boolean {
+  const viewport = page.viewportSize();
+  return Boolean(viewport && viewport.width < 1024);
 }
 
 /**
- * Types the code and presses Add, the same way the counter's manual fallback
- * works. What the code resolves to — a basket line or the unit picker — is the
- * caller's assertion, because a serialized code never reaches the basket.
+ * The counter issues from one shelf, chosen as a single depot-and-location pair.
+ * The option's own text is returned so the dialogs that name the shelf — the unit
+ * picker, the basket, the completion screen — are asserted against what the field
+ * offers rather than against a hardcoded label.
+ */
+async function chooseShelf(page: Page): Promise<string> {
+  const value = `${WAREHOUSE_ID}|${LOCATION_ID}`;
+  const select = page.locator('#sale-selling-location');
+  await select.selectOption(value);
+  const label = (await select.locator(`option[value="${value}"]`).textContent())?.trim() ?? '';
+  expect(label).not.toBe('');
+  return label;
+}
+
+function findSection(page: Page): Locator {
+  return page
+    .locator('section')
+    .filter({ has: page.getByRole('heading', { name: 'Find & add items' }) });
+}
+
+function basketSection(page: Page): Locator {
+  return page
+    .locator('section')
+    .filter({ has: page.getByRole('heading', { name: 'Basket', exact: true }) });
+}
+
+function stepper(page: Page): Locator {
+  return page.getByRole('list', { name: 'Counter sale steps' });
+}
+
+function scanField(page: Page): Locator {
+  return page.getByLabel('Barcode, serial number or SKU');
+}
+
+/**
+ * Types the code and presses Enter, the way the field is read by hand. Enter is
+ * also the wedge terminator, so this is the same capture a scanner produces with
+ * the keystrokes spread over a burst — and no button is involved either way.
  */
 async function scan(page: Page, code: string): Promise<void> {
-  const section = scanSection(page);
-  await section.locator('#sale-scan-code').fill(code);
-  await section.getByRole('button', { name: 'Add', exact: true }).click();
+  await scanField(page).fill(code);
+  await scanField(page).press('Enter');
 }
 
 /**
@@ -234,7 +262,7 @@ async function scan(page: Page, code: string): Promise<void> {
  * is the only test that proves a USB scan cannot also submit the payment form.
  */
 async function scanWithWedge(page: Page, code: string): Promise<void> {
-  await scanSection(page).locator('#sale-scan-code').click();
+  await scanField(page).click();
   await page.keyboard.type(code, { delay: 8 });
   await page.keyboard.press('Enter');
 }
@@ -256,8 +284,48 @@ async function confirmScan(page: Page, quantity?: string): Promise<void> {
   await expect(dialog).toBeHidden();
 }
 
-function summaryBar(page: Page): Locator {
-  return page.locator('#sale-mobile-summary');
+/**
+ * The buyer, the tax, the reference and the notes live inside disclosures, so a
+ * field is only reachable once its own `<details>` is open. The summary of the
+ * disclosure that holds the field is clicked, which is what an operator does.
+ */
+async function reveal(page: Page, id: string): Promise<Locator> {
+  const field = page.locator(`#${id}`);
+  if (!(await field.isVisible())) {
+    const summary = page.locator('details').filter({ has: field }).locator('> summary').first();
+    await summary.click();
+  }
+  await expect(field).toBeVisible();
+  return field;
+}
+
+/** The desk keeps the checkout in the rail; the phone reaches it through the review step. */
+function reviewButton(page: Page): Locator {
+  return page.locator('#sale-mobile-summary').getByRole('button', { name: 'Review & pay' });
+}
+
+async function openCheckout(page: Page): Promise<void> {
+  if (!isPhone(page)) return;
+  await reviewButton(page).click();
+}
+
+function confirmButton(page: Page): Locator {
+  return page.getByRole('button', { name: /Confirm sale/ });
+}
+
+function doneHeading(page: Page, status: 'paid' | 'partial' | 'unpaid'): Locator {
+  const titles = {
+    paid: 'All paid. Sale complete.',
+    partial: 'Partly paid. Sale recorded.',
+    unpaid: 'Recorded. Nothing received.',
+  } as const;
+  return page.getByRole('heading', { level: 2, name: titles[status], exact: true });
+}
+
+async function openHistory(page: Page): Promise<void> {
+  const toggle = page.getByRole('button', { name: 'History' });
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+  await expect(page.locator('#sale-recent-search')).toBeVisible();
 }
 
 /**
@@ -288,7 +356,7 @@ test.beforeAll(async () => {
 });
 
 test.describe('counter sale', () => {
-  test('scans into a basket, posts the sale and downloads both documents', async ({
+  test('scans into a basket, reviews it and posts the sale with both documents', async ({
     page,
     request,
   }) => {
@@ -303,8 +371,19 @@ test.describe('counter sale', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Counter sale' })).toBeVisible();
     await expect(page.getByText('Nothing scanned yet')).toBeVisible();
 
-    await chooseDepot(page);
-    await page.locator('#sale-default-tax').fill('19');
+    // Nothing posts until a shelf is chosen, and the reason is said out loud.
+    const noShelf = page.getByText('Choose the location this sale leaves from');
+    await expect(noShelf).toBeVisible();
+    await expect(isPhone(page) ? reviewButton(page) : confirmButton(page)).toBeDisabled();
+
+    const shelf = await chooseShelf(page);
+    // A desk prices the tax once, before the reads, because its checkout rail is
+    // on screen the whole time. A phone only reaches the checkout after the
+    // basket is built, so there the rate is set on the line instead.
+    if (!isPhone(page)) {
+      await reveal(page, 'sale-default-tax');
+      await page.locator('#sale-default-tax').fill('19');
+    }
 
     // The same code read twice is one line with two units, not two lines: once as
     // a hardware-scanner burst, once typed by hand. Each read waits for the operator.
@@ -317,27 +396,44 @@ test.describe('counter sale', () => {
     await expect(popup).not.toContainText('Already in basket');
     await confirmScan(page);
     expect(await beepCount(page)).toBe(1);
-    await expect(scanSection(page).getByRole('status')).toContainText('added to the basket');
-    await expect(page.getByLabel('Barcode, serial number or SKU')).toHaveValue('');
-    await expect(page.getByLabel('Barcode, serial number or SKU')).toBeFocused();
+    await expect(findSection(page).getByRole('status')).toContainText('added to the basket');
+    await expect(scanField(page)).toHaveValue('');
+    await expect(scanField(page)).toBeFocused();
 
     await scan(page, CABLE_CODE);
     expect(await beepCount(page)).toBe(2);
     await expect(popup).toContainText('Already in basket');
     await confirmScan(page);
-    await expect(page.getByLabel(`Quantity for ${CABLE_NAME}`)).toHaveValue('2');
-    await expect(page.getByLabel(`Tax rate for ${CABLE_NAME}`)).toHaveValue('19');
 
-    // The client edits the price; the server decides what the invoice carries.
-    await page.getByLabel(`Unit price for ${CABLE_NAME}`).fill('9.000');
+    const basket = basketSection(page);
+    await expect(basket.getByLabel(`Quantity for ${CABLE_NAME}`)).toHaveValue('2');
+    if (isPhone(page)) await basket.getByLabel(`Tax rate for ${CABLE_NAME}`).selectOption('19');
+    await expect(basket.getByLabel(`Tax rate for ${CABLE_NAME}`)).toHaveValue('19');
+    // Availability is read against the shelf the sale leaves from, not the depot total.
+    await expect(basket.getByText(/^2 of \d+ available · /)).toBeVisible();
+
+    // The catalogue price is what the line shows; the operator edits it on purpose.
+    await basket.getByRole('button', { name: 'Adjust price' }).click();
+    await basket.getByLabel(`Unit price for ${CABLE_NAME}`).fill('9.000');
+
+    await openCheckout(page);
+    await reveal(page, 'sale-customer-name');
     await page.locator('#sale-customer-name').fill(buyer);
+
+    // Pay in full books the total and returns the extra cash; anything the buyer
+    // hands over short of the total is a partial payment by choice, not by accident.
+    await page.getByRole('button', { name: 'Partial payment' }).click();
     await page.locator('#sale-payment-amount').fill('11.182');
+    await expect(page.getByText('Remaining balance')).toBeVisible();
+    await reveal(page, 'sale-reference');
     await page.locator('#sale-reference').fill(reference);
 
-    await page.getByRole('button', { name: 'Post sale' }).click();
-    const posted = page.getByRole('heading', { name: /Invoice FI-\d{4}-\d{4} issued/ });
-    await expect(posted).toBeVisible();
-    await expect(page.getByText(/1 line \/ 2 units left the depot/)).toBeVisible();
+    await confirmButton(page).click();
+    await expect(doneHeading(page, 'partial')).toBeVisible();
+    await expect(
+      page.getByText(`Invoice issued for ${buyer}. 2 units sold from ${shelf}.`),
+    ).toBeVisible();
+    await expect(page.getByText(/^FI-\d{4}-\d{4}$/)).toBeVisible();
     await expect(page.getByText('Partially paid', { exact: false }).first()).toBeVisible();
     await expect(page.getByText('Stock left through the ledger')).toBeVisible();
 
@@ -367,8 +463,10 @@ test.describe('counter sale', () => {
 
     expect(await onHand(request)).toBe(before - 2);
 
-    // The counter's memory lists the invoice it just posted.
-    await page.getByRole('button', { name: 'Next sale' }).click();
+    // The counter's memory lists the invoice it just posted, once it is opened.
+    await page.getByRole('button', { name: 'New sale' }).click();
+    await expect(page.getByText('Nothing scanned yet')).toBeVisible();
+    await openHistory(page);
     await page.locator('#sale-recent-search').fill(reference);
     const row = page.getByRole('row', { name: new RegExp(escapeRegExp(invoice.number)) });
     await expect(row).toBeVisible();
@@ -377,13 +475,10 @@ test.describe('counter sale', () => {
   });
 
   test('holds a product read until the operator confirms it', async ({ page }) => {
-    const viewport = page.viewportSize();
-    const phone = Boolean(viewport && viewport.width < 1024);
-
     await armBeepCounter(page);
     await signIn(page);
     await page.goto('/sale');
-    await chooseDepot(page);
+    await chooseShelf(page);
 
     // A read is an offer, not an order: refusing it leaves the basket as it was.
     await scanWithWedge(page, CABLE_CODE);
@@ -399,12 +494,31 @@ test.describe('counter sale', () => {
     await confirmScan(page, '3');
     await expect(page.getByLabel(`Quantity for ${CABLE_NAME}`)).toHaveValue('3');
 
-    // On a phone the basket the operator built stays on screen, not below the fold.
-    if (phone) {
-      const summary = summaryBar(page);
+    // On a phone the basket the operator built rides at the bottom of the screen,
+    // and the checkout only arrives when the review step is taken.
+    if (isPhone(page)) {
+      const summary = page.locator('#sale-mobile-summary');
       await expect(summary).toBeInViewport();
       await expect(summary).toContainText('1 line / 3 units');
-      await expect(summary.getByRole('button', { name: 'Post sale' })).toBeVisible();
+      await expect(reviewButton(page)).toBeEnabled();
+      await expect(stepper(page).locator('[aria-current="step"]')).toContainText('Items');
+
+      await reviewButton(page).click();
+      await expect(
+        page.getByRole('heading', { level: 2, name: 'Checkout', exact: true }),
+      ).toBeVisible();
+      await expect(stepper(page).locator('[aria-current="step"]')).toContainText('Payment');
+      // A sale with no buyer is refused here, and the reason is on the same screen:
+      // the buyer line, not the alert filed away inside the closed picker.
+      await expect(
+        page.getByRole('paragraph').filter({ hasText: 'Choose a customer from the directory' }),
+      ).toBeVisible();
+
+      await page.getByRole('button', { name: 'Basket', exact: true }).click();
+      await expect(stepper(page).locator('[aria-current="step"]')).toContainText('Items');
+      // Walking back to the basket step loses nothing: the three units are still
+      // the ones the operator agreed to.
+      await expect(page.getByLabel(`Quantity for ${CABLE_NAME}`)).toHaveValue('3');
     }
   });
 
@@ -422,10 +536,12 @@ test.describe('counter sale', () => {
 
     await signIn(page);
     await page.goto('/sale');
-    await chooseDepot(page);
+    const shelf = await chooseShelf(page);
 
     await scan(page, serialScanned);
-    await expect(page.getByText(`${serialScanned} added to the basket.`)).toBeVisible();
+    await expect(findSection(page).getByRole('status')).toHaveText(
+      `${serialScanned} added to the basket — verified at ${shelf}.`,
+    );
 
     // A serialized product code names the model, so the counter asks which unit leaves.
     await scan(page, IPHONE_BARCODE);
@@ -433,21 +549,30 @@ test.describe('counter sale', () => {
     await expect(
       picker.getByRole('heading', { name: 'Choose the unit — iPhone 15 128GB' }),
     ).toBeVisible();
-    await expect(picker).toContainText(`${stockedBefore + 2} units in stock at MAIN / A-01.`);
+    await expect(picker).toContainText(`${stockedBefore + 2} units in stock at ${shelf}.`);
 
     await picker.locator('#sale-device-search').fill(serialPicked);
-    await expect(picker).toContainText('1 unit in stock at MAIN / A-01.');
+    await expect(picker).toContainText(`1 unit in stock at ${shelf}.`);
     await expect(picker.getByRole('button', { name: 'Take this unit' })).toHaveCount(1);
     await picker.getByRole('button', { name: 'Take this unit' }).click();
     await expect(picker).toBeHidden();
 
+    await openCheckout(page);
+    await reveal(page, 'sale-customer-name');
     await page.locator('#sale-customer-name').fill(`E2E Serial Buyer ${RUN}`);
+    await reveal(page, 'sale-reference');
     await page.locator('#sale-reference').fill(reference);
-    await page.getByRole('button', { name: 'Post sale' }).click();
 
-    await expect(
-      page.getByRole('heading', { name: /Invoice FI-\d{4}-\d{4} issued/ }),
-    ).toBeVisible();
+    // Nothing changes hands for a credit sale, so "pay in full" is taken off the
+    // table rather than defaulting an unpaid invoice into a paid one.
+    await page.getByRole('radio', { name: 'Credit / on account' }).check();
+    await expect(page.getByRole('button', { name: 'Partial payment' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await confirmButton(page).click();
+
+    await expect(doneHeading(page, 'unpaid')).toBeVisible();
     await expect(page.getByText('Serialized units only')).toBeVisible();
 
     const invoice = await invoiceByReference(request, reference);
@@ -486,6 +611,7 @@ test.describe('counter sale', () => {
 
     await signIn(page);
     await page.goto('/sale');
+    await openHistory(page);
     await page.locator('#sale-recent-search').fill(reference);
 
     const row = page.getByRole('row', { name: new RegExp(escapeRegExp(sale.number)) });
@@ -525,7 +651,8 @@ test.describe('counter sale', () => {
     await expect(
       page.getByText('Your viewer role is read-only', { exact: false }).first(),
     ).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Post sale' })).toBeDisabled();
-    await expect(page.locator('#sale-scan-code')).toBeDisabled();
+    await expect(page.locator('#sale-selling-location')).toBeDisabled();
+    await expect(scanField(page)).toBeDisabled();
+    await expect(isPhone(page) ? reviewButton(page) : confirmButton(page)).toBeDisabled();
   });
 });
