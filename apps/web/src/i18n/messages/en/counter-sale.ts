@@ -15,11 +15,6 @@ export const counterSale = {
   'sale.scan.productAdded': '{product} added to the basket.',
   'sale.scan.pickDevice': '{product} is serialized — choose which unit leaves the depot.',
   'sale.scan.unknownCode': 'This code could not be resolved.',
-  'sale.manual.action': 'Manual entry',
-
-  'sale.depot.title': 'Outbound depot',
-  'sale.depot.hint':
-    'Availability is checked against this shelf and the invoice issues from it, so choose it before the first scan.',
 
   'sale.confirm.title': 'Add {product}?',
   'sale.confirm.hint': 'Nothing enters the basket until you confirm the read.',
@@ -110,6 +105,7 @@ export const counterSale = {
     'A walk-in needs no directory record: whatever the depot calls this buyer is printed on the invoice.',
   'sale.customer.nameRequired': 'Choose a customer from the directory or name the buyer.',
 
+  'sale.checkout.title': 'Checkout',
   'sale.checkout.depot': 'Depot',
   'sale.checkout.issueFrom': 'Issue from',
   'sale.checkout.reference': 'Reference',
@@ -123,18 +119,10 @@ export const counterSale = {
     'Anything not received stays on the invoice as a balance; credit sales are recorded as unpaid, not as a second document.',
   'sale.payment.invalid': 'Enter an amount in millimes, or leave it empty.',
   'sale.payment.exceedsTotal': 'The amount received is larger than the gross total.',
-  'sale.post.needsDepot': 'Choose the depot and the location the sale leaves from.',
   'sale.post.action': 'Post sale',
   'sale.post.basketEmpty': 'Scan or add at least one line before posting the sale.',
   'sale.post.fixLines': 'Fix the highlighted lines before posting the sale.',
   'sale.post.failed': 'The sale could not be posted.',
-
-  'sale.review.title': 'Review the sale',
-  'sale.review.hint':
-    'Check the buyer, the depot and the money. Confirming writes the invoice and moves the stock.',
-  'sale.review.items': 'Items',
-  'sale.review.depot': 'Leaving from',
-  'sale.review.confirm': 'Confirm sale',
 
   'sale.posted.title': 'Invoice {number} issued',
   'sale.posted.lines': '{lines} / {quantity} left the depot.',

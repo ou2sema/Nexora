@@ -257,24 +257,7 @@ async function confirmScan(page: Page, quantity?: string): Promise<void> {
 }
 
 function summaryBar(page: Page): Locator {
-  return page.locator('#sale-summary-bar');
-}
-
-/**
- * Nothing posts the sale but the review popup: the bar opens it, and buyer, depot,
- * amounts and money are checked there. Returning the dialog keeps the fills scoped
- * to the popup instead of the page behind it.
- */
-async function openReview(page: Page): Promise<Locator> {
-  await summaryBar(page).getByRole('button', { name: 'Post sale' }).click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('heading', { name: 'Review the sale' })).toBeVisible();
-  return dialog;
-}
-
-async function confirmReview(dialog: Locator): Promise<void> {
-  await dialog.getByRole('button', { name: 'Confirm sale' }).click();
-  await expect(dialog).toBeHidden();
+  return page.locator('#sale-mobile-summary');
 }
 
 /**
@@ -347,17 +330,11 @@ test.describe('counter sale', () => {
 
     // The client edits the price; the server decides what the invoice carries.
     await page.getByLabel(`Unit price for ${CABLE_NAME}`).fill('9.000');
+    await page.locator('#sale-customer-name').fill(buyer);
+    await page.locator('#sale-payment-amount').fill('11.182');
+    await page.locator('#sale-reference').fill(reference);
 
-    // The buyer, the money and the reference are named in the review, and the one
-    // action there is what writes the invoice.
-    const review = await openReview(page);
-    await expect(review).toContainText(CABLE_NAME);
-    await expect(review).toContainText('2 units');
-    await review.locator('#sale-customer-name').fill(buyer);
-    await review.locator('#sale-payment-amount').fill('11.182');
-    await review.locator('#sale-reference').fill(reference);
-    await confirmReview(review);
-
+    await page.getByRole('button', { name: 'Post sale' }).click();
     const posted = page.getByRole('heading', { name: /Invoice FI-\d{4}-\d{4} issued/ });
     await expect(posted).toBeVisible();
     await expect(page.getByText(/1 line \/ 2 units left the depot/)).toBeVisible();
@@ -422,14 +399,6 @@ test.describe('counter sale', () => {
     await confirmScan(page, '3');
     await expect(page.getByLabel(`Quantity for ${CABLE_NAME}`)).toHaveValue('3');
 
-    // The buyer is no longer a column beside the counter: the review popup carries it.
-    await expect(page.locator('#sale-customer-name')).toHaveCount(0);
-    const review = await openReview(page);
-    await expect(review).toContainText('MAIN / A-01');
-    await expect(review.locator('#sale-customer-name')).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(review).toBeHidden();
-
     // On a phone the basket the operator built stays on screen, not below the fold.
     if (phone) {
       const summary = summaryBar(page);
@@ -437,32 +406,6 @@ test.describe('counter sale', () => {
       await expect(summary).toContainText('1 line / 3 units');
       await expect(summary.getByRole('button', { name: 'Post sale' })).toBeVisible();
     }
-  });
-
-  test('adds items through manual entry, without a code', async ({ page }) => {
-    await signIn(page);
-    await page.goto('/sale');
-    await chooseDepot(page);
-
-    // The product list is no longer a block that lengthens the page; it opens from
-    // the scan box and stays open while the operator fills the basket by hand.
-    await expect(page.getByRole('heading', { name: 'Add without a code' })).toHaveCount(0);
-    await scanSection(page).getByRole('button', { name: 'Manual entry' }).click();
-
-    const dialog = page.getByRole('dialog');
-    await expect(dialog.getByRole('heading', { name: 'Add without a code' })).toBeVisible();
-    await dialog.locator('#sale-product-search').fill(CABLE_CODE);
-
-    const row = dialog.getByRole('listitem').filter({ hasText: CABLE_NAME });
-    await expect(row).toHaveCount(1);
-    await row.getByRole('button', { name: 'Add', exact: true }).click();
-    await expect(dialog).toContainText(`${CABLE_NAME} added to the basket.`);
-    await row.getByRole('button', { name: 'Add', exact: true }).click();
-    await expect(dialog).toBeVisible();
-
-    await page.keyboard.press('Escape');
-    await expect(dialog).toBeHidden();
-    await expect(page.getByLabel(`Quantity for ${CABLE_NAME}`)).toHaveValue('2');
   });
 
   test('sells a serialized unit chosen from the picker without a ledger movement', async ({
@@ -498,10 +441,9 @@ test.describe('counter sale', () => {
     await picker.getByRole('button', { name: 'Take this unit' }).click();
     await expect(picker).toBeHidden();
 
-    const review = await openReview(page);
-    await review.locator('#sale-customer-name').fill(`E2E Serial Buyer ${RUN}`);
-    await review.locator('#sale-reference').fill(reference);
-    await confirmReview(review);
+    await page.locator('#sale-customer-name').fill(`E2E Serial Buyer ${RUN}`);
+    await page.locator('#sale-reference').fill(reference);
+    await page.getByRole('button', { name: 'Post sale' }).click();
 
     await expect(
       page.getByRole('heading', { name: /Invoice FI-\d{4}-\d{4} issued/ }),

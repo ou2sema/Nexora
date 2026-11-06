@@ -17,11 +17,6 @@ export const counterSale: CounterSaleMessages = {
   'sale.scan.productAdded': '{product} ajouté au panier.',
   'sale.scan.pickDevice': '{product} est sérialisé — choisissez l’unité qui quitte le dépôt.',
   'sale.scan.unknownCode': 'Ce code n’a pas pu être résolu.',
-  'sale.manual.action': 'Saisie manuelle',
-
-  'sale.depot.title': 'Dépôt de sortie',
-  'sale.depot.hint':
-    'La disponibilité se vérifie à cette étagère et la facture en sort : choisissez-les avant le premier scan.',
 
   'sale.confirm.title': 'Ajouter {product} ?',
   'sale.confirm.hint': 'Rien n’entre dans le panier avant votre confirmation.',
@@ -112,6 +107,7 @@ export const counterSale: CounterSaleMessages = {
     'Un acheteur de passage n’a pas besoin de fiche : le nom que le dépôt lui donne s’imprime sur la facture.',
   'sale.customer.nameRequired': 'Choisissez un client du répertoire ou nommez l’acheteur.',
 
+  'sale.checkout.title': 'Encaissement',
   'sale.checkout.depot': 'Dépôt',
   'sale.checkout.issueFrom': 'Sortie de',
   'sale.checkout.reference': 'Référence',
@@ -125,18 +121,10 @@ export const counterSale: CounterSaleMessages = {
     'Ce qui n’est pas encaissé reste comme solde sur la facture ; une vente à crédit se constate comme impayée, pas comme un second document.',
   'sale.payment.invalid': 'Saisissez un montant en millimes, ou laissez vide.',
   'sale.payment.exceedsTotal': 'Le montant encaissé dépasse le total TTC.',
-  'sale.post.needsDepot': 'Choisissez le dépôt et l’emplacement d’où la vente sort.',
   'sale.post.action': 'Valider la vente',
   'sale.post.basketEmpty': 'Scannez ou ajoutez au moins une ligne avant de valider la vente.',
   'sale.post.fixLines': 'Corrigez les lignes surlignées avant de valider la vente.',
   'sale.post.failed': 'La vente n’a pas pu être validée.',
-
-  'sale.review.title': 'Récapitulatif de la vente',
-  'sale.review.hint':
-    'Vérifiez l’acheteur, le dépôt et l’encaissement. Confirmer écrit la facture et sort le stock.',
-  'sale.review.items': 'Articles',
-  'sale.review.depot': 'Sortie de',
-  'sale.review.confirm': 'Confirmer la vente',
 
   'sale.posted.title': 'Facture {number} émise',
   'sale.posted.lines': '{lines} / {quantity} ont quitté le dépôt.',

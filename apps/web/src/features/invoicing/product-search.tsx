@@ -4,7 +4,6 @@ import { useState } from 'react';
 import type { ProductSummary } from '@mystock/contracts';
 
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { useProducts } from '@/features/catalog/api';
 import { useI18n } from '@/i18n/provider';
 import { fieldClass } from '@/lib/form-field';
@@ -20,8 +19,11 @@ interface ProductSearchProps {
   onPickDevice: (product: ProductSummary) => void;
 }
 
-/** The search itself, without card chrome: the dialog owns the heading and the hint. */
-function ProductSearch({
+/**
+ * The fallback for a code that is on the shelf but not on the label: the same
+ * product search the catalog page uses, wired straight into the basket.
+ */
+export function ProductSearch({
   organizationId,
   disabled = false,
   onAddProduct,
@@ -41,20 +43,30 @@ function ProductSearch({
   const items = products.data?.items ?? [];
 
   return (
-    <div>
-      <label htmlFor="sale-product-search" className="sr-only">
-        {t('sale.search.label')}
-      </label>
-      <input
-        id="sale-product-search"
-        type="search"
-        value={search}
-        disabled={disabled}
-        placeholder={t('sale.search.placeholder')}
-        autoComplete="off"
-        className={`${fieldClass} mt-0`}
-        onChange={(event) => setSearch(event.target.value)}
-      />
+    <section
+      aria-labelledby="sale-search-heading"
+      className="rounded-xl border border-slate-200 bg-white p-4"
+    >
+      <h2 id="sale-search-heading" className="text-sm font-semibold text-slate-900">
+        {t('sale.search.title')}
+      </h2>
+      <p className="mt-1 text-xs text-slate-500">{t('sale.search.hint')}</p>
+
+      <div className="mt-3">
+        <label htmlFor="sale-product-search" className="sr-only">
+          {t('sale.search.label')}
+        </label>
+        <input
+          id="sale-product-search"
+          type="search"
+          value={search}
+          disabled={disabled}
+          placeholder={t('sale.search.placeholder')}
+          autoComplete="off"
+          className={`${fieldClass} mt-0`}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+      </div>
 
       {products.isError ? (
         <p role="alert" className="mt-3 text-sm text-rose-700">
@@ -70,7 +82,7 @@ function ProductSearch({
           {t('sale.search.empty')}
         </p>
       ) : (
-        <ul className="mt-3 max-h-80 divide-y divide-slate-100 overflow-y-auto">
+        <ul className="mt-3 max-h-72 divide-y divide-slate-100 overflow-y-auto">
           {items.map((product) => (
             <li key={product.id} className="flex items-center gap-3 py-2">
               <div className="min-w-0 flex-1">
@@ -102,59 +114,6 @@ function ProductSearch({
           ))}
         </ul>
       )}
-    </div>
-  );
-}
-
-interface ProductSearchDialogProps {
-  organizationId: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  /** What the counter just did with the item, said where the operator is looking. */
-  notice?: string | null;
-  onAddProduct: (product: ProductSummary) => void;
-  onPickDevice: (product: ProductSummary) => void;
-}
-
-/**
- * The fallback for a code that is on the shelf but not on the label, kept out of
- * the page so the counter shows only what the operator is working on. Adding an
- * item leaves the dialog open — a counter sells several things at once — while a
- * serialized model hands over to the unit picker.
- */
-export function ProductSearchDialog({
-  organizationId,
-  open,
-  onOpenChange,
-  notice = null,
-  onAddProduct,
-  onPickDevice,
-}: ProductSearchDialogProps) {
-  const { t } = useI18n();
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogTitle>{t('sale.search.title')}</DialogTitle>
-        <DialogDescription>{t('sale.search.hint')}</DialogDescription>
-
-        <div className="mt-4">
-          <ProductSearch
-            organizationId={organizationId}
-            onAddProduct={onAddProduct}
-            onPickDevice={(product) => {
-              onOpenChange(false);
-              onPickDevice(product);
-            }}
-          />
-        </div>
-
-        {notice && (
-          <p role="status" className="mt-3 text-sm text-emerald-700">
-            {notice}
-          </p>
-        )}
-      </DialogContent>
-    </Dialog>
+    </section>
   );
 }

@@ -695,7 +695,7 @@ cd apps/web
 npx playwright test --config playwright.local-stack.config.ts --headed
 ```
 
-Expected: 70 checks (35 tests × desktop/mobile), the count as of the counter review pass. The four
+Expected: 68 checks (34 tests × desktop/mobile), the count as of the counter confirmation pass. The four
 `e2e-local/i18n.spec.ts` tests cover:
 
 - French pre-auth copy, the sign-in form, dashboard copy, `fr-TN` money and date output,
@@ -858,53 +858,6 @@ being edited.
 
 Not verified yet: a real USB/Bluetooth scanner has not been driven physically; the browser test
 emulates the same key-event shape. The PDFs and CSV exports stay English (ADR-0014 decision 4).
-
-**Counter review pass (2026-11-06).** The counter still asked for a list nobody reads while working:
-every product was cited inline under the scan box, and the buyer, depot, amount taken and payment
-method sat in a second column that a phone pushed below the basket. The list went behind a `Saisie
-manuelle` button next to the camera toggle, and the second column became a review popup opened from
-the one posting action.
-
-- `product-search.tsx` keeps its search as an inner component and exports `ProductSearchDialog`
-  around it. The dialog stays open after a plain product is added, because a sale usually has more
-  than one line, and closes itself for a serialized product so the device picker is never stacked
-  behind it. The "added to the basket" notice is mirrored inside the dialog as well as on the page.
-- `sale-review-dialog.tsx` is new and carries what the right column used to: the buyer, the item
-  recap with each line's total, `Leaving from` the resolved depot, the net/tax/gross block, the
-  amount taken, the method, the reference and the notes. One `Confirmer la vente` posts it.
-- `sale-form.ts` is new: the zod schema, `SaleValues` and `emptySale` moved out of the page so the
-  dialog and the page share them without importing each other. The dialog takes `register` and
-  `errors` from the page's `useForm`, which works because `register` is not bound to the `<form>`
-  element that happens to render the inputs.
-- The depot and sortie selects stay inline above the scan box rather than moving into the popup:
-  device availability is read against them, so they have to be chosen before the first scan.
-- `#sale-summary-bar` is now the only posting action. It opens the review instead of posting
-  directly, and a `blockedHint` ladder says why it is closed in order of what the operator has to
-  fix: viewer role, then depot not chosen, then empty basket, then lines with problems. The
-  amount-exceeds-total rejection moved into dialog state, because a message rendered on the page
-  sits behind the modal that caused it.
-- The scan box and camera go inactive while _any_ dialog is open — confirmation, device picker,
-  manual entry or review — so a label still held in front of the lens cannot queue work the operator
-  is busy answering.
-- Strings: `sale.manual.action`, `sale.depot.title`/`.hint`, `sale.post.needsDepot` and
-  `sale.review.*` added in all three catalogs, `sale.checkout.title` dropped. `guide.sale.step2`
-  and `step4` now describe naming the buyer inside the review.
-
-`e2e-local/counter-sale.spec.ts` follows the new path: `openReview` clicks `Post sale`, asserts the
-`Review the sale` heading, and returns the dialog; `confirmReview` clicks `Confirm sale` and waits
-for it to close; the buyer, amount and reference are now typed into that dialog. The posting test
-asserts `#sale-customer-name` has count `0` outside the popup, that the recap shows
-`MAIN / A-01`, and that Escape closes it. A new test, `adds items through manual entry, without a
-code`, proves the inline list is gone, searches `CABLE-01` in the dialog, adds it twice, and checks
-the quantity field on the second confirmation. That takes the suite to 35 tests, 70 checks.
-
-Gates on this tree: `format:check`, `lint`, `typecheck` and `build` clean; 413 Vitest tests; the
-full headed local-stack suite 70/70 in 8.9 minutes on `E2E_PG_PORT=55499`. Before that green run,
-one mobile check failed on `scanWithWedge` with `No product or device matches this code`: the burst
-reached the field and Enter submitted it, but the code resolved to nothing, while the identical
-desktop check and the same mobile read in another test of the same run passed. Re-running that one
-spec on an unchanged tree passed in 9.4 s and the full suite then passed 70/70, so nothing in this
-diff accounts for it. The cause is not established, and it is the only such observation so far.
 
 **Hosted counter sale (2026-11-03).** The operator posted the first counter sale through the
 signed-in app against the hosted project, and a read-only query of the hosted database confirms the
@@ -1485,7 +1438,7 @@ npm run test --workspace @mystock/api -- test/db
 | `npm run test:e2e`                                              | Playwright against the API and dev server (18 checks: 9 tests × desktop/mobile)                                                                                                                                                                                                                                                                                                                                             |
 | `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                                                                                                                                                                                            |
 | `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–15 flows on the self-contained stack (70 checks: 35 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`; needs Chromium, because the API under test prints its own documents                                                                                                                                                                                                                    |
+| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–15 flows on the self-contained stack (68 checks: 34 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`; needs Chromium, because the API under test prints its own documents                                                                                                                                                                                                                    |
 | `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                                                                                                                                                                                           |
 | `npm run drill:virgin-database --workspace @mystock/api`        | Migrations + seed onto virgin local databases and both schema-guard boot paths (needs `npm run build` and a localhost `DATABASE_URL`)                                                                                                                                                                                                                                                                                       |
 
