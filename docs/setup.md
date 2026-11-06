@@ -695,7 +695,7 @@ cd apps/web
 npx playwright test --config playwright.local-stack.config.ts --headed
 ```
 
-Expected: 68 checks (34 tests × desktop/mobile), the count as of the counter confirmation pass. The four
+Expected: 70 checks (35 tests × desktop/mobile), the count as of the auto-picked-shelf pass. The four
 `e2e-local/i18n.spec.ts` tests cover:
 
 - French pre-auth copy, the sign-in form, dashboard copy, `fr-TN` money and date output,
@@ -858,6 +858,42 @@ being edited.
 
 Not verified yet: a real USB/Bluetooth scanner has not been driven physically; the browser test
 emulates the same key-event shape. The PDFs and CSV exports stay English (ADR-0014 decision 4).
+
+**Counter rebuild on the Figma design (2026-11-06, `acc6b3c`).** The design arrived as frames read
+from Figma and `/sale` was rebuilt on it: a **Find & add items** panel holding the scan field, the
+selling location and a quick-add list of what the chosen shelf actually contains; a **Basket** card
+that edits a line where it is shown, with a quantity stepper, a per-line tax select and the price
+behind an “Adjust price” link; a **Checkout** panel that keeps the buyer, the tender and the
+reference inside native `<details>` disclosures; a **Sale complete** screen whose heading is the
+payment status; and an Items → Payment → Done stepper below `lg` with `#sale-mobile-summary`
+carrying the review action. The product-search and basket-table files were deleted and the three
+catalogs rewritten to one key set. Gates: 68/68 headed (34 tests × desktop/mobile), 413 Vitest,
+format/lint/typecheck/build clean.
+**The bug that cost a full headed run to find:** the checkout became a `<form>` so that Enter posts
+the sale, and a submit handler that never called `preventDefault()` let the browser submit
+natively — `/sale` reloaded, the basket vanished, and every test that posts died on the completion
+heading. A counter test that fails on the post with an empty pristine page in the snapshot is a
+form-submission bug, not a selector problem.
+
+**Auto-picked shelf and re-voiced copy (2026-11-06, `ac5aea5`).** The operator asked why the counter
+asks for a shelf before the first read, when the read already knows it: a serialized unit carries
+its own location, and a product stocked on exactly one shelf has only one place to leave from.
+`apps/web/src/features/invoicing/shelf-guess.ts` reads `/stock-levels?productId=` for that product
+and answers `shelf | several | unknown`; a scan settles the pair only on `shelf`, an explicit choice
+is never moved under a basket already built, `several` is announced rather than guessed, and a
+stock read that will not answer is not a failed sale. The select then collapses into a
+“Leaves from <shelf>” line with **Change shelf** beside it for the reads the counter cannot answer.
+Nothing below the interface moved: `app.create_sales_invoice` still takes exactly one `p_location`,
+so the decrement simply lands on the shelf the goods were on. The same pass read the screen for
+sentences said twice and left one of each — the count in the basket badge, the total in the totals
+block and in the phone’s docked bar, the shelf name in the collapsed line, the checkout header and
+the bar. Six catalog strings went with their duplicates, five arrived for the states the auto-pick
+makes possible, and en, fr and ar hold the same 165 keys. Two regressions reached the gate and both
+were caught only by the phone project: the bar had taken over the line count, and it showed its
+blocking reason only once a shelf was chosen, which a viewer can never do, so a phone explained
+nothing at all while the desktop rail did. Gates: `format:check`, `lint`, `typecheck` and `build`
+clean; 413 Vitest tests (345 API across 43 files, 47 domain, 14 contracts, 7 config); the headed
+local-stack suite 70/70 (35 tests × desktop/mobile) in 8.6 minutes on `E2E_PG_PORT=55499`.
 
 **Hosted counter sale (2026-11-03).** The operator posted the first counter sale through the
 signed-in app against the hosted project, and a read-only query of the hosted database confirms the
@@ -1438,7 +1474,7 @@ npm run test --workspace @mystock/api -- test/db
 | `npm run test:e2e`                                              | Playwright against the API and dev server (18 checks: 9 tests × desktop/mobile)                                                                                                                                                                                                                                                                                                                                             |
 | `npm run test:e2e:headed`                                       | Same, with visible browsers (local verification)                                                                                                                                                                                                                                                                                                                                                                            |
 | `npm run test:e2e -- --project=desktop`                         | One Playwright project only                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–15 flows on the self-contained stack (68 checks: 34 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`; needs Chromium, because the API under test prints its own documents                                                                                                                                                                                                                    |
+| `npm run test:e2e:local --workspace @mystock/web`               | Phase 6–15 flows on the self-contained stack (70 checks: 35 tests × desktop/mobile); run from `apps/web` after `npm run build:apps`; needs Chromium, because the API under test prints its own documents                                                                                                                                                                                                                    |
 | `npx playwright test --config playwright.local-stack.config.ts` | The same suite directly, adding `--headed` for local verification                                                                                                                                                                                                                                                                                                                                                           |
 | `npm run drill:virgin-database --workspace @mystock/api`        | Migrations + seed onto virgin local databases and both schema-guard boot paths (needs `npm run build` and a localhost `DATABASE_URL`)                                                                                                                                                                                                                                                                                       |
 
