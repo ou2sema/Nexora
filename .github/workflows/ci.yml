@@ -45,7 +45,44 @@ jobs:
         run: npm run typecheck
 
       - name: Unit and integration tests
-        run: npm run test
+        id: unit-tests
+        run: |
+          npm run build:packages
+          start=$(date +%s)
+          set +e
+          npm test --workspace @mystock/api -- \
+            --reporter=default \
+            --reporter=json \
+            --outputFile.json="$RUNNER_TEMP/api-test-results.json"
+          status=$?
+          set -e
+          echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
+          exit $status
+
+      # Best effort: observability must never turn a green build red. The step
+      # skips itself when the repository has no GRAFANA_URL secret, which is the
+      # default until a reachable Grafana is configured.
+      - name: Record the test run in Grafana
+        if: always()
+        continue-on-error: true
+        env:
+          GRAFANA_URL: ${{ secrets.GRAFANA_URL }}
+          GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
+          RESULTS_FILE: ${{ runner.temp }}/api-test-results.json
+        run: |
+          if [ -z "$GRAFANA_URL" ] || [ -z "$GRAFANA_TOKEN" ]; then
+            echo "GRAFANA_URL/GRAFANA_TOKEN are not configured; skipping the annotation."
+            exit 0
+          fi
+          if [ ! -f "$RESULTS_FILE" ]; then
+            echo "No test result file was produced; skipping the annotation."
+            exit 0
+          fi
+          PASSED=$(node -e "const r=require(process.argv[1]);process.stdout.write(String(r.numPassedTests??0))" "$RESULTS_FILE")
+          FAILED=$(node -e "const r=require(process.argv[1]);process.stdout.write(String(r.numFailedTests??0))" "$RESULTS_FILE")
+          bash infra/observability/scripts/record-test-run.sh \
+            "$PASSED" "$FAILED" "${{ steps.unit-tests.outputs.seconds }}" \
+            "api ${GITHUB_SHA::7}"
 
       - name: Build
         run: npm run build

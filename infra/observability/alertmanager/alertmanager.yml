@@ -1,0 +1,23 @@
+# The default receiver has no integrations: alerts are visible in Prometheus
+# and Alertmanager, but nothing is sent. Add an email, Slack or webhook
+# integration below, then `docker compose restart alertmanager`.
+route:
+  receiver: default
+  group_by: ['alertname', 'environment', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: default
+    # email_configs:
+    #   - to: ops@example.com
+    #     from: alerts@example.com
+    #     smarthost: smtp.example.com:587
+    #     auth_username: alerts@example.com
+    #     auth_password_file: /etc/alertmanager/smtp_password
+    #
+    # slack_configs:
+    #   - api_url_file: /etc/alertmanager/slack_webhook
+    #     channel: '#nexora-alerts'
+    #     send_resolved: true

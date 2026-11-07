@@ -18,6 +18,7 @@ import { DatabaseModule } from './database/database.module';
 import { DevicesModule } from './devices/devices.module';
 import { HealthModule } from './health/health.module';
 import { LogosModule } from './logos/logo.module';
+import { MetricsModule } from './metrics/metrics.module';
 import { OperationsModule } from './operations/operations.module';
 import { ReportsModule } from './reports/reports.module';
 import { ScanningModule } from './scanning/scanning.module';
@@ -62,6 +63,7 @@ import { TenancyModule } from './tenancy/tenancy.module';
       ],
     }),
     DatabaseModule,
+    MetricsModule,
     TenancyModule,
     AuthModule,
     AccountModule,

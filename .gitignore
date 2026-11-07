@@ -25,6 +25,9 @@ playwright-report/
 test-results/
 blob-report/
 
+# observability secrets
+infra/observability/secrets/metrics_token
+
 # supabase local state
 supabase/.temp/
 supabase/.branches/

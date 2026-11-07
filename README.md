@@ -119,12 +119,23 @@ apps/api        NestJS API
 apps/web        React SPA
 packages/       contracts (Zod), domain rules, config, testing helpers
 supabase/       migrations, seed, RLS tests
+infra/          Docker Compose for Prometheus, Alertmanager and Grafana
 docs/           ADRs, diagrams, runbooks
 ```
 
 Multi-tenancy is organization-based: every catalog row carries `organization_id`, access is
 decided by `memberships.role`, and Postgres RLS enforces the boundary for every query. See
 [ADR-0003](docs/adr/0003-tenancy-and-rls.md).
+
+## Observability
+
+The API exposes Prometheus metrics at `GET /metrics`, outside the `/api/v1` prefix. In
+production the endpoint requires `METRICS_TOKEN` and answers `404` without one; in development
+it is open. The repository ships a Docker Compose stack with Prometheus, Alertmanager and
+Grafana, a provisioned datasource and an API dashboard, plus scrape and alert rules.
+
+See [`docs/observability.md`](docs/observability.md) for the full tutorial: local stack, pointing
+Prometheus at the Render service, the dashboard panels, alerts, security and troubleshooting.
 
 ## Authentication and API surface
 

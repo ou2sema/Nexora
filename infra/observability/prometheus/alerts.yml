@@ -1,0 +1,55 @@
+groups:
+  - name: nexora-api
+    rules:
+      - alert: NexoraApiDown
+        expr: up{job=~"nexora-api-.*"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Prometheus cannot scrape {{ $labels.job }}'
+          description: 'The {{ $labels.environment }} API has answered no scrape for 5 minutes. A sleeping free Render instance also lands here; open the service to wake it.'
+
+      - alert: NexoraHighErrorRate
+        expr: |
+          sum by (environment) (rate(nexora_http_requests_total{status=~"5.."}[5m]))
+          /
+          clamp_min(sum by (environment) (rate(nexora_http_requests_total[5m])), 1e-9)
+          > 0.05
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'More than 5% of {{ $labels.environment }} API responses are 5xx'
+          description: 'Sustained server errors. Check the Render logs and /health/ready.'
+
+      - alert: NexoraSlowP95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, environment) (rate(nexora_http_request_duration_seconds_bucket[5m]))
+          ) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'p95 latency above 2 s on {{ $labels.environment }}'
+          description: 'The p95 has stayed above 2 s for 10 minutes. Check database latency and the Render instance size.'
+
+      - alert: NexoraMemoryPressure
+        expr: nexora_process_resident_memory_bytes > 450e6
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'API RSS above 450 MB on {{ $labels.environment }}'
+          description: 'A 512 MB Render instance is close to its limit. Look for a growing heap before the process is restarted.'
+
+      - alert: NexoraEventLoopLag
+        expr: nexora_nodejs_eventloop_lag_p99_seconds > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Event loop p99 lag above 500 ms on {{ $labels.environment }}'
+          description: 'Synchronous work is blocking the event loop. Check recent document rendering and large reports.'

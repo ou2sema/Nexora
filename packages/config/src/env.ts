@@ -27,6 +27,10 @@ export const serverEnvSchema = z
 
     RATE_LIMIT_TTL_SECONDS: z.coerce.number().int().positive().default(60),
     RATE_LIMIT_LIMIT: z.coerce.number().int().positive().default(120),
+
+    // Bearer token Prometheus presents to /metrics. Optional in development,
+    // required in production: without it the endpoint answers 404 there.
+    METRICS_TOKEN: z.string().min(16).optional(),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') {
