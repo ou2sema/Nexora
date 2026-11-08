@@ -2,19 +2,21 @@
 # Record a test run as an annotation on the Nexora API dashboard.
 #
 # Usage:
-#   GRAFANA_PASSWORD=<admin password> ./record-test-run.sh <passed> <failed> [seconds] [suite]
+#   GRAFANA_PASSWORD=<admin password> ./record-test-run.sh <passed> <failed> [seconds] [suite] [tag]
 #
 # Example:
 #   GRAFANA_PASSWORD=... ./record-test-run.sh 352 0 119 api
+#   GRAFANA_PASSWORD=... ./record-test-run.sh 72 0 300 "e2e local stack" e2e-tests
 #
 # In CI, set GRAFANA_URL and use a Grafana service-account token:
 #   GRAFANA_TOKEN=<token> ./record-test-run.sh 352 0 119 api
 set -euo pipefail
 
-passed=${1:?usage: record-test-run.sh <passed> <failed> [seconds] [suite]}
-failed=${2:?usage: record-test-run.sh <passed> <failed> [seconds] [suite]}
+passed=${1:?usage: record-test-run.sh <passed> <failed> [seconds] [suite] [tag]}
+failed=${2:?usage: record-test-run.sh <passed> <failed> [seconds] [suite] [tag]}
 seconds=${3:-}
 suite=${4:-api}
+tag=${5:-api-tests}
 
 url=${GRAFANA_URL:-http://localhost:3001}
 time_ms=$(($(date +%s) * 1000))
@@ -39,5 +41,5 @@ fi
 curl -fsS "${auth[@]}" \
   -H 'content-type: application/json' \
   -X POST "$url/api/annotations" \
-  -d "{\"text\":\"$text\",\"tags\":[\"api-tests\",\"$status\"],\"time\":$time_ms}"
+  -d "{\"text\":\"$text\",\"tags\":[\"$tag\",\"$status\"],\"time\":$time_ms}"
 echo

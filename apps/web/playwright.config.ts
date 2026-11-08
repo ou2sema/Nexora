@@ -1,6 +1,15 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices, type ReporterDescription } from '@playwright/test';
 
 const API_URL = 'http://localhost:4100';
+
+// Set by CI to write a machine-readable summary for the Grafana annotation.
+const reporters: ReporterDescription[] = [
+  ['list'],
+  ['allure-playwright', { outputFolder: 'allure-results', detail: true, suiteTitle: false }],
+];
+if (process.env.PLAYWRIGHT_JSON_OUTPUT_NAME) {
+  reporters.push(['json', { outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT_NAME }]);
+}
 
 // Local runs reuse the system Edge install; CI downloads Playwright's Chromium.
 const browserChannel = process.env.PLAYWRIGHT_CHANNEL ?? (process.env.CI ? undefined : 'msedge');
@@ -26,10 +35,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
-  reporter: [
-    ['list'],
-    ['allure-playwright', { outputFolder: 'allure-results', detail: true, suiteTitle: false }],
-  ],
+  reporter: reporters,
   use: {
     baseURL: 'http://localhost:5173',
     trace: 'retain-on-failure',

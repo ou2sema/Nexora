@@ -38,17 +38,18 @@ so the stack lives on your laptop, a small VPS, or inside Grafana Cloud.
 
 What is already in the repository:
 
-| Path                                                | What it does                                          |
-| --------------------------------------------------- | ----------------------------------------------------- |
-| `apps/api/src/metrics/metrics.service.ts`           | Registry, HTTP counters/histogram, process metrics    |
-| `apps/api/src/metrics/http-metrics.middleware.ts`   | Counts every request when the response finishes       |
-| `apps/api/src/metrics/metrics.controller.ts`        | `GET /metrics`, token check, `no-store`               |
-| `apps/api/src/metrics/metrics.module.ts`            | Wires the controller before routes are mounted        |
-| `infra/observability/docker-compose.yml`            | Prometheus, Alertmanager, Grafana                     |
-| `infra/observability/prometheus/*.yml`              | Scrape jobs and alert rules                           |
-| `infra/observability/grafana/**`                    | Provisioned datasource, dashboard provider, dashboard |
-| `infra/observability/secrets/metrics_token.example` | Placeholder for the scrape token                      |
-| `infra/observability/scripts/record-test-run.sh`    | Posts a test-run annotation to Grafana (§13)          |
+| Path                                                | What it does                                                   |
+| --------------------------------------------------- | -------------------------------------------------------------- |
+| `apps/api/src/metrics/metrics.service.ts`           | Registry, HTTP counters/histogram, process metrics             |
+| `apps/api/src/metrics/http-metrics.middleware.ts`   | Counts every request when the response finishes                |
+| `apps/api/src/metrics/metrics.controller.ts`        | `GET /metrics`, token check, `no-store`                        |
+| `apps/api/src/metrics/metrics.module.ts`            | Wires the controller before routes are mounted                 |
+| `infra/observability/docker-compose.yml`            | Prometheus, Alertmanager, Grafana                              |
+| `infra/observability/prometheus/*.yml`              | Scrape jobs and alert rules                                    |
+| `infra/observability/grafana/**`                    | Provisioned datasource, dashboard provider, dashboard          |
+| `infra/observability/secrets/metrics_token.example` | Placeholder for the scrape token                               |
+| `infra/observability/scripts/record-test-run.sh`    | Posts a test-run annotation to Grafana (§13)                   |
+| `infra/observability/scripts/ci-annotate.sh`        | Reads Vitest or Playwright JSON and posts the annotation (§14) |
 
 ---
 
@@ -690,22 +691,41 @@ Why not push test results into Prometheus directly:
 What was added so a test run can be recorded on the dashboard — as an
 **annotation**, which is the right shape for a discrete event:
 
-1. The dashboard now has an `API test runs` annotation query, enabled by
-   default, matching the tag `api-tests`. It draws purple dashed markers on
-   every time-series panel.
+1. The dashboard has two annotation queries, both enabled by default: `API test
+runs` matching `api-tests` (purple) and `E2E test runs` matching `e2e-tests`
+   (orange). They draw dashed markers on every time-series panel.
 2. `infra/observability/scripts/record-test-run.sh` posts an annotation with the
-   counts, the duration and a `passed`/`failed` tag.
+   counts, the duration, a suite label and a tag.
+3. `infra/observability/scripts/ci-annotate.sh` reads a Vitest or Playwright
+   JSON report and calls the recorder, so CI does not parse test output.
 
 Run it after a suite:
 
 ```bash
 GRAFANA_PASSWORD=$(grep '^GRAFANA_ADMIN_PASSWORD=' infra/observability/.env | cut -d= -f2-) \
   infra/observability/scripts/record-test-run.sh 352 0 119 api
+
+# E2E: same script, different tag
+GRAFANA_PASSWORD=... infra/observability/scripts/record-test-run.sh \
+  72 0 300 "e2e local stack desktop+mobile" e2e-tests
 ```
 
 ```json
 { "id": 1, "message": "Annotation added" }
 ```
+
+Both Playwright configs add a JSON reporter only when the environment variable
+is set, so ordinary local runs keep their `list` + Allure output:
+
+```ts
+if (process.env.PLAYWRIGHT_JSON_OUTPUT_NAME) {
+  reporters.push(['json', { outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT_NAME }]);
+}
+```
+
+`stats.expected + stats.flaky` becomes the passed count and `stats.unexpected`
+the failed count. With CI retries enabled, a test that passes on the second
+attempt counts as passed and stays visible as flaky in the Playwright report.
 
 In CI, use a Grafana service-account token instead of a password:
 
@@ -735,19 +755,20 @@ The detailed per-test report stays in Allure: `npm run report:allure`.
 
 Two different things happen on a push, and only one of them needs CI:
 
-| What                     | Trigger                                          | Where it shows                                           |
-| ------------------------ | ------------------------------------------------ | -------------------------------------------------------- |
-| The deployed API changes | Render auto-deploy (already on)                  | `/metrics` on Render → `environment="production"` series |
-| The test run is recorded | GitHub Actions job in `.github/workflows/ci.yml` | `API test runs` markers on the dashboard                 |
+| What                        | Trigger                                         | Where it shows                                           |
+| --------------------------- | ----------------------------------------------- | -------------------------------------------------------- |
+| The deployed API changes    | Render auto-deploy (already on)                 | `/metrics` on Render → `environment="production"` series |
+| The API suite is recorded   | `quality` job in `.github/workflows/ci.yml`     | `API test runs` markers (purple)                         |
+| The E2E suites are recorded | `e2e` and `e2e-local` jobs in the same workflow | `E2E test runs` markers (orange)                         |
 
 Prometheus does the first part by itself: it scrapes Render every 60 s, so a
 successful deploy appears in the production series without any workflow. The
-annotation is what carries the test verdict onto the same timeline.
+annotations are what carry the test verdicts onto the same timeline.
 
 ### 14.1 What the workflow does
 
-The `quality` job in `.github/workflows/ci.yml` now runs the API suite once and
-writes machine-readable results:
+Three jobs each run a suite, save a machine-readable report to `$RUNNER_TEMP`,
+and then post an annotation. The `quality` job runs the API suite once:
 
 ```yaml
 - name: Unit and integration tests
@@ -766,23 +787,51 @@ writes machine-readable results:
     exit $status
 ```
 
-Then a best-effort step reads `numPassedTests` / `numFailedTests`, posts the
-annotation, and exits successfully even if Grafana is unreachable:
+The two Playwright jobs do the same, using the environment variable the configs
+look for:
 
 ```yaml
-- name: Record the test run in Grafana
+- name: Run E2E suite
+  id: e2e-tests
+  run: |
+    start=$(date +%s)
+    set +e
+    PLAYWRIGHT_JSON_OUTPUT_NAME="$RUNNER_TEMP/e2e-results.json" npm run test:e2e
+    status=$?
+    set -e
+    echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
+    exit $status
+```
+
+`e2e-local` is identical with `npm run test:e2e:local --workspace @mystock/web`
+and `e2e-local-results.json`.
+
+Then a best-effort step hands the report to `ci-annotate.sh`, which handles both
+report shapes and exits successfully even if Grafana is unreachable:
+
+```yaml
+- name: Record the E2E run in Grafana
   if: always()
   continue-on-error: true
   env:
     GRAFANA_URL: ${{ secrets.GRAFANA_URL }}
     GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
-  ...
+  run: |
+    bash infra/observability/scripts/ci-annotate.sh \
+      "$RUNNER_TEMP/e2e-results.json" \
+      "${{ steps.e2e-tests.outputs.seconds }}" \
+      "e2e desktop+mobile" "e2e-tests"
 ```
+
+The `quality` job calls the same script with `api-test-results.json`,
+`"api ${GITHUB_SHA::7}"` and `api-tests`; `e2e-local` uses its own file and the
+suite label `e2e local stack desktop+mobile`.
 
 When the two secrets are absent — the state of a fresh fork, or a pull request
 from a fork — the step prints a skip message and the build stays green. The
 `--reporter=default` flag keeps the readable Vitest output in the job log; only
-the JSON file goes to `$RUNNER_TEMP`.
+the JSON file goes to `$RUNNER_TEMP`. A missing results file (the job died
+before writing one) is skipped rather than reported as zero failures.
 
 ### 14.2 Make Grafana reachable from the runner
 
@@ -817,21 +866,26 @@ requests skip the annotation automatically.
 
 ### 14.4 Result
 
-On the next push to `main`, the `quality` job finishes and a purple marker
-appears at the run's timestamp:
+On the next push to `main`, each job finishes and leaves a marker at the run's
+timestamp:
 
 ```text
 api 3f9c2ab tests: 352 passed, 0 failed in 118s
+e2e desktop+mobile tests: 72 passed, 0 failed in 298s
+e2e local stack desktop+mobile tests: 36 passed, 0 failed in 152s
 ```
 
-Tags are `api-tests` plus `passed` or `failed`, so the marker is visible on
-every panel and queryable:
+The first is purple (`api-tests`), the other two orange (`e2e-tests`). Each
+carries a `passed` or `failed` tag, so a red marker is visible on every panel
+and the whole set is queryable:
 
 ```bash
 curl -s -H "Authorization: Bearer $GRAFANA_TOKEN" \
-  "$GRAFANA_URL/api/annotations?tags=api-tests&limit=10"
+  "$GRAFANA_URL/api/annotations?tags=e2e-tests&limit=10"
 ```
 
 The token path was verified against the running stack: a temporary service
-account with the Editor role posted annotation `#2`, after which the account
-was deleted. The first annotation (`#1`, `admin`) came from the password path.
+account with the Editor role posted annotation `#2` (`api-tests`), after which
+the account was deleted. The first annotation (`#1`, `admin`) came from the
+password path, and `#3` was written by `ci-annotate.sh` from a real Playwright
+report (`e2e-tests`, 2 passed in 37 s).

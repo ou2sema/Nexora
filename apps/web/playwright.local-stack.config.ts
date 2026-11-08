@@ -1,4 +1,13 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices, type ReporterDescription } from '@playwright/test';
+
+// Set by CI to write a machine-readable summary for the Grafana annotation.
+const reporters: ReporterDescription[] = [
+  ['list'],
+  ['allure-playwright', { outputFolder: 'allure-results', detail: true, suiteTitle: false }],
+];
+if (process.env.PLAYWRIGHT_JSON_OUTPUT_NAME) {
+  reporters.push(['json', { outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT_NAME }]);
+}
 
 // Self-contained stack: embedded PostgreSQL, a fake Supabase auth/JWKS server,
 // the real API build and this app — no hosted project or credentials involved.
@@ -17,10 +26,7 @@ export default defineConfig({
   workers: 1,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
-  reporter: [
-    ['list'],
-    ['allure-playwright', { outputFolder: 'allure-results', detail: true, suiteTitle: false }],
-  ],
+  reporter: reporters,
   use: {
     baseURL: WEB_ORIGIN,
     trace: 'retain-on-failure',

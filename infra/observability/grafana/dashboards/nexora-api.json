@@ -27,6 +27,21 @@
           "tags": ["api-tests"],
           "type": "tags"
         }
+      },
+      {
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "iconColor": "orange",
+        "name": "E2E test runs",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": ["e2e-tests"],
+          "type": "tags"
+        }
       }
     ]
   },
