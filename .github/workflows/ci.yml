@@ -45,33 +45,9 @@ jobs:
         run: npm run typecheck
 
       - name: Unit and integration tests
-        id: unit-tests
         run: |
           npm run build:packages
-          start=$(date +%s)
-          set +e
-          npm test --workspace @mystock/api -- \
-            --reporter=default \
-            --reporter=json \
-            --outputFile.json="$RUNNER_TEMP/api-test-results.json"
-          status=$?
-          set -e
-          echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
-          exit $status
-
-      # Best effort: observability must never turn a green build red. The script
-      # skips itself when the repository has no GRAFANA_URL/GRAFANA_TOKEN.
-      - name: Record the test run in Grafana
-        if: always()
-        continue-on-error: true
-        env:
-          GRAFANA_URL: ${{ secrets.GRAFANA_URL }}
-          GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
-        run: |
-          bash infra/observability/scripts/ci-annotate.sh \
-            "$RUNNER_TEMP/api-test-results.json" \
-            "${{ steps.unit-tests.outputs.seconds }}" \
-            "api ${GITHUB_SHA::7}" "api-tests"
+          npm test --workspace @mystock/api
 
       - name: Build
         run: npm run build
@@ -178,27 +154,7 @@ jobs:
         run: npm run build
 
       - name: Run E2E suite
-        id: e2e-tests
-        run: |
-          start=$(date +%s)
-          set +e
-          PLAYWRIGHT_JSON_OUTPUT_NAME="$RUNNER_TEMP/e2e-results.json" npm run test:e2e
-          status=$?
-          set -e
-          echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
-          exit $status
-
-      - name: Record the E2E run in Grafana
-        if: always()
-        continue-on-error: true
-        env:
-          GRAFANA_URL: ${{ secrets.GRAFANA_URL }}
-          GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
-        run: |
-          bash infra/observability/scripts/ci-annotate.sh \
-            "$RUNNER_TEMP/e2e-results.json" \
-            "${{ steps.e2e-tests.outputs.seconds }}" \
-            "e2e desktop+mobile" "e2e-tests"
+        run: npm run test:e2e
 
       - name: Upload Playwright artifacts
         if: failure()
@@ -231,28 +187,7 @@ jobs:
         run: npm run build
 
       - name: Run local-stack E2E suite
-        id: e2e-local-tests
-        run: |
-          start=$(date +%s)
-          set +e
-          PLAYWRIGHT_JSON_OUTPUT_NAME="$RUNNER_TEMP/e2e-local-results.json" \
-            npm run test:e2e:local --workspace @mystock/web
-          status=$?
-          set -e
-          echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
-          exit $status
-
-      - name: Record the local-stack E2E run in Grafana
-        if: always()
-        continue-on-error: true
-        env:
-          GRAFANA_URL: ${{ secrets.GRAFANA_URL }}
-          GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
-        run: |
-          bash infra/observability/scripts/ci-annotate.sh \
-            "$RUNNER_TEMP/e2e-local-results.json" \
-            "${{ steps.e2e-local-tests.outputs.seconds }}" \
-            "e2e local stack desktop+mobile" "e2e-tests"
+        run: npm run test:e2e:local --workspace @mystock/web
 
       - name: Upload Playwright artifacts
         if: failure()

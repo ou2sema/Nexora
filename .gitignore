@@ -27,6 +27,7 @@ blob-report/
 
 # observability secrets
 infra/observability/secrets/metrics_token
+infra/observability/.state/
 
 # supabase local state
 supabase/.temp/

@@ -38,18 +38,18 @@ so the stack lives on your laptop, a small VPS, or inside Grafana Cloud.
 
 What is already in the repository:
 
-| Path                                                | What it does                                                   |
-| --------------------------------------------------- | -------------------------------------------------------------- |
-| `apps/api/src/metrics/metrics.service.ts`           | Registry, HTTP counters/histogram, process metrics             |
-| `apps/api/src/metrics/http-metrics.middleware.ts`   | Counts every request when the response finishes                |
-| `apps/api/src/metrics/metrics.controller.ts`        | `GET /metrics`, token check, `no-store`                        |
-| `apps/api/src/metrics/metrics.module.ts`            | Wires the controller before routes are mounted                 |
-| `infra/observability/docker-compose.yml`            | Prometheus, Alertmanager, Grafana                              |
-| `infra/observability/prometheus/*.yml`              | Scrape jobs and alert rules                                    |
-| `infra/observability/grafana/**`                    | Provisioned datasource, dashboard provider, dashboard          |
-| `infra/observability/secrets/metrics_token.example` | Placeholder for the scrape token                               |
-| `infra/observability/scripts/record-test-run.sh`    | Posts a test-run annotation to Grafana (§13)                   |
-| `infra/observability/scripts/ci-annotate.sh`        | Reads Vitest or Playwright JSON and posts the annotation (§14) |
+| Path                                                  | What it does                                          |
+| ----------------------------------------------------- | ----------------------------------------------------- |
+| `apps/api/src/metrics/metrics.service.ts`             | Registry, HTTP counters/histogram, process metrics    |
+| `apps/api/src/metrics/http-metrics.middleware.ts`     | Counts every request when the response finishes       |
+| `apps/api/src/metrics/metrics.controller.ts`          | `GET /metrics`, token check, `no-store`               |
+| `apps/api/src/metrics/metrics.module.ts`              | Wires the controller before routes are mounted        |
+| `infra/observability/docker-compose.yml`              | Prometheus, Alertmanager, Grafana                     |
+| `infra/observability/prometheus/*.yml`                | Scrape jobs and alert rules                           |
+| `infra/observability/grafana/**`                      | Provisioned datasource, dashboard provider, dashboard |
+| `infra/observability/secrets/metrics_token.example`   | Placeholder for the scrape token                      |
+| `infra/observability/scripts/record-test-run.sh`      | Posts a test-run annotation to Grafana (§13)          |
+| `infra/observability/scripts/sync-ci-annotations.mjs` | Turns finished CI runs into annotations (§14)         |
 
 ---
 
@@ -436,15 +436,14 @@ series count that is a few hundred MB. Raise it only with disk headroom.
   Compose v5.6.1): Prometheus 3.16.0, Alertmanager v0.34.2 and Grafana 13.3.0.
   `nexora-api-local` is `up` and scraping a host API on `:4100`; Prometheus
   answered the dashboard's rate, status and p95 queries; the five alert rules
-  loaded (`NexoraApiDown` pending only because the Render target was `down`).
-  Grafana provisioned the `Prometheus` datasource (uid `nexora-prometheus`) and
-  the `Nexora API` dashboard, which rendered live values across all 13 panels in
-  a signed-in browser session.
-- The Render target currently reports `down` with `HTTP 404 Not Found`: that is
-  the production fail-closed behaviour until `METRICS_TOKEN` is set on the
-  Render service and the same value is written to
-  `infra/observability/secrets/metrics_token`. `NexoraApiDown` firing on Render
-  is therefore expected before that step.
+  loaded. Grafana provisioned the `Prometheus` datasource (uid
+  `nexora-prometheus`) and the `Nexora API` dashboard, which rendered live values
+  across all 13 panels in a signed-in browser session.
+- The Render target reports `up` since `METRICS_TOKEN` was set on the service:
+  `/metrics` answers `200` with the bearer and `404` without it or with a wrong
+  value, `up{job="nexora-api-render"}` moved from `0` to `1` on the next scrape,
+  and `NexoraApiDown`, which had been firing since 2026-11-07 18:32, went
+  `inactive`. Production series now appear next to the local ones.
 - Running Compose exposed one real defect that native testing could not: the
   secrets volume was mounted at `/etc/prometheus/secrets`, inside the
   read-only `/etc/prometheus` mount, so Docker could not create the mountpoint.
@@ -453,10 +452,11 @@ series count that is a few hundred MB. Raise it only with disk headroom.
 - `promtool` validated the config and all five rules, and a dashboard pass
   confirmed the 5xx stat renders `0%` with no traffic errors and that an unknown
   path is charted as `unmatched` rather than the raw wildcard.
-- The test-run annotation path was exercised against the running stack: the
-  `API test runs` annotation query appeared on the dashboard, the recorder
-  posted annotation `#1` (`api tests: 352 passed, 0 failed in 119s`), and the
-  purple marker rendered on every time-series panel.
+- The annotation path was exercised against the running stack: `record-test-run.sh`
+  posted annotation `#1` by password and a temporary service account posted
+  `#2`, then `sync-ci-annotations.mjs` backfilled seven real runs (21 markers,
+  including one `failed`), and both `API test runs` and `E2E test runs` queries
+  render on the dashboard.
 
 ---
 
@@ -694,12 +694,13 @@ What was added so a test run can be recorded on the dashboard — as an
 1. The dashboard has two annotation queries, both enabled by default: `API test
 runs` matching `api-tests` (purple) and `E2E test runs` matching `e2e-tests`
    (orange). They draw dashed markers on every time-series panel.
-2. `infra/observability/scripts/record-test-run.sh` posts an annotation with the
-   counts, the duration, a suite label and a tag.
-3. `infra/observability/scripts/ci-annotate.sh` reads a Vitest or Playwright
-   JSON report and calls the recorder, so CI does not parse test output.
+2. `infra/observability/scripts/record-test-run.sh` posts one annotation by
+   hand: counts, duration, suite label and tag.
+3. `infra/observability/scripts/sync-ci-annotations.mjs` reads finished runs
+   from the public Actions API and marks each suite step, so a push reaches the
+   dashboard without CI having to reach the stack.
 
-Run it after a suite:
+Run the recorder after a suite:
 
 ```bash
 GRAFANA_PASSWORD=$(grep '^GRAFANA_ADMIN_PASSWORD=' infra/observability/.env | cut -d= -f2-) \
@@ -714,20 +715,14 @@ GRAFANA_PASSWORD=... infra/observability/scripts/record-test-run.sh \
 { "id": 1, "message": "Annotation added" }
 ```
 
-Both Playwright configs add a JSON reporter only when the environment variable
-is set, so ordinary local runs keep their `list` + Allure output:
+The sync records the suite's own verdict rather than counts: the marker spans
+the step that ran the tests (`Unit and integration tests`, `Run E2E suite`,
+`Run local-stack E2E suite`) and reads `api a161e8e passed in 1m 3s`. A skipped
+or cancelled step counts as failed, and a job that died before its suite step
+started falls back to the job's span. Each run is recorded once, so polling
+never draws a marker twice; §14 covers the schedule.
 
-```ts
-if (process.env.PLAYWRIGHT_JSON_OUTPUT_NAME) {
-  reporters.push(['json', { outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT_NAME }]);
-}
-```
-
-`stats.expected + stats.flaky` becomes the passed count and `stats.unexpected`
-the failed count. With CI retries enabled, a test that passes on the second
-attempt counts as passed and stays visible as flaky in the Playwright report.
-
-In CI, use a Grafana service-account token instead of a password:
+The recorder also accepts a service-account token instead of a password:
 
 ```bash
 GRAFANA_URL=https://grafana.example.com \
@@ -755,137 +750,94 @@ The detailed per-test report stays in Allure: `npm run report:allure`.
 
 Two different things happen on a push, and only one of them needs CI:
 
-| What                        | Trigger                                         | Where it shows                                           |
-| --------------------------- | ----------------------------------------------- | -------------------------------------------------------- |
-| The deployed API changes    | Render auto-deploy (already on)                 | `/metrics` on Render → `environment="production"` series |
-| The API suite is recorded   | `quality` job in `.github/workflows/ci.yml`     | `API test runs` markers (purple)                         |
-| The E2E suites are recorded | `e2e` and `e2e-local` jobs in the same workflow | `E2E test runs` markers (orange)                         |
+| What                     | Trigger                                                   | Where it shows                                           |
+| ------------------------ | --------------------------------------------------------- | -------------------------------------------------------- |
+| The deployed API changes | Render auto-deploy (already on)                           | `/metrics` on Render → `environment="production"` series |
+| The suites are recorded  | `sync-ci-annotations.mjs` on this host, every ten minutes | `API test runs` / `E2E test runs` markers                |
 
 Prometheus does the first part by itself: it scrapes Render every 60 s, so a
 successful deploy appears in the production series without any workflow. The
-annotations are what carry the test verdicts onto the same timeline.
+poller does the second.
 
-### 14.1 What the workflow does
+### 14.1 Why CI does not post to the dashboard
 
-Three jobs each run a suite, save a machine-readable report to `$RUNNER_TEMP`,
-and then post an annotation. The `quality` job runs the API suite once:
+A GitHub-hosted runner cannot reach `http://localhost:3001`. The stack binds
+every port to `127.0.0.1` in `docker-compose.yml`, and the alternative — a
+public URL to an admin tool — trades a missing marker for an exposed Grafana. A
+self-hosted runner would sit next to the stack, but this repository is public
+and a fork pull request can change the workflow it runs, which means arbitrary
+code on the machine that holds the database password.
 
-```yaml
-- name: Unit and integration tests
-  id: unit-tests
-  run: |
-    npm run build:packages
-    start=$(date +%s)
-    set +e
-    npm test --workspace @mystock/api -- \
-      --reporter=default \
-      --reporter=json \
-      --outputFile.json="$RUNNER_TEMP/api-test-results.json"
-    status=$?
-    set -e
-    echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
-    exit $status
+So the direction is reversed. CI already publishes every run, job and step
+through the public Actions API; the host reads it and writes the annotation.
+Nothing in `.github/workflows/ci.yml` mentions Grafana, and no secret is shared
+with the runner.
+
+### 14.2 Install the poller
+
+Windows Task Scheduler, every ten minutes, running as the signed-in user:
+
+```bat
+schtasks /Create /TN "Nexora CI annotations" /SC MINUTE /MO 10 /TR "\"C:\Program Files\nodejs\node.exe\" \"C:\Users\ou2se\OneDrive\Documents\mystock\infra\observability\scripts\sync-ci-annotations.mjs\"" /F
 ```
-
-The two Playwright jobs do the same, using the environment variable the configs
-look for:
-
-```yaml
-- name: Run E2E suite
-  id: e2e-tests
-  run: |
-    start=$(date +%s)
-    set +e
-    PLAYWRIGHT_JSON_OUTPUT_NAME="$RUNNER_TEMP/e2e-results.json" npm run test:e2e
-    status=$?
-    set -e
-    echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
-    exit $status
-```
-
-`e2e-local` is identical with `npm run test:e2e:local --workspace @mystock/web`
-and `e2e-local-results.json`.
-
-Then a best-effort step hands the report to `ci-annotate.sh`, which handles both
-report shapes and exits successfully even if Grafana is unreachable:
-
-```yaml
-- name: Record the E2E run in Grafana
-  if: always()
-  continue-on-error: true
-  env:
-    GRAFANA_URL: ${{ secrets.GRAFANA_URL }}
-    GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
-  run: |
-    bash infra/observability/scripts/ci-annotate.sh \
-      "$RUNNER_TEMP/e2e-results.json" \
-      "${{ steps.e2e-tests.outputs.seconds }}" \
-      "e2e desktop+mobile" "e2e-tests"
-```
-
-The `quality` job calls the same script with `api-test-results.json`,
-`"api ${GITHUB_SHA::7}"` and `api-tests`; `e2e-local` uses its own file and the
-suite label `e2e local stack desktop+mobile`.
-
-When the two secrets are absent — the state of a fresh fork, or a pull request
-from a fork — the step prints a skip message and the build stays green. The
-`--reporter=default` flag keeps the readable Vitest output in the job log; only
-the JSON file goes to `$RUNNER_TEMP`. A missing results file (the job died
-before writing one) is skipped rather than reported as zero failures.
-
-### 14.2 Make Grafana reachable from the runner
-
-GitHub-hosted runners cannot reach `http://localhost:3001` on your laptop. Pick
-one of these:
-
-| Option                        | `GRAFANA_URL`                 | Notes                                                                                                                              |
-| ----------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Self-hosted runner on this PC | `http://localhost:3001`       | The runner runs on the same machine as Docker; simplest for a single operator                                                      |
-| Grafana on a VPS              | `https://grafana.example.com` | Put it behind HTTPS and keep Prometheus unexposed; only Grafana needs to be public                                                 |
-| Grafana Cloud (free tier)     | `https://<org>.grafana.net`   | Reachable from CI; the local dashboard does not see those annotations, so either use Cloud for everything or forward metrics to it |
-| Tunnel (cloudflared/ngrok)    | the tunnel URL                | Works, but a public URL to an admin tool must be token-protected, rate-limited and short-lived                                     |
-
-Do not expose the local stack's ports as-is: they are deliberately bound to
-`127.0.0.1` in `docker-compose.yml`.
-
-### 14.3 Create the CI identity
-
-Use a **service account**, never the admin password:
-
-1. Grafana → Administration → Users and access → Service accounts → **Add
-   service account**.
-2. Name it `ci-annotations`, role **Editor** (Viewer cannot create
-   annotations).
-3. Add a token, copy the `glsa_...` value once.
-4. GitHub → Settings → Secrets and variables → Actions → add:
-   - `GRAFANA_URL`
-   - `GRAFANA_TOKEN`
-
-The repository secrets are only injected into trusted workflows, so forked pull
-requests skip the annotation automatically.
-
-### 14.4 Result
-
-On the next push to `main`, each job finishes and leaves a marker at the run's
-timestamp:
-
-```text
-api 3f9c2ab tests: 352 passed, 0 failed in 118s
-e2e desktop+mobile tests: 72 passed, 0 failed in 298s
-e2e local stack desktop+mobile tests: 36 passed, 0 failed in 152s
-```
-
-The first is purple (`api-tests`), the other two orange (`e2e-tests`). Each
-carries a `passed` or `failed` tag, so a red marker is visible on every panel
-and the whole set is queryable:
 
 ```bash
-curl -s -H "Authorization: Bearer $GRAFANA_TOKEN" \
-  "$GRAFANA_URL/api/annotations?tags=e2e-tests&limit=10"
+schtasks /Query /TN "Nexora CI annotations"
+schtasks /Run /TN "Nexora CI annotations"
 ```
 
-The token path was verified against the running stack: a temporary service
-account with the Editor role posted annotation `#2` (`api-tests`), after which
-the account was deleted. The first annotation (`#1`, `admin`) came from the
-password path, and `#3` was written by `ci-annotate.sh` from a real Playwright
-report (`e2e-tests`, 2 passed in 37 s).
+On a Linux host the equivalent is one cron line:
+
+```cron
+*/10 * * * * /usr/bin/node /path/to/mystock/infra/observability/scripts/sync-ci-annotations.mjs
+```
+
+The script reads `GRAFANA_ADMIN_PASSWORD` from `infra/observability/.env` when no
+`GRAFANA_TOKEN` is set, so the scheduled task carries no secret. Optional
+tunables: `GITHUB_REPOSITORY`, `CI_BRANCH`, `CI_RUN_LIMIT` (default 10),
+`CI_MAX_AGE_HOURS` (default 72), `GRAFANA_URL`.
+
+State lives in `infra/observability/.state/ci-annotations.json` (gitignored) and
+holds the runs already posted, so a tick that runs twice never draws a marker
+twice. If Grafana is down the script exits non-zero without recording the run,
+and the next tick retries it.
+
+### 14.3 What a marker looks like
+
+Each completed suite step becomes one annotation, spanning that step's own start
+and end:
+
+```text
+api a161e8e passed in 1m 3s
+e2e desktop+mobile a161e8e passed in 15s
+e2e local stack desktop+mobile a161e8e passed in 3m 46s
+```
+
+The first is purple (`api-tests`), the other two orange (`e2e-tests`). A step
+that did not succeed carries the `failed` tag, so a red marker is visible on
+every panel. Durations are the step's wall-clock: about a minute for the unit
+suite and four for the local-stack E2E suite. The hosted `e2e` job only runs
+`shell.spec.ts`, hence its 15 s.
+
+The first tick backfills up to ten runs from the last 72 hours; after that only
+new pushes appear. Query them directly:
+
+```bash
+curl -s -u "admin:$(grep '^GRAFANA_ADMIN_PASSWORD=' infra/observability/.env | cut -d= -f2-)" \
+  'localhost:3001/api/annotations?tags=e2e-tests&limit=10'
+```
+
+### 14.4 If the stack moves off this machine
+
+A hosted Grafana can be posted to directly:
+
+1. Grafana → Administration → Users and access → Service accounts → **Add
+   service account**, name it `ci-annotations`, role **Editor** (Viewer cannot
+   create annotations).
+2. Add a token, copy the `glsa_...` value once, and store it with the URL as the
+   repository secrets `GRAFANA_URL` / `GRAFANA_TOKEN`.
+3. From each job, best effort, send `{"text", "tags", "time"}` to
+   `$GRAFANA_URL/api/annotations`.
+
+Do not run both at once: the push and the poller would draw two markers for the
+same run. Retire the scheduled task when the push is live.
