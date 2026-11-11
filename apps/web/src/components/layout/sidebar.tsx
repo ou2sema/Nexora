@@ -4,6 +4,7 @@ import { NavLink, useLocation } from 'react-router';
 import { BrandMark } from '@/components/brand-mark';
 import { navItems } from '@/components/layout/nav-items';
 import { useOrganization } from '@/features/organizations/organization-provider';
+import { capabilitiesFor } from '@/features/organizations/permissions';
 import { useI18n } from '@/i18n/provider';
 import { cn } from '@/lib/cn';
 
@@ -13,15 +14,17 @@ interface SidebarProps {
 }
 
 export function Sidebar({ className, onNavigate }: SidebarProps) {
-  const { memberships, platformAdmin } = useOrganization();
+  const { memberships, organization, platformAdmin } = useOrganization();
   const { t } = useI18n();
   const { pathname } = useLocation();
   const navRef = useRef<HTMLElement>(null);
   const hasOrganization = memberships.length > 0;
+  const { workspace } = capabilitiesFor(organization?.role ?? memberships[0]?.role);
   const items = navItems.filter(
     (item) =>
       (!item.platformAdminOnly || platformAdmin) &&
-      (hasOrganization || item.requiresOrganization === false),
+      (hasOrganization || item.requiresOrganization === false) &&
+      (!item.workspaces || item.workspaces.includes(workspace)),
   );
 
   // A deep route should not leave its own highlight hidden below the scroll.
