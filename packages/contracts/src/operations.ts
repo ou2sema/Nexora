@@ -191,9 +191,21 @@ export const purchaseOrderStatusResultSchema = z.object({
 
 export type PurchaseOrderStatusResult = z.infer<typeof purchaseOrderStatusResultSchema>;
 
+export const purchaseReceiptTrackedItemSchema = z.object({
+  id: z.uuid(),
+  productId: z.uuid(),
+  lineId: z.uuid(),
+  unitCode: z.string(),
+  serialNumber: z.string().nullable(),
+  imei: z.string().nullable(),
+});
+
+export type PurchaseReceiptTrackedItem = z.infer<typeof purchaseReceiptTrackedItemSchema>;
+
 export const purchaseReceiptResultSchema = purchaseOrderStatusResultSchema.extend({
   receivedLines: z.number().int(),
   receivedQuantity: z.number(),
+  trackedItems: z.array(purchaseReceiptTrackedItemSchema),
 });
 
 export type PurchaseReceiptResult = z.infer<typeof purchaseReceiptResultSchema>;
@@ -204,6 +216,7 @@ export const purchaseOrderLineSchema = z.object({
   productSku: z.string(),
   productName: z.string(),
   isSerialized: z.boolean(),
+  isIndividuallyTracked: z.boolean(),
   quantityOrdered: z.number(),
   quantityReceived: z.number(),
   quantityReturned: z.number(),

@@ -244,7 +244,9 @@ export function ProductsPage() {
                     <td className="px-4 py-3 text-slate-600">
                       {product.isSerialized
                         ? t('products.trackingSerialized')
-                        : t('common.quantity')}
+                        : product.isIndividuallyTracked
+                          ? t('products.trackingIndividually')
+                          : t('common.quantity')}
                     </td>
                     <td className="px-4 py-3 text-end tabular-nums text-slate-700">
                       {product.reorderThreshold > 0

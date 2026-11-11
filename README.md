@@ -90,7 +90,9 @@ Authentication, tenant-scoped data access, and the catalog API are specified in
 idempotency, and device traceability are specified in
 [ADR-0005](docs/adr/0005-stock-ledger-and-device-traceability.md). Barcodes, scanning, labels,
 and inventory counts are specified in
-[ADR-0006](docs/adr/0006-barcodes-scanning-and-stock-counts.md). Reporting, exports, and
+[ADR-0006](docs/adr/0006-barcodes-scanning-and-stock-counts.md); per-unit identity for
+non-serialized products is specified in
+[ADR-0020](docs/adr/0020-individually-tracked-units.md). Reporting, exports, and
 authorized realtime are specified in
 [ADR-0007](docs/adr/0007-reporting-and-realtime.md). Suppliers, purchase orders, and outgoing
 orders are specified in
@@ -136,6 +138,9 @@ Grafana, a provisioned datasource and an API dashboard, plus scrape and alert ru
 
 See [`docs/observability.md`](docs/observability.md) for the full tutorial: local stack, pointing
 Prometheus at the Render service, the dashboard panels, alerts, security and troubleshooting.
+[`docs/observability-tools.md`](docs/observability-tools.md) is the reference for each tool —
+Prometheus, Alertmanager, Grafana, Slack and the supporting scripts — with their configuration
+surfaces, PromQL and alerting concepts, day-2 operations and per-tool failure modes.
 
 ## Authentication and API surface
 
@@ -256,13 +261,21 @@ the projection without touching historical movements. Serialized devices move th
 fixed status graph (`in_stock → reserved/sold/in_repair/lost/disposed`, …) and every change
 appends an immutable `device_events` row.
 
-`GET .../scan?code=` resolves a device serial or IMEI first, then a product barcode, SKU, or
-internal code, and returns either a device with its full context or a product with
-per-location stock lines. `POST .../products/:id/barcode` mints an EAN-13 in the GS1
-in-store `2` range with a valid check digit and is idempotent per product; manufacturer
-barcodes are never overwritten. `POST .../labels` returns a print-ready A4 PDF for up to
-50 product or device targets (1–20 copies each), choosing EAN-8/UPC-A/EAN-13/ITF-14 when
-the code is a valid GTIN and Code 128 otherwise.
+`GET .../scan?code=` resolves an individually tracked unit code first, then a device serial or
+IMEI, then a product barcode, SKU, or internal code, and returns the unit with its product and
+event history, a device with its full context, or a product with per-location stock lines.
+`POST .../products/:id/barcode` mints an EAN-13 in the GS1 in-store `2` range with a valid
+check digit and is idempotent per product; manufacturer barcodes are never overwritten.
+`POST .../labels` returns a print-ready A4 PDF for up to 50 product, device, or item targets
+(1–20 copies each), choosing EAN-8/UPC-A/EAN-13/ITF-14 when the code is a valid GTIN and
+Code 128 otherwise.
+
+Products can opt into `isIndividuallyTracked` (never together with `isSerialized`). Receiving
+such a line registers one `tracked_items` row and one distinct opaque `NX…` code per unit
+received, while the ledger still posts a single aggregate receipt — units describe quantity
+but never add it. The receipt response carries the unit codes, an idempotent replay returns
+the same codes, and item labels print one per unit. See
+[ADR-0020](docs/adr/0020-individually-tracked-units.md).
 
 Inventory counts are persisted sessions: only one count can be open per location, lines can
 be incremented by repeated scans or set directly, and posting writes one adjustment

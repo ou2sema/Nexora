@@ -1,23 +1,26 @@
-# The default receiver has no integrations: alerts are visible in Prometheus
-# and Alertmanager, but nothing is sent. Add an email, Slack or webhook
-# integration below, then `docker compose restart alertmanager`.
+# Alerts are delivered to Slack. The incoming-webhook URL is a secret: it lives
+# in infra/observability/secrets/slack_webhook (git-ignored) and is mounted
+# read-only at /etc/alertmanager-secrets. Alertmanager will not start until that
+# file exists — see docs/observability.md §6.
 route:
-  receiver: default
+  receiver: slack
   group_by: ['alertname', 'environment', 'severity']
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
 
 receivers:
-  - name: default
-    # email_configs:
-    #   - to: ops@example.com
-    #     from: alerts@example.com
-    #     smarthost: smtp.example.com:587
-    #     auth_username: alerts@example.com
-    #     auth_password_file: /etc/alertmanager/smtp_password
-    #
-    # slack_configs:
-    #   - api_url_file: /etc/alertmanager/slack_webhook
-    #     channel: '#nexora-alerts'
-    #     send_resolved: true
+  - name: slack
+    slack_configs:
+      - api_url_file: /etc/alertmanager-secrets/slack_webhook
+        send_resolved: true
+        # No `channel`: a Slack app webhook posts to the channel chosen at
+        # install time and ignores per-message overrides. Use one webhook and
+        # one receiver per destination channel.
+        title: '{{ .Status | toUpper }}: {{ .CommonLabels.alertname }} ({{ .CommonLabels.environment }})'
+        text: |-
+          {{ range .Alerts -}}
+          *{{ .Labels.alertname }}* — {{ .Labels.severity }}
+          {{ .Annotations.summary }}
+          {{ if .Annotations.description }}{{ .Annotations.description }}{{ end }}
+          {{ end }}

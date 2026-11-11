@@ -33,6 +33,14 @@ interface DeviceLabelRow {
   product_sku: string;
 }
 
+interface TrackedItemLabelRow {
+  id: string;
+  unit_code: string;
+  serial_number: string | null;
+  product_name: string;
+  product_sku: string;
+}
+
 interface LabelSpec {
   title: string;
   subtitle: string;
@@ -53,6 +61,14 @@ const PAGE_MARGIN_Y = 22;
 const GRID_COLUMNS = 3;
 const GRID_ROWS = 8;
 const CELL_HEIGHT = 100;
+
+const BARCODE_MAX_HEIGHT = 44;
+// The human-readable code sits under the bars, centred on them and spread to their width,
+// the way a retail label reads: bars and number are one block, not two lines of text.
+const CODE_MIN_SIZE = 8;
+const CODE_MAX_SIZE = 11;
+const CODE_WIDTH_SHARE = 0.94;
+const CODE_HEIGHT_SHARE = 0.3;
 
 // Eight 100 pt rows start 22 pt from the top, so the only free paper on an A4 sheet is
 // the bottom margin. Branding goes there: the grid itself never moves, because these
@@ -102,6 +118,21 @@ function fitText(font: PDFFont, size: number, text: string, maxWidth: number): s
   return `${cut}…`;
 }
 
+function codeSize(
+  font: PDFFont,
+  code: string,
+  barcodeWidth: number,
+  barcodeHeight: number,
+): number {
+  const widthAtOne = font.widthOfTextAtSize(code, 1);
+  if (widthAtOne <= 0) return CODE_MIN_SIZE;
+  const ideal = Math.min(
+    (barcodeWidth * CODE_WIDTH_SHARE) / widthAtOne,
+    barcodeHeight * CODE_HEIGHT_SHARE,
+  );
+  return Math.min(CODE_MAX_SIZE, Math.max(CODE_MIN_SIZE, Math.round(ideal * 2) / 2));
+}
+
 @Injectable()
 export class LabelsService {
   constructor(private readonly access: TenantAccessService) {}
@@ -115,6 +146,9 @@ export class LabelsService {
       ];
       const deviceIds = [
         ...new Set(input.items.flatMap((item) => (item.kind === 'device' ? [item.deviceId] : []))),
+      ];
+      const itemIds = [
+        ...new Set(input.items.flatMap((item) => (item.kind === 'item' ? [item.itemId] : []))),
       ];
 
       const productRows = productIds.length
@@ -152,6 +186,25 @@ export class LabelsService {
       const productById = new Map(productRows.map((row) => [row.id, row]));
       const deviceById = new Map(deviceRows.map((row) => [row.id, row]));
 
+      const itemRows = itemIds.length
+        ? resultRows<TrackedItemLabelRow>(
+            await tx.execute(sql`
+              select t.id, t.unit_code, t.serial_number,
+                     p.name as product_name, p.sku as product_sku
+              from public.tracked_items t
+              join public.products p
+                on p.id = t.product_id and p.organization_id = t.organization_id
+              where t.organization_id = ${organizationId}
+                and t.id in (${sql.join(
+                  itemIds.map((id) => sql`${id}::uuid`),
+                  sql`, `,
+                )})
+            `),
+          )
+        : [];
+
+      const itemById = new Map(itemRows.map((row) => [row.id, row]));
+
       const labels: LabelSpec[] = [];
       for (const item of input.items) {
         const copies = item.copies ?? 1;
@@ -168,15 +221,29 @@ export class LabelsService {
           continue;
         }
 
-        const device = deviceById.get(item.deviceId);
-        if (!device) {
-          throw new AppError('device_not_found', 'Device not found.', 404);
+        if (item.kind === 'device') {
+          const device = deviceById.get(item.deviceId);
+          if (!device) {
+            throw new AppError('device_not_found', 'Device not found.', 404);
+          }
+          const subtitle = device.imei
+            ? `SKU ${device.product_sku} · IMEI ${device.imei}`
+            : `SKU ${device.product_sku}`;
+          for (let copy = 0; copy < copies; copy += 1) {
+            labels.push({ title: device.product_name, subtitle, code: device.serial_number });
+          }
+          continue;
         }
-        const subtitle = device.imei
-          ? `SKU ${device.product_sku} · IMEI ${device.imei}`
-          : `SKU ${device.product_sku}`;
+
+        const tracked = itemById.get(item.itemId);
+        if (!tracked) {
+          throw new AppError('tracked_item_not_found', 'Tracked item not found.', 404);
+        }
+        const subtitle = tracked.serial_number
+          ? `SKU ${tracked.product_sku} · SN ${tracked.serial_number}`
+          : `SKU ${tracked.product_sku}`;
         for (let copy = 0; copy < copies; copy += 1) {
-          labels.push({ title: device.product_name, subtitle, code: device.serial_number });
+          labels.push({ title: tracked.product_name, subtitle, code: tracked.unit_code });
         }
       }
 
@@ -206,7 +273,6 @@ export class LabelsService {
 
     const regular = await document.embedFont(StandardFonts.Helvetica);
     const bold = await document.embedFont(StandardFonts.HelveticaBold);
-    const mono = await document.embedFont(StandardFonts.Courier);
     const logoImage = identity.logo ? await embedLogoImage(document, identity.logo) : null;
 
     const barcodeCache = new Map<string, Awaited<ReturnType<typeof document.embedPng>>>();
@@ -258,22 +324,27 @@ export class LabelsService {
 
       const image = barcodeCache.get(label.code);
       if (image) {
-        const maxImageWidth = cellWidth - 20;
-        const maxImageHeight = 44;
-        const scale = Math.min(maxImageWidth / image.width, maxImageHeight / image.height);
+        const scale = Math.min((cellWidth - 20) / image.width, BARCODE_MAX_HEIGHT / image.height);
         const imageWidth = image.width * scale;
         const imageHeight = image.height * scale;
+        const imageX = left + (cellWidth - imageWidth) / 2;
+        const imageY = top - 26 - imageHeight;
+
         page.drawImage(image, {
-          x: left + (cellWidth - imageWidth) / 2,
-          y: top - 26 - imageHeight,
+          x: imageX,
+          y: imageY,
           width: imageWidth,
           height: imageHeight,
         });
-        page.drawText(fitText(mono, 8, label.code, maxTextWidth), {
-          x: left + 8,
-          y: top - 78,
-          size: 8,
-          font: mono,
+
+        const size = codeSize(regular, label.code, imageWidth, imageHeight);
+        const printed = fitText(regular, size, label.code, imageWidth);
+        const textWidth = regular.widthOfTextAtSize(printed, size);
+        page.drawText(printed, {
+          x: imageX + (imageWidth - textWidth) / 2,
+          y: imageY - size * 0.8,
+          size,
+          font: regular,
           color: rgb(0.08, 0.1, 0.15),
         });
       }

@@ -122,11 +122,18 @@ export function ScanningPage() {
     try {
       const scanned = await scanCode(organizationId, token, code);
       setResult(scanned);
-      setNotice(
-        scanned.kind === 'device'
-          ? t('scan.notice.device', { serial: scanned.device.serialNumber })
-          : t('scan.notice.product', { product: scanned.product.name }),
-      );
+      if (scanned.kind === 'tracked_item') {
+        setNotice(
+          t('scan.notice.trackedItem', {
+            code: scanned.item.unitCode,
+            product: scanned.item.productName,
+          }),
+        );
+      } else if (scanned.kind === 'device') {
+        setNotice(t('scan.notice.device', { serial: scanned.device.serialNumber }));
+      } else {
+        setNotice(t('scan.notice.product', { product: scanned.product.name }));
+      }
       if (mode === 'receive') dock.onResolved(scanned);
     } catch (error) {
       // A code the server cannot resolve is, at the dock, the serial of a unit that has
@@ -393,7 +400,11 @@ export function ScanningPage() {
 
         <aside className="space-y-6">
           {mode === 'receive' ? (
-            <ReceiveDock dock={dock} canWrite={canWrite} />
+            <ReceiveDock
+              dock={dock}
+              canWrite={canWrite}
+              onPrintLabels={(targets) => setLabelTargets(targets)}
+            />
           ) : (
             <>
               <CountWorkflowPanel

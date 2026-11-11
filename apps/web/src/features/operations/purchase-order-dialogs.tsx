@@ -649,6 +649,11 @@ export function PurchaseOrderDetailDialog({
                               count: formatQuantity(line.quantityOrdered - line.quantityReceived),
                             })}
                           </p>
+                          {line.isIndividuallyTracked && (
+                            <p className="text-xs text-slate-500">
+                              {t('purchasing.receipt.trackedHint')}
+                            </p>
+                          )}
                         </div>
                         {line.isSerialized ? (
                           <textarea

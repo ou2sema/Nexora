@@ -111,6 +111,7 @@ export const products = pgTable('products', {
     .notNull()
     .default('0'),
   isSerialized: boolean('is_serialized').notNull().default(false),
+  isIndividuallyTracked: boolean('is_individually_tracked').notNull().default(false),
   status: text('status').$type<ProductStatus>().notNull().default('active'),
   attributes: jsonb('attributes').$type<Record<string, unknown>>().notNull().default({}),
   imagePath: text('image_path'),

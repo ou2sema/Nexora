@@ -169,11 +169,19 @@ order, `receive_purchase_order` registers the devices and their `registered` eve
 same transaction as the receipt; it posts no quantity movement for those lines. Quantity-tracked
 products use the stock RPCs.
 
-Scan lookups (`GET .../scan?code=`) are available to every member and resolve a device serial
-or IMEI before a product barcode, SKU, or internal code. Barcode assignment and every count
-mutation require owner, admin, or manager. Labels are a PDF download; the SPA requests them
-with the bearer token and saves the blob, so the token never appears in a URL. Count posting
-requires `Idempotency-Key` like the other stock mutations.
+Scan lookups (`GET .../scan?code=`) are available to every member and resolve an individually
+tracked unit code first, then a device serial or IMEI, then a product barcode, SKU, or
+internal code. Barcode assignment and every count mutation require owner, admin, or manager.
+
+Products can opt into `isIndividuallyTracked` at creation (never together with
+`isSerialized`). Receiving a tracked line creates one `tracked_items` row and one Code 128
+friendly `NX…` unit code per unit actually received, while the ledger still gets a single
+aggregate `receipt` movement — units never add quantity. The receipt response carries the unit
+codes, and an idempotent replay returns the same codes. See ADR-0020.
+
+Labels are a PDF download; the SPA requests them with the bearer token and saves the blob, so
+the token never appears in a URL. Count posting requires `Idempotency-Key` like the other
+stock mutations.
 
 ## Barcode workflow verification
 
@@ -212,6 +220,34 @@ inside the guard window was ignored, a denied camera permission left manual entr
 1-unit scan receipt posted, product and device labels downloaded as 1-page A4 PDFs, and an
 inventory count at `MAIN / A-01` recorded `CABLE-01` at 9 and posted with 0 adjustments
 (on-hand unchanged). No defects surfaced.
+
+## Individually tracked units
+
+Tracked-unit coverage runs without a hosted project:
+
+```powershell
+npm run test --workspace @mystock/api -- test/db/tracked-items.test.ts test/api/scanning.test.ts
+```
+
+The database suite proves five receipts make five distinct codes and one movement, unit codes
+are unique and format-checked, a retry returns the same codes with no extra stock, a failure
+in a later line rolls the whole receipt back, tenant reads are isolated, and bulk products are
+unchanged. To exercise it by hand:
+
+1. **Catalog → New product**, turn on **Individually tracked** (the serialized switch turns
+   off, and vice versa), and save.
+2. **Purchasing**: order three or more units of that product, then open the order in
+   **Scanning → Receive**.
+3. Scan the shared product barcode once — the dock queues one unit and names the product.
+   Enter the remaining quantity, then **Post receipt**. The order becomes received.
+4. Click **Print N unit labels**. The dialog lists one distinct `NX…` code per unit, not N
+   copies of the product barcode; download the PDF and confirm each label prints its own code
+   with the product name and SKU.
+5. **Scanning → Look up** one unit code: the card says **Individually tracked unit**, shows the
+   unit's product, location, status, purchase order, received date, and unit history. Looking
+   up the shared product barcode still shows the quantity card with total on hand.
+6. Sign in as a viewer: scans and unit history read normally, receiving and label downloads
+   from another tenant's code are refused.
 
 ## Reporting and realtime verification
 

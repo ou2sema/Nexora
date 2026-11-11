@@ -78,6 +78,7 @@ export const purchasing: PurchasingMessages = {
   'purchasing.receipt.remaining': 'Restant : {count}',
   'purchasing.receipt.serialsLabel': 'Numéros de série pour {sku}',
   'purchasing.receipt.quantityLabel': 'Quantité à réceptionner pour {sku}',
+  'purchasing.receipt.trackedHint': 'Une étiquette sera créée pour chaque unité reçue.',
   'purchasing.receipt.empty':
     'Saisissez une quantité ou au moins un numéro de série à réceptionner.',
   'purchasing.receipt.posted.zero': 'Reçu {count} unité · {status}',

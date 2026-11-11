@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { Send, X } from 'lucide-react';
+import { Printer, Send, X } from 'lucide-react';
 
 import type {
   PurchaseOrderLineSummary,
   PurchaseOrderSummary,
+  PurchaseReceiptTrackedItem,
   ScanResult,
 } from '@mystock/contracts';
 
@@ -32,6 +33,7 @@ import {
   type CollectOutcome,
   type DockState,
 } from './dock-receipt';
+import type { LabelTarget } from './label-dialog';
 
 interface DockMessage {
   key: MessageKey;
@@ -55,6 +57,7 @@ export function useReceiveDock(organizationId: string | null) {
   const [state, setState] = useState<DockState>({});
   const [collectorId, setCollectorId] = useState<string | null>(null);
   const [message, setMessage] = useState<DockMessage | null>(null);
+  const [lastTrackedItems, setLastTrackedItems] = useState<PurchaseReceiptTrackedItem[]>([]);
 
   const ordered = usePurchaseOrders(organizationId, {
     search: '',
@@ -147,6 +150,14 @@ export function useReceiveDock(organizationId: string | null) {
       return;
     }
 
+    if (result.kind === 'tracked_item') {
+      setMessage({
+        key: 'scan.dock.alreadyRegisteredUnit',
+        values: { code: result.item.unitCode, product: result.item.productName },
+      });
+      return;
+    }
+
     if (result.kind === 'device') {
       const onOrder = lines.some((line) => line.productId === result.device.productId);
       setMessage({
@@ -221,6 +232,7 @@ export function useReceiveDock(organizationId: string | null) {
     setState({});
     setCollectorId(null);
     setMessage(null);
+    setLastTrackedItems([]);
   };
 
   const post = async () => {
@@ -236,6 +248,7 @@ export function useReceiveDock(organizationId: string | null) {
       const result = await receive.mutateAsync({ purchaseOrderId: order.data.id, input });
       setState({});
       setCollectorId(null);
+      setLastTrackedItems(result.trackedItems);
       // A finished order leaves the picker, so the next delivery is the one in the room.
       if (result.status === 'received') setPurchaseOrderId('');
       setMessage({
@@ -271,6 +284,7 @@ export function useReceiveDock(organizationId: string | null) {
     posting: receive.isPending,
     postError: receive.error ? errorMessage(receive.error, 'purchasing.receipt.failed') : null,
     message,
+    lastTrackedItems,
   };
 }
 
@@ -356,6 +370,10 @@ function DockLineRow({
         </label>
       )}
 
+      {line.isIndividuallyTracked && (
+        <p className="mt-1 text-xs text-slate-500">{t('scan.dock.trackedHint')}</p>
+      )}
+
       {queued > 0 && (
         <button
           type="button"
@@ -370,7 +388,15 @@ function DockLineRow({
   );
 }
 
-export function ReceiveDock({ dock, canWrite }: { dock: ReceiveDockApi; canWrite: boolean }) {
+export function ReceiveDock({
+  dock,
+  canWrite,
+  onPrintLabels,
+}: {
+  dock: ReceiveDockApi;
+  canWrite: boolean;
+  onPrintLabels?: (targets: LabelTarget[]) => void;
+}) {
   const { t, plural } = useI18n();
   const order = dock.order;
 
@@ -442,20 +468,47 @@ export function ReceiveDock({ dock, canWrite }: { dock: ReceiveDockApi; canWrite
                     lines: plural('scan.dock.lines', dock.totals.open),
                   })}
             </Button>
-
-            {dock.postError ? (
-              <p role="alert" className="text-sm text-rose-700">
-                {dock.postError}
-              </p>
-            ) : (
-              dock.message && (
-                <p role="status" className="text-sm text-slate-600">
-                  {t(dock.message.key, dock.message.values)}
-                </p>
-              )
-            )}
           </div>
         </>
+      )}
+
+      {/* A fully received order leaves the picker, so its confirmation and the labels
+          for the units just registered must render outside the order block. */}
+      {(dock.postError || dock.message || (dock.lastTrackedItems.length > 0 && onPrintLabels)) && (
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          {dock.postError ? (
+            <p role="alert" className="text-sm text-rose-700">
+              {dock.postError}
+            </p>
+          ) : (
+            dock.message && (
+              <p role="status" className="text-sm text-slate-600">
+                {t(dock.message.key, dock.message.values)}
+              </p>
+            )
+          )}
+
+          {dock.lastTrackedItems.length > 0 && onPrintLabels && (
+            <Button
+              variant="secondary"
+              disabled={dock.posting}
+              onClick={() =>
+                onPrintLabels(
+                  dock.lastTrackedItems.map((item) => ({
+                    kind: 'item',
+                    id: item.id,
+                    title: item.unitCode,
+                  })),
+                )
+              }
+            >
+              <Printer aria-hidden="true" className="size-4" />
+              {t('scan.dock.printUnitLabels', {
+                labels: plural('scan.dock.units', dock.lastTrackedItems.length),
+              })}
+            </Button>
+          )}
+        </div>
       )}
     </section>
   );

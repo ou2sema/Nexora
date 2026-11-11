@@ -23,6 +23,7 @@ export const catalog: CatalogMessages = {
   'products.caption': 'منتجات هذه المؤسسة',
   'products.noBarcode': 'لم يُعيَّن رمز شريطي',
   'products.trackingSerialized': 'بأرقام تسلسلية',
+  'products.trackingIndividually': 'تتبّع فردي',
   'products.column.salePrice': 'سعر البيع',
   'products.column.tracking': 'التتبع',
   'products.column.reorderAt': 'حد إعادة الطلب',
@@ -43,6 +44,9 @@ export const catalog: CatalogMessages = {
   'productForm.reorderThreshold': 'حد إعادة الطلب',
   'productForm.serialized': 'تتبع أرقام التسلسل الفردية',
   'productForm.serializedHint': 'تستخدم تنبيهات المخزون المنخفض هذا الحد؛ وتعطّلها القيمة 0.',
+  'productForm.individuallyTracked': 'تتبّع باركود واحد لكل وحدة مادية',
+  'productForm.individuallyTrackedHint':
+    'تحصل كل وحدة مستلمة على رمز داخلي دائم وملصق خاص بها. يبقى الرقم التسلسلي للمصنّع اختياريًا.',
   'productForm.failed': 'تعذّر إنشاء المنتج.',
   'productForm.create': 'إنشاء منتج',
   'productForm.skuRequired': 'أدخل SKU',

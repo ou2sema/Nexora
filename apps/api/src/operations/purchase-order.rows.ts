@@ -36,6 +36,7 @@ export interface PurchaseOrderLineRow {
   product_sku: string;
   product_name: string;
   is_serialized: boolean;
+  is_individually_tracked: boolean;
   quantity_ordered: string;
   quantity_received: string;
   quantity_returned: string | number;
@@ -159,6 +160,7 @@ export function toPurchaseOrderLine(row: PurchaseOrderLineRow) {
     productSku: row.product_sku,
     productName: row.product_name,
     isSerialized: row.is_serialized,
+    isIndividuallyTracked: row.is_individually_tracked,
     quantityOrdered: toNumber(row.quantity_ordered),
     quantityReceived: toNumber(row.quantity_received),
     quantityReturned: toNumber(row.quantity_returned),

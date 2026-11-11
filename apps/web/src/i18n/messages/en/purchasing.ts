@@ -73,6 +73,7 @@ export const purchasing = {
   'purchasing.receipt.remaining': 'Remaining {count}',
   'purchasing.receipt.serialsLabel': 'Serial numbers for {sku}',
   'purchasing.receipt.quantityLabel': 'Quantity to receive for {sku}',
+  'purchasing.receipt.trackedHint': 'One unit label will be created for each unit received.',
   'purchasing.receipt.empty': 'Enter a quantity or at least one serial number to receive.',
   'purchasing.receipt.posted.zero': 'Received {count} units · {status}',
   'purchasing.receipt.posted.one': 'Received {count} unit · {status}',

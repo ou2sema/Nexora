@@ -1,0 +1,1015 @@
+{
+  "@@locale": "en",
+  "appTagline": "Your stock, in perspective.",
+  "navHome": "Home",
+  "navInventory": "Inventory",
+  "navScan": "Scan",
+  "navSell": "Sell",
+  "navMore": "More",
+  "commonRetry": "Try again",
+  "commonRefresh": "Refresh",
+  "commonLoading": "Loading…",
+  "commonSave": "Save",
+  "commonSaving": "Saving…",
+  "commonCancel": "Cancel",
+  "commonCreate": "Create",
+  "commonAdd": "Add",
+  "commonEdit": "Edit",
+  "commonRemove": "Remove",
+  "commonDelete": "Delete",
+  "commonClose": "Close",
+  "commonConfirm": "Confirm",
+  "commonBack": "Back",
+  "commonNext": "Next",
+  "commonSearch": "Search",
+  "commonClear": "Clear",
+  "commonAll": "All",
+  "commonNone": "None",
+  "commonOptional": "Optional",
+  "commonStatus": "Status",
+  "commonDate": "Date",
+  "commonEmail": "Email",
+  "commonName": "Name",
+  "commonReason": "Reason",
+  "commonReference": "Reference",
+  "commonNotes": "Notes",
+  "commonQuantity": "Quantity",
+  "commonLocation": "Location",
+  "commonWarehouse": "Warehouse",
+  "commonOrganization": "Organization",
+  "commonProduct": "Product",
+  "commonCategory": "Category",
+  "commonBrand": "Brand",
+  "commonDevice": "Device",
+  "commonSupplier": "Supplier",
+  "commonCustomer": "Customer",
+  "commonTotal": "Total",
+  "commonUnits": "units",
+  "commonActions": "Actions",
+  "commonDetails": "Details",
+  "commonViewAll": "View all",
+  "commonApply": "Apply",
+  "commonReset": "Reset",
+  "commonDone": "Done",
+  "commonNew": "New",
+  "commonYes": "Yes",
+  "commonNo": "No",
+  "commonLanguage": "Language",
+  "commonSignOut": "Sign out",
+  "commonPlatformAdmin": "Platform admin",
+  "commonFilters": "Filters",
+  "commonSort": "Sort",
+  "commonPageOf": "Page {page} of {pages}",
+  "@commonPageOf": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      },
+      "pages": {
+        "type": "int"
+      }
+    }
+  },
+  "commonPrevious": "Previous",
+  "commonError": "Something went wrong",
+  "commonSuccess": "Done",
+  "commonRequired": "Required",
+  "commonInvalidNumber": "Enter a valid number",
+  "commonInvalidAmount": "Enter a valid amount with up to three decimals",
+  "commonNoResults": "No results",
+  "commonEmpty": "Nothing here yet",
+  "commonAllWarehouses": "All warehouses",
+  "commonVat": "VAT",
+  "commonUnitPrice": "Unit price",
+  "commonSku": "SKU",
+  "commonSerial": "Serial",
+  "commonImei": "IMEI",
+  "commonRate": "Rate",
+  "commonAmount": "Amount",
+  "commonNote": "Note",
+  "commonType": "Type",
+  "commonFrom": "From",
+  "commonTo": "To",
+  "commonBy": "by {name}",
+  "@commonBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commonAt": "at {time}",
+  "@commonAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "commonOf": "of",
+  "commonItems": "items",
+  "commonToday": "Today",
+  "commonSearchWorkflows": "Search workflows, screens and actions",
+  "commonViewDocument": "View document",
+  "commonDownload": "Download",
+  "commonShare": "Share",
+  "commonSavedToPhone": "Saved on this phone",
+  "commonOpen": "Open",
+  "commonSelect": "Select",
+  "authSignInTitle": "Sign in",
+  "authSignUpTitle": "Create your account",
+  "authSignInSubtitle": "Use the email and password linked to your invitation.",
+  "authSignUpSubtitle": "The account can join or create an organization afterwards.",
+  "authEmail": "Email",
+  "authPassword": "Password",
+  "authSignIn": "Sign in",
+  "authSignUp": "Create account",
+  "authHaveAccount": "Already have an account?",
+  "authCreateOne": "Create an account",
+  "authCheckInbox": "Check your inbox",
+  "authConfirmationSent": "We sent a confirmation link to {email}. Confirm it, then sign in.",
+  "@authConfirmationSent": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "authBackToSignIn": "Back to sign in",
+  "authInvalidEmail": "Enter a valid email address",
+  "authPasswordTooShort": "Use at least 8 characters",
+  "authFailed": "Sign-in failed.",
+  "authWelcomeBack": "Welcome back",
+  "authSessionExpired": "Your session expired. Sign in again.",
+  "authSecureNote": "Your session is stored in the device's secure storage.",
+  "orgChooseTitle": "Choose a workspace",
+  "orgChooseSubtitle": "You belong to more than one organization.",
+  "orgSwitch": "Switch organization",
+  "orgCurrent": "Current organization",
+  "orgPendingTitle": "You have {count, plural, =1{an invitation} other{invitations}}",
+  "@orgPendingTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "orgPendingBody": "Accept the invitation to join the organization.",
+  "orgAccept": "Accept invitation",
+  "orgAccepting": "Accepting…",
+  "orgAccepted": "Invitation accepted",
+  "orgExpires": "Expires {date}",
+  "@orgExpires": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "orgNoMembershipsTitle": "No workspace yet",
+  "orgNoMembershipsBody": "Your account is not a member of any organization. Ask an owner or administrator to invite you, or contact your Nexora platform administrator.",
+  "orgNoMembershipsNote": "Nexora sends no outbound email; the owner invites your address and you accept it here after signing in.",
+  "orgRole": "Role",
+  "orgMemberOf": "Member of {organization}",
+  "@orgMemberOf": {
+    "placeholders": {
+      "organization": {
+        "type": "String"
+      }
+    }
+  },
+  "roleOwner": "Owner",
+  "roleAdmin": "Admin",
+  "roleManager": "Manager",
+  "roleViewer": "Viewer",
+  "homeStockValuation": "Stock valuation",
+  "homeVsLastMonth": "{change} vs. last month · at cost",
+  "@homeVsLastMonth": {
+    "placeholders": {
+      "change": {
+        "type": "String"
+      }
+    }
+  },
+  "homeOnHand": "On hand",
+  "homeReserved": "Reserved",
+  "homeAvailable": "Available",
+  "homeStartOperation": "Start an operation",
+  "homeNewSale": "New sale",
+  "homeScanItem": "Scan item",
+  "homeNeedsAttention": "Needs attention",
+  "homeAllAlerts": "All {count} alerts",
+  "@homeAllAlerts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeBelowReorder": "Below reorder level",
+  "homeLowStockEmpty": "Nothing needs attention right now.",
+  "homeRecentActivity": "Recent activity",
+  "homeNoActivity": "No movements in this window.",
+  "homeWindowLast7": "7 days",
+  "homeWindowLast30": "30 days",
+  "homeWindowLast90": "90 days",
+  "homeOpenInventory": "Open inventory",
+  "homeHealthOnline": "API online",
+  "homeHealthOffline": "API unreachable",
+  "homeHealthChecking": "Checking API…",
+  "homeStale": "Last refreshed {time}",
+  "@homeStale": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "inventoryTitle": "Inventory",
+  "inventorySubtitle": "Stock on hand, by shelf",
+  "inventorySearchHint": "Search product, SKU or serial",
+  "inventoryAllCategories": "All categories",
+  "inventoryStockOverview": "Stock overview",
+  "inventoryProductsUnits": "{products} products · {units} available units",
+  "@inventoryProductsUnits": {
+    "placeholders": {
+      "products": {
+        "type": "String"
+      },
+      "units": {
+        "type": "String"
+      }
+    }
+  },
+  "inventorySortName": "Name A-Z",
+  "inventoryInStock": "In stock",
+  "inventoryLowStock": "Low stock",
+  "inventoryOutOfStock": "Out of stock",
+  "inventoryAvailableReserved": "{available} available · {reserved} reserved",
+  "@inventoryAvailableReserved": {
+    "placeholders": {
+      "available": {
+        "type": "String"
+      },
+      "reserved": {
+        "type": "String"
+      }
+    }
+  },
+  "inventoryNoProducts": "No products match this search.",
+  "inventoryProductDetails": "Product details",
+  "inventoryStockByLocation": "Stock by location",
+  "inventoryAllWarehouses": "All warehouses",
+  "inventoryAvailableFormula": "Available = on hand − reserved",
+  "inventoryDeviceTraceability": "Device traceability",
+  "inventorySelectedDevice": "Selected device",
+  "inventoryViewDevices": "View all {count}",
+  "@inventoryViewDevices": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "inventorySerialized": "Serialized",
+  "inventoryIndividuallyTracked": "Tracked units",
+  "inventoryIndividuallyTrackedHint": "Each received unit gets its own barcode and record.",
+  "inventoryBulk": "Bulk",
+  "inventoryReorderLevel": "Reorder level",
+  "inventoryBarcode": "Barcode",
+  "inventoryInternalCode": "Internal code",
+  "inventoryDescription": "Description",
+  "inventoryCategoryBrand": "Category and brand",
+  "inventoryNoDevices": "No devices registered for this product.",
+  "inventoryDeviceCount": "{count, plural, =0{No devices} =1{1 device} other{{count} devices}}",
+  "@inventoryDeviceCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "inventoryOnHandShort": "On hand",
+  "inventoryReservedShort": "Reserved",
+  "inventoryAvailableShort": "Available",
+  "inventoryPriceMinor": "Retail price",
+  "inventoryCostMinor": "Cost",
+  "inventoryVatRate": "{rate}% VAT",
+  "@inventoryVatRate": {
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "scanTitle": "Scan item",
+  "scanSubtitle": "Barcode, SKU or device serial",
+  "scanCameraActive": "Camera active",
+  "scanKeepInside": "Keep the barcode or serial inside the frame",
+  "scanEnterManually": "Or enter a code manually",
+  "scanPlaceholder": "Barcode, serial, SKU or internal code",
+  "scanResolve": "Resolve code",
+  "scanDeviceFound": "Device found",
+  "scanProductFound": "Product found",
+  "scanNotFound": "No match for this code",
+  "scanPermissionTitle": "Camera access",
+  "scanPermissionBody": "Nexora uses the camera only while this screen is open, to read barcodes and serial numbers. Manual entry always works.",
+  "scanPermissionDenied": "Camera permission was denied. Enter the code manually or allow camera access in Android settings.",
+  "scanStartCamera": "Start camera",
+  "scanStopCamera": "Stop camera",
+  "scanTorch": "Torch",
+  "scanUseDeviceToSell": "Use this device to sell",
+  "scanAddToBasket": "Add to basket",
+  "scanViewProduct": "Open product",
+  "scanAvailableAt": "{warehouse} · {location}",
+  "@scanAvailableAt": {
+    "placeholders": {
+      "warehouse": {
+        "type": "String"
+      },
+      "location": {
+        "type": "String"
+      }
+    }
+  },
+  "scanWrongLocation": "This unit is on another shelf and cannot join a sale from this one.",
+  "scanAlreadyInBasket": "{serial} is already in the basket.",
+  "@scanAlreadyInBasket": {
+    "placeholders": {
+      "serial": {
+        "type": "String"
+      }
+    }
+  },
+  "scanDeviceNotInStock": "{serial} is not available for sale.",
+  "@scanDeviceNotInStock": {
+    "placeholders": {
+      "serial": {
+        "type": "String"
+      }
+    }
+  },
+  "scanManualHint": "A USB or Bluetooth scanner types into this field. Enter also resolves it.",
+  "scanHardwareHint": "Keyboard-wedge scanners work here; the camera and typed entry stay available.",
+  "scanScanning": "Resolving…",
+  "scanStockLines": "Stock by location",
+  "scanTrackedItemFound": "Unit found",
+  "scanProductBarcode": "Product barcode",
+  "scanSerialNumber": "Serial number",
+  "scanPurchaseOrder": "Purchase order",
+  "scanReceivedAt": "Received",
+  "scanHistory": "Unit history",
+  "scanNoHistory": "No movements recorded yet.",
+  "scanPrintLabel": "Print label",
+  "scanTrackedEventReceived": "Received into stock",
+  "scanTrackedEventMoved": "Moved",
+  "scanTrackedEventSold": "Sold",
+  "scanTrackedEventReturned": "Returned",
+  "scanTrackedEventMarkedLost": "Marked lost",
+  "scanTrackedEventStatusChanged": "Status changed",
+  "saleTitle": "Counter sale",
+  "saleSubtitle": "Scan or search, name the buyer, take payment",
+  "saleDraft": "Draft · {products} products / {units} units",
+  "@saleDraft": {
+    "placeholders": {
+      "products": {
+        "type": "int"
+      },
+      "units": {
+        "type": "String"
+      }
+    }
+  },
+  "saleStepBasket": "Basket",
+  "saleStepPayment": "Payment",
+  "saleStepDone": "Done",
+  "saleSearchHint": "Add by name, SKU or scan",
+  "saleBuyer": "Buyer",
+  "saleChangeBuyer": "Change",
+  "saleBasketHeading": "Basket",
+  "saleTaxExclusive": "TND · excl. VAT",
+  "saleRemoveLine": "Remove line",
+  "saleDeviceLine": "1 device × {price}",
+  "@saleDeviceLine": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "saleUnitLine": "{quantity} × {price}",
+  "@saleUnitLine": {
+    "placeholders": {
+      "quantity": {
+        "type": "String"
+      },
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "salePriceOverride": "Price",
+  "saleTaxRate": "VAT rate",
+  "saleSubtotal": "Net subtotal",
+  "saleVatLine": "VAT · {rate}%",
+  "@saleVatLine": {
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "saleTotalLine": "Total · TND",
+  "saleReviewPay": "Review & pay",
+  "saleReviewTitle": "Review & pay",
+  "saleReviewSubtitle": "Counter sale · {units}",
+  "@saleReviewSubtitle": {
+    "placeholders": {
+      "units": {
+        "type": "String"
+      }
+    }
+  },
+  "saleBuyerDetails": "Buyer details",
+  "salePaymentMethod": "Payment method",
+  "saleCash": "Cash",
+  "saleTransfer": "Transfer",
+  "saleCard": "Card",
+  "saleCredit": "Credit",
+  "saleCardHint": "Card payments are recorded manually, no terminal charge.",
+  "saleCashTendered": "Cash tendered · TND",
+  "salePaymentRecorded": "Payment recorded",
+  "saleChangeToReturn": "Change to return",
+  "saleChangeHint": "Excess cash is change, not an invoice overpayment.",
+  "saleAdditionalDetails": "Additional details",
+  "saleAdditionalHint": "Reference, notes",
+  "saleConfirmSale": "Confirm sale · TND {total}",
+  "@saleConfirmSale": {
+    "placeholders": {
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "salePosting": "Posting the sale…",
+  "saleCompleteTitle": "Sale complete",
+  "saleCompleteBody": "Invoice issued for {buyer}. {units} sold from {location}.",
+  "@saleCompleteBody": {
+    "placeholders": {
+      "buyer": {
+        "type": "String"
+      },
+      "units": {
+        "type": "String"
+      },
+      "location": {
+        "type": "String"
+      }
+    }
+  },
+  "saleAllPaid": "All paid. Sale complete.",
+  "saleInvoice": "Invoice",
+  "salePaidInFull": "Paid in full",
+  "salePaidPartial": "Partially paid",
+  "saleUnpaid": "Unpaid",
+  "saleRemainingBalance": "Remaining balance",
+  "saleCashBack": "Cash tendered",
+  "saleNewSale": "New sale",
+  "saleDownloadInvoice": "Download invoice",
+  "saleDownloadIssueNote": "Download issue note",
+  "saleOpenInvoice": "Open invoice",
+  "saleRecentInvoices": "Recent invoices",
+  "saleNoInvoices": "No invoices posted yet.",
+  "saleWalkIn": "Walk-in buyer",
+  "saleCustomerName": "Buyer name",
+  "saleCustomerPhone": "Phone",
+  "saleCustomerEmail": "Email",
+  "saleSelectCustomer": "Select customer",
+  "saleNewCustomer": "New customer",
+  "saleEmptyBasket": "The basket is empty. Scan a device or add a product.",
+  "saleNeedBuyer": "Select a customer or name the buyer.",
+  "saleNeedShelf": "Choose the warehouse and location the sale leaves from.",
+  "saleNeedItems": "Add at least one line.",
+  "saleQtyInvalid": "Use a quantity greater than zero with at most four decimals.",
+  "saleAmountInvalid": "Enter a valid amount with at most three decimals.",
+  "salePriceInvalid": "Enter a price in TND with at most three decimals.",
+  "saleOverpaidHint": "More than the total is recorded as change, not as an invoice payment.",
+  "saleCreditHint": "A credit sale records no payment now; the balance stays on the invoice.",
+  "saleLeaveTitle": "Leave this sale?",
+  "saleLeaveBody": "The basket is kept as a draft for this user and organization.",
+  "saleLeaveStay": "Keep working",
+  "saleLeaveDraft": "Leave and keep draft",
+  "salePayments": "Payments",
+  "saleRecordPayment": "Record payment",
+  "salePaymentAmount": "Amount · TND",
+  "salePaymentNote": "Note",
+  "salePaymentAdded": "Payment recorded",
+  "saleBalance": "Balance",
+  "saleSerializedTag": "Serialized",
+  "saleSellingShelf": "Selling shelf",
+  "saleChooseDevice": "Choose the exact unit",
+  "saleNoSellableDevices": "No in-stock unit for this product on that shelf.",
+  "saleQuantity": "Quantity",
+  "salePrice": "Price",
+  "saleVatPercent": "VAT %",
+  "saleBuyerRequired": "Name the buyer or choose a customer.",
+  "saleDuplicateScan": "Already in the basket.",
+  "saleDeviceLocationMismatch": "This unit is on another shelf.",
+  "saleStepOf": "Step {step} of {total}",
+  "@saleStepOf": {
+    "placeholders": {
+      "step": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "ordersTitle": "Orders",
+  "ordersPurchases": "Purchases",
+  "ordersSales": "Sales",
+  "ordersReturns": "Returns",
+  "ordersSearchHint": "Search by number, supplier or customer",
+  "ordersNewPurchase": "New purchase order",
+  "ordersNewSale": "New sales order",
+  "ordersSupplier": "Supplier",
+  "ordersDeliverTo": "Deliver to",
+  "ordersExpectedOn": "Expected {date}",
+  "@ordersExpectedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "ordersOrderedOn": "Ordered {date}",
+  "@ordersOrderedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "ordersReceivingProgress": "Receiving progress",
+  "ordersUnitsProgress": "{received} / {ordered} units",
+  "@ordersUnitsProgress": {
+    "placeholders": {
+      "received": {
+        "type": "String"
+      },
+      "ordered": {
+        "type": "String"
+      }
+    }
+  },
+  "ordersOrdered": "Ordered",
+  "ordersReceived": "Received",
+  "ordersRemaining": "Remaining",
+  "ordersOrderTotal": "Order total",
+  "ordersMarkOrdered": "Mark as ordered",
+  "ordersReceive": "Receive",
+  "ordersCancelOrder": "Cancel order",
+  "ordersReceiveTitle": "Receive into stock",
+  "ordersSerials": "Serials",
+  "ordersAddSerial": "Add serial or IMEI",
+  "ordersSerialCountMismatch": "A serialized line needs exactly one serial per received unit.",
+  "ordersReceiveNote": "Receipt note",
+  "ordersPostReceipt": "Post receipt",
+  "ordersReceiptPosted": "Receipt posted",
+  "ordersNewReturn": "New return",
+  "ordersReturnReason": "Why are the goods going back?",
+  "ordersPostReturn": "Post return",
+  "ordersCancelReturn": "Cancel return",
+  "ordersReturnPosted": "Return posted",
+  "ordersDownloadPdf": "Download PDF",
+  "ordersPurchaseOrder": "Purchase order",
+  "ordersSalesOrder": "Sales order",
+  "ordersFilterStatus": "Status",
+  "ordersCreatePurchaseTitle": "New purchase order",
+  "ordersCreateSaleTitle": "New sales order",
+  "ordersAddLine": "Add line",
+  "ordersSelectSupplier": "Select a supplier",
+  "ordersSelectProduct": "Select a product",
+  "ordersAtLeastOneLine": "Add at least one line.",
+  "ordersDuplicateProduct": "Each product may appear only once.",
+  "ordersExpectedDate": "Expected date",
+  "ordersStatusDraft": "Draft",
+  "ordersStatusOrdered": "Ordered",
+  "ordersStatusPartiallyReceived": "Partially received",
+  "ordersStatusReceived": "Received",
+  "ordersStatusCancelled": "Cancelled",
+  "ordersStatusConfirmed": "Confirmed",
+  "ordersStatusFulfilled": "Fulfilled",
+  "ordersStatusPosted": "Posted",
+  "ordersConfirmOrder": "Confirm order",
+  "ordersFulfilOrder": "Fulfil order",
+  "ordersNoOrders": "No orders yet.",
+  "ordersLines": "{count, plural, =0{No lines} =1{1 line} other{{count} lines}}",
+  "@ordersLines": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ordersQuantityOrdered": "Ordered",
+  "ordersQuantityReceived": "Received",
+  "ordersQuantityReturned": "Returned",
+  "ordersUnitCost": "Unit cost",
+  "ordersUnitPrice": "Unit price",
+  "ordersReference": "Reference",
+  "ordersNotes": "Notes",
+  "ordersCustomer": "Customer name",
+  "ordersPostReceiptHint": "Bulk lines post one ledger receipt per line. Serialized lines register one device per serial.",
+  "stockTitle": "Stock",
+  "stockMovements": "Movements",
+  "stockTransfers": "Transfers",
+  "stockReservations": "Reservations",
+  "stockCounts": "Stock counts",
+  "stockReconciliation": "Reconciliation",
+  "stockPostMovement": "Post movement",
+  "stockReceipt": "Receipt",
+  "stockIssue": "Issue",
+  "stockAdjustment": "Adjustment",
+  "stockSignedQuantity": "Signed quantity",
+  "stockReasonRequired": "Adjustments require a reason.",
+  "stockPosted": "Movement posted",
+  "stockMove": "Move stock",
+  "stockTransferTitle": "Transfer stock",
+  "stockSource": "Source",
+  "stockTarget": "Target",
+  "stockReserve": "Reserve stock",
+  "stockRelease": "Release",
+  "stockReservationStatus": "Status",
+  "stockExpires": "Expires",
+  "stockNoReservations": "No reservations.",
+  "stockReconcileTitle": "Stock reconciliation",
+  "stockReconcileBody": "Compare the balance projection with the ledger sum. Repair rebuilds the projection without touching history.",
+  "stockBalance": "Balance",
+  "stockLedger": "Ledger",
+  "stockDifference": "Difference",
+  "stockRepair": "Repair projection",
+  "stockDryRun": "Dry run",
+  "stockRepairApplied": "Projection repaired",
+  "stockBalanced": "Balance and ledger agree.",
+  "stockCountsTitle": "Stock counts",
+  "stockNewCount": "Start a count",
+  "stockResumeCount": "Resume count",
+  "stockCountLines": "Counted lines",
+  "stockAddCountLine": "Add or increment a line",
+  "stockIncrement": "Increment",
+  "stockSetCount": "Set count",
+  "stockVariance": "Variance",
+  "stockPostCount": "Post count",
+  "stockDiscardCount": "Discard count",
+  "stockCountPosted": "Count posted",
+  "stockCountDiscarded": "Count discarded",
+  "stockCountEmpty": "No lines counted yet.",
+  "stockSerializedNotCountable": "Serialized products are counted through devices, not quantity counts.",
+  "stockOpenCountExists": "Only one count can be open per location.",
+  "stockSelectCountLocation": "Choose the warehouse and location to count.",
+  "stockCountNote": "Count note",
+  "stockMovementType": "Movement type",
+  "stockNoMovements": "No movements in this window.",
+  "stockReserveHint": "Reserving never consumes stock; available = on hand − active reservations.",
+  "stockReservationReleased": "Reservation released",
+  "stockQuantityAvailable": "Available",
+  "devicesTitle": "Devices",
+  "devicesRegister": "Register device",
+  "devicesSerial": "Serial number",
+  "devicesImei": "IMEI",
+  "devicesCondition": "Condition",
+  "devicesWarranty": "Warranty",
+  "devicesWarrantyStart": "Warranty start",
+  "devicesWarrantyEnd": "Warranty end",
+  "devicesSupplierRef": "Supplier reference",
+  "devicesStatus": "Status",
+  "devicesEvents": "Events",
+  "devicesMove": "Move location",
+  "devicesChangeStatus": "Change status",
+  "devicesSearchHint": "Search serial, IMEI, SKU or product",
+  "devicesAllStatuses": "All statuses",
+  "devicesRegisteredAt": "Received {date}",
+  "@devicesRegisteredAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "devicesNew": "New",
+  "devicesUsed": "Used",
+  "devicesRefurbished": "Refurbished",
+  "devicesDamaged": "Damaged",
+  "devicesDefective": "Defective",
+  "devicesRegisterTitle": "Register a serialized unit",
+  "devicesDeviceRegistered": "Device registered",
+  "devicesEventHistory": "Event history",
+  "devicesNoEvents": "No events recorded.",
+  "devicesMoveTitle": "Move to another shelf",
+  "devicesStatusChanged": "Device status updated",
+  "devicesStatusInStock": "In stock",
+  "devicesStatusReserved": "Reserved",
+  "devicesStatusSold": "Sold",
+  "devicesStatusReturned": "Returned",
+  "devicesStatusInRepair": "In repair",
+  "devicesStatusLost": "Lost",
+  "devicesStatusDisposed": "Disposed",
+  "devicesNoDevices": "No devices match this search.",
+  "suppliersTitle": "Suppliers",
+  "suppliersNew": "New supplier",
+  "suppliersSearchHint": "Search suppliers",
+  "suppliersActive": "Active",
+  "suppliersInactive": "Inactive",
+  "suppliersActivate": "Activate",
+  "suppliersDeactivate": "Deactivate",
+  "suppliersContact": "Contact name",
+  "suppliersTaxId": "Tax ID",
+  "suppliersCity": "City",
+  "suppliersCountry": "Country code",
+  "suppliersAddress": "Address",
+  "suppliersNoSuppliers": "No suppliers yet.",
+  "suppliersSaved": "Supplier saved",
+  "customersTitle": "Customers",
+  "customersNew": "New customer",
+  "customersSearchHint": "Search customers",
+  "customersActive": "Active",
+  "customersInactive": "Inactive",
+  "customersActivate": "Activate",
+  "customersDeactivate": "Deactivate",
+  "customersPhone": "Phone",
+  "customersNoCustomers": "No customers yet.",
+  "customersSaved": "Customer saved",
+  "customersTaxId": "Tax ID",
+  "customersCity": "City",
+  "customersAddress": "Address",
+  "reportsTitle": "Reports",
+  "reportsOverview": "Overview",
+  "reportsLowStock": "Low stock",
+  "reportsSupplierPerformance": "Supplier performance",
+  "reportsWindow": "Window",
+  "reportsPurchases": "Purchase value",
+  "reportsSales": "Retail value",
+  "reportsUnpriced": "{count} unpriced products",
+  "@reportsUnpriced": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reportsMovements": "Movements",
+  "reportsReceived": "Received",
+  "reportsIssued": "Issued",
+  "reportsNet": "Net",
+  "reportsWarehouses": "By warehouse",
+  "reportsExportStockLevels": "Export stock levels CSV",
+  "reportsExportMovements": "Export movements CSV",
+  "reportsExported": "Export ready",
+  "reportsNoLowStock": "Nothing is below its reorder level.",
+  "reportsProducts": "Products",
+  "reportsAvailable": "Available",
+  "reportsShortfall": "Shortfall",
+  "reportsOnTime": "On-time rate",
+  "reportsAvgLeadTime": "Average lead time",
+  "reportsReturnRate": "Return rate",
+  "reportsOrdersCreated": "Orders created",
+  "reportsOrdersReceived": "Orders received",
+  "reportsGeneratedAt": "Generated {time}",
+  "@reportsGeneratedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "reportsNoData": "No data in this window.",
+  "reportsDays": "{count} days",
+  "@reportsDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reportsSalesValue": "Sale value",
+  "reportsPurchaseValue": "Purchase value",
+  "reportsLowStockTitle": "Low stock",
+  "teamTitle": "Team",
+  "teamMembers": "Members",
+  "teamInvitations": "Invitations",
+  "teamInvite": "Invite",
+  "teamInviteTitle": "Invite a teammate",
+  "teamRole": "Role",
+  "teamChangeRole": "Change role",
+  "teamRemove": "Remove from organization",
+  "teamRemoveConfirm": "Remove {email} from this organization?",
+  "@teamRemoveConfirm": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "teamManagerViewerOnly": "Managers can invite viewers only.",
+  "teamOwnerOnly": "Only owners can manage owner roles.",
+  "teamNoMembers": "No members.",
+  "teamPending": "Pending",
+  "teamAccepted": "Accepted",
+  "teamExpired": "Expired",
+  "teamRevoked": "Revoked",
+  "teamRevoke": "Revoke",
+  "teamInvitesExpire": "Invitations expire after 14 days.",
+  "teamInvitedBy": "Invited by {name}",
+  "@teamInvitedBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "teamInviteCreated": "Invitation created",
+  "teamRoleChanged": "Role updated",
+  "teamMemberRemoved": "Member removed",
+  "teamInvitedEmail": "Email address",
+  "teamAcceptInvitation": "Accept",
+  "teamInvitationAccepted": "Invitation accepted",
+  "teamPendingInvitations": "Pending invitations",
+  "adminTitle": "Administration",
+  "adminOrganizations": "Organizations",
+  "adminAudit": "Operator activity",
+  "adminNewOrganization": "New organization",
+  "adminNewOrganizationTitle": "Create an organization",
+  "adminOrgName": "Organization name",
+  "adminOrgSlug": "Slug",
+  "adminFirstMemberEmail": "First member email",
+  "adminFirstMemberRole": "First member role",
+  "adminCreateOrg": "Create organization",
+  "adminMembers": "{count} members",
+  "@adminMembers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "adminPendingInvites": "{count} pending",
+  "@adminPendingInvites": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "adminNoOrgs": "No organizations.",
+  "adminNoAudit": "No operator activity.",
+  "adminAction": "Action",
+  "adminActor": "Actor",
+  "adminTarget": "Target",
+  "adminOrganizationCreated": "Organization created",
+  "adminManageTeam": "Manage team",
+  "adminIdentityOnly": "Platform administration covers identity rows only; tenant stock and sales stay behind membership.",
+  "brandingTitle": "Branding",
+  "brandingUpload": "Upload logo",
+  "brandingReplace": "Replace logo",
+  "brandingRemove": "Remove logo",
+  "brandingRemoveConfirm": "Remove the organization logo?",
+  "brandingLogo": "Organization logo",
+  "brandingHint": "PNG or JPEG, up to 400 KB. The mark appears in the workspace and on generated documents.",
+  "brandingTooLarge": "The image must be 400 KB or smaller.",
+  "brandingUploaded": "Logo updated",
+  "brandingRemoved": "Logo removed",
+  "brandingUnsupported": "Choose a PNG or JPEG image.",
+  "documentsLabels": "Labels",
+  "documentsSelectCopies": "Copies",
+  "documentsLabelHint": "Labels print as an A4 sheet. Choose 1 to 20 copies per item.",
+  "documentsDownloaded": "Document ready",
+  "documentsShare": "Share",
+  "documentsOpen": "Open",
+  "documentsNoApp": "No app on this phone can open this file. It can still be shared.",
+  "moreTitle": "More",
+  "moreOperations": "Operations",
+  "moreDirectory": "Directory",
+  "moreOrganization": "Organization",
+  "moreAccount": "Account",
+  "moreWarehouses": "Warehouses",
+  "moreCatalogSettings": "Catalog settings",
+  "moreReports": "Reports",
+  "moreAdmin": "Platform administration",
+  "moreStockCounts": "Stock counts",
+  "moreMovements": "Stock movements",
+  "moreTransfers": "Stock transfers",
+  "moreReservations": "Reservations",
+  "moreReconciliation": "Reconciliation",
+  "moreDevices": "Devices",
+  "moreSuppliers": "Suppliers",
+  "moreCustomers": "Customers",
+  "morePurchaseOrders": "Purchase orders",
+  "moreSalesOrders": "Sales orders",
+  "moreBranding": "Branding",
+  "moreTeam": "Team",
+  "moreLanguage": "Language",
+  "moreSignOut": "Sign out",
+  "moreNoResults": "No workflow matches this search.",
+  "moreSignedInAs": "Signed in as {email}",
+  "@moreSignedInAs": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "moreInventory": "Inventory",
+  "moreStockLevels": "Stock levels",
+  "moreReturns": "Returns",
+  "errorNetwork": "The API could not be reached. Check the connection and try again.",
+  "errorTimeout": "The request took too long. Try again.",
+  "errorUnauthorized": "Your session is no longer valid. Sign in again.",
+  "errorForbidden": "Your role does not allow this action. The server refuses it.",
+  "errorNotFound": "This item was not found, or it belongs to another organization.",
+  "errorConflict": "This operation conflicts with the current data. Refresh and try again.",
+  "errorValidation": "Check the highlighted fields.",
+  "errorRateLimited": "Too many requests. Try again in {seconds} seconds.",
+  "@errorRateLimited": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "errorServer": "The server could not complete the request.",
+  "errorUnknown": "Something unexpected happened.",
+  "errorRequestId": "Support reference: {requestId}",
+  "@errorRequestId": {
+    "placeholders": {
+      "requestId": {
+        "type": "String"
+      }
+    }
+  },
+  "errorSessionExpired": "Session expired",
+  "errorIdempotency": "This request was already posted with different data. Review it and try again.",
+  "errorInsufficientStock": "Not enough stock available for this operation.",
+  "errorServerEnforced": "The server is the authority for permissions, stock and totals.",
+  "errorServerMessage": "Server message",
+  "errorPermissionDenied": "Permission denied",
+  "errorCameraRequired": "Camera permission is required to scan.",
+  "commonLoadMore": "Load more",
+  "@commonLoadMore": {
+    "description": "Button that fetches the next page of a list"
+  },
+  "moreInvoices": "Invoices",
+  "stockReservationActive": "Active",
+  "stockReservationReleasedStatus": "Released",
+  "stockReservationFulfilled": "Fulfilled",
+  "stockReservationExpiredStatus": "Expired",
+  "warehousesNew": "New warehouse",
+  "warehousesCode": "Code",
+  "warehousesCity": "City",
+  "warehousesLocations": "Locations",
+  "warehousesAddLocation": "Add location",
+  "warehousesLocationCode": "Location code",
+  "warehousesLocationName": "Location name",
+  "warehousesSaved": "Warehouse saved",
+  "catalogNewCategory": "New category",
+  "catalogNewBrand": "New brand",
+  "stockSameLocation": "Choose two different locations",
+  "stockTransferred": "Stock moved",
+  "languageSystem": "System default",
+  "languageEnglish": "English",
+  "languageFrench": "Français",
+  "languageArabic": "العربية",
+  "moreConnection": "API connection",
+  "connectionTitle": "API connection",
+  "connectionIntro": "The app sends every request to this address. It is stored on this device only; your account and data do not change.",
+  "connectionApiLabel": "API address",
+  "connectionHint": "https://nexora-web-service.onrender.com/api/v1",
+  "connectionBuiltIn": "Built-in address: {url}",
+  "@connectionBuiltIn": {
+    "placeholders": {
+      "url": { "type": "String" }
+    }
+  },
+  "connectionCustom": "Custom address on this device",
+  "connectionNoBuiltIn": "This build has no built-in address.",
+  "connectionTest": "Test",
+  "connectionTesting": "Testing…",
+  "connectionTestOk": "Reachable, answered in {milliseconds} ms.",
+  "@connectionTestOk": {
+    "placeholders": {
+      "milliseconds": { "type": "int" }
+    }
+  },
+  "connectionTestFailed": "No answer: {message}",
+  "@connectionTestFailed": {
+    "placeholders": {
+      "message": { "type": "String" }
+    }
+  },
+  "connectionInvalid": "Enter an http(s) address with a host, such as https://nexora-web-service.onrender.com/api/v1.",
+  "connectionSaved": "API address saved.",
+  "connectionReset": "Use the built-in address",
+  "connectionWaking": "A free Render instance can take up to a minute to wake on the first call.",
+  "errorApiNotConfigured": "No API address is set. Open API connection settings on this device."
+}

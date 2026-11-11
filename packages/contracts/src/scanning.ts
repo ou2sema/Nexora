@@ -42,7 +42,63 @@ export const scanDeviceResultSchema = z.object({
 
 export type ScanDeviceResult = z.infer<typeof scanDeviceResultSchema>;
 
+export const trackedItemStatusSchema = z.enum(['in_stock', 'sold', 'returned', 'lost']);
+export type TrackedItemStatus = z.infer<typeof trackedItemStatusSchema>;
+
+export const trackedItemEventTypeSchema = z.enum([
+  'received',
+  'moved',
+  'sold',
+  'returned',
+  'marked_lost',
+  'status_changed',
+]);
+export type TrackedItemEventType = z.infer<typeof trackedItemEventTypeSchema>;
+
+export const trackedItemEventSchema = z.object({
+  id: z.uuid(),
+  eventType: trackedItemEventTypeSchema,
+  statusFrom: trackedItemStatusSchema.nullable(),
+  statusTo: trackedItemStatusSchema.nullable(),
+  note: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+export type TrackedItemEvent = z.infer<typeof trackedItemEventSchema>;
+
+export const trackedItemSummarySchema = z.object({
+  id: z.uuid(),
+  organizationId: z.uuid(),
+  productId: z.uuid(),
+  productSku: z.string(),
+  productName: z.string(),
+  unitCode: z.string(),
+  serialNumber: z.string().nullable(),
+  imei: z.string().nullable(),
+  status: trackedItemStatusSchema,
+  warehouseId: z.uuid(),
+  warehouseCode: z.string(),
+  locationId: z.uuid(),
+  locationCode: z.string(),
+  purchaseOrderNumber: z.string().nullable(),
+  receivedAt: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type TrackedItemSummary = z.infer<typeof trackedItemSummarySchema>;
+
+export const scanTrackedItemResultSchema = z.object({
+  kind: z.literal('tracked_item'),
+  item: trackedItemSummarySchema,
+  product: productSchema,
+  events: z.array(trackedItemEventSchema),
+});
+
+export type ScanTrackedItemResult = z.infer<typeof scanTrackedItemResultSchema>;
+
 export const scanResultSchema = z.discriminatedUnion('kind', [
+  scanTrackedItemResultSchema,
   scanProductResultSchema,
   scanDeviceResultSchema,
 ]);
@@ -64,6 +120,7 @@ export const labelRequestSchema = z.object({
       z.discriminatedUnion('kind', [
         z.object({ kind: z.literal('product'), productId: z.uuid(), copies: labelCopiesSchema }),
         z.object({ kind: z.literal('device'), deviceId: z.uuid(), copies: labelCopiesSchema }),
+        z.object({ kind: z.literal('item'), itemId: z.uuid(), copies: labelCopiesSchema }),
       ]),
     )
     .min(1)

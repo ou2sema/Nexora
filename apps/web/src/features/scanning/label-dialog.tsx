@@ -17,7 +17,7 @@ import { fieldClass } from '@/lib/form-field';
 import { useDownloadLabels } from './api';
 
 export interface LabelTarget {
-  kind: 'product' | 'device';
+  kind: 'product' | 'device' | 'item';
   id: string;
   title: string;
 }
@@ -68,7 +68,9 @@ export function LabelDialog({ organizationId, targets, open, onOpenChange }: Lab
     const items: LabelRequest['items'] = targets.map((target) =>
       target.kind === 'product'
         ? { kind: 'product', productId: target.id, copies: copyCount }
-        : { kind: 'device', deviceId: target.id, copies: copyCount },
+        : target.kind === 'device'
+          ? { kind: 'device', deviceId: target.id, copies: copyCount }
+          : { kind: 'item', itemId: target.id, copies: copyCount },
     );
 
     setError(null);
@@ -102,7 +104,11 @@ export function LabelDialog({ organizationId, targets, open, onOpenChange }: Lab
               <span className="truncate">{target.title}</span>
               <span className="shrink-0 text-xs uppercase tracking-wide text-slate-500">
                 {t(
-                  target.kind === 'product' ? 'scanLabels.kind.product' : 'scanLabels.kind.device',
+                  target.kind === 'product'
+                    ? 'scanLabels.kind.product'
+                    : target.kind === 'device'
+                      ? 'scanLabels.kind.device'
+                      : 'scanLabels.kind.item',
                 )}
               </span>
             </li>

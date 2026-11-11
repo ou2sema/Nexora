@@ -127,7 +127,8 @@ export class PurchaseOrdersService {
       const lines = resultRows<PurchaseOrderLineRow>(
         await tx.execute(sql`
           select l.id, l.product_id, p.sku as product_sku, p.name as product_name,
-                 p.is_serialized, l.quantity_ordered, l.quantity_received,
+                 p.is_serialized, p.is_individually_tracked,
+                 l.quantity_ordered, l.quantity_received,
                  coalesce((
                    select sum(rl.quantity)
                    from public.purchase_return_lines rl

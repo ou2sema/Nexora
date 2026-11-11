@@ -50,6 +50,7 @@ type Values = {
   salePrice: string;
   reorderThreshold: string;
   isSerialized: boolean;
+  isIndividuallyTracked: boolean;
   status: 'active' | 'inactive' | 'discontinued';
 };
 
@@ -105,6 +106,7 @@ export function ProductFormDialog({
       salePrice: priceField,
       reorderThreshold: thresholdField,
       isSerialized: z.boolean(),
+      isIndividuallyTracked: z.boolean(),
       status: z.enum(['active', 'inactive', 'discontinued']),
     });
   }, [t]);
@@ -113,6 +115,7 @@ export function ProductFormDialog({
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm<Values>({
     resolver: zodResolver(schema),
@@ -126,9 +129,13 @@ export function ProductFormDialog({
       salePrice: '',
       reorderThreshold: '',
       isSerialized: false,
+      isIndividuallyTracked: false,
       status: 'active',
     },
   });
+
+  const serialized = watch('isSerialized');
+  const individuallyTracked = watch('isIndividuallyTracked');
 
   useEffect(() => {
     if (open) reset();
@@ -147,6 +154,7 @@ export function ProductFormDialog({
       salePriceMinor: parsePriceInput(values.salePrice),
       reorderThreshold: values.reorderThreshold === '' ? 0 : Number(values.reorderThreshold),
       isSerialized: values.isSerialized,
+      isIndividuallyTracked: values.isIndividuallyTracked,
       status: values.status as ProductStatus,
     };
 
@@ -361,11 +369,27 @@ export function ProductFormDialog({
               <input
                 type="checkbox"
                 className="size-4 rounded border-slate-300 text-indigo-600"
+                disabled={individuallyTracked}
                 {...register('isSerialized')}
               />
               {t('productForm.serialized')}
             </label>
             <p className="mt-1 text-xs text-slate-500">{t('productForm.serializedHint')}</p>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                className="size-4 rounded border-slate-300 text-indigo-600"
+                disabled={serialized}
+                {...register('isIndividuallyTracked')}
+              />
+              {t('productForm.individuallyTracked')}
+            </label>
+            <p className="mt-1 text-xs text-slate-500">
+              {t('productForm.individuallyTrackedHint')}
+            </p>
           </div>
 
           {error && (

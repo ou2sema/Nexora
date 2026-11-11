@@ -32,10 +32,16 @@ services:
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
+      # Otherwise the "View in Alertmanager" links in Slack point at the
+      # container hostname. Set this to the tunnel or public URL on a VPS.
+      - --web.external-url=${ALERTMANAGER_EXTERNAL_URL:-http://localhost:9093}
     ports:
       - '127.0.0.1:9093:9093'
     volumes:
       - ./alertmanager:/etc/alertmanager:ro
+      # Holds the Slack incoming-webhook URL. Outside /etc/alertmanager for the
+      # same read-only-mount reason as Prometheus below.
+      - ./secrets:/etc/alertmanager-secrets:ro
       - alertmanager-data:/alertmanager
 
   grafana:

@@ -75,6 +75,7 @@ export const purchasing: PurchasingMessages = {
   'purchasing.receipt.remaining': 'المتبقي: {count}',
   'purchasing.receipt.serialsLabel': 'الأرقام التسلسلية للمنتج {sku}',
   'purchasing.receipt.quantityLabel': 'الكمية المطلوب استلامها للمنتج {sku}',
+  'purchasing.receipt.trackedHint': 'سيُنشأ ملصق واحد لكل وحدة مستلمة.',
   'purchasing.receipt.empty': 'أدخل كمية أو رقماً تسلسلياً واحداً على الأقل للاستلام.',
   'purchasing.receipt.posted.zero': 'لم يتم استلام أي وحدة · {status}',
   'purchasing.receipt.posted.one': 'تم استلام وحدة واحدة · {status}',

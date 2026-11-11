@@ -24,6 +24,7 @@ export const catalog = {
   'products.caption': 'Products in this organization',
   'products.noBarcode': 'No barcode assigned',
   'products.trackingSerialized': 'Serialized',
+  'products.trackingIndividually': 'Individually tracked',
   'products.column.salePrice': 'Sale price',
   'products.column.tracking': 'Tracking',
   'products.column.reorderAt': 'Reorder at',
@@ -45,6 +46,9 @@ export const catalog = {
   'productForm.reorderThreshold': 'Reorder threshold',
   'productForm.serialized': 'Track individual serial numbers',
   'productForm.serializedHint': 'Low-stock alerts use the threshold; 0 disables them.',
+  'productForm.individuallyTracked': 'Track one barcode per physical unit',
+  'productForm.individuallyTrackedHint':
+    'Each received unit gets its own permanent internal code and label. Manufacturer serials stay optional.',
   'productForm.failed': 'The product could not be created.',
   'productForm.create': 'Create product',
   'productForm.skuRequired': 'Enter a SKU',

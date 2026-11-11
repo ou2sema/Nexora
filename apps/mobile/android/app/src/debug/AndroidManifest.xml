@@ -1,0 +1,4 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Debug builds talk to the local API over http://. Release builds never do. -->
+    <application android:usesCleartextTraffic="true" />
+</manifest>

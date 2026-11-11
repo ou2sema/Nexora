@@ -1,0 +1,997 @@
+{
+  "@@locale": "ar",
+  "appTagline": "مخزونك، من منظور واضح.",
+  "navHome": "الرئيسية",
+  "navInventory": "المخزون",
+  "navScan": "المسح",
+  "navSell": "البيع",
+  "navMore": "المزيد",
+  "commonRetry": "إعادة المحاولة",
+  "commonRefresh": "تحديث",
+  "commonLoading": "جارٍ التحميل…",
+  "commonSave": "حفظ",
+  "commonSaving": "جارٍ الحفظ…",
+  "commonCancel": "إلغاء",
+  "commonCreate": "إنشاء",
+  "commonAdd": "إضافة",
+  "commonEdit": "تعديل",
+  "commonRemove": "إزالة",
+  "commonDelete": "حذف",
+  "commonClose": "إغلاق",
+  "commonConfirm": "تأكيد",
+  "commonBack": "رجوع",
+  "commonNext": "التالي",
+  "commonSearch": "بحث",
+  "commonClear": "مسح",
+  "commonAll": "الكل",
+  "commonNone": "لا شيء",
+  "commonOptional": "اختياري",
+  "commonStatus": "الحالة",
+  "commonDate": "التاريخ",
+  "commonEmail": "البريد الإلكتروني",
+  "commonName": "الاسم",
+  "commonReason": "السبب",
+  "commonReference": "المرجع",
+  "commonNotes": "ملاحظات",
+  "commonQuantity": "الكمية",
+  "commonLocation": "الموقع",
+  "commonWarehouse": "المستودع",
+  "commonOrganization": "المؤسسة",
+  "commonProduct": "المنتج",
+  "commonCategory": "الفئة",
+  "commonBrand": "العلامة التجارية",
+  "commonDevice": "الجهاز",
+  "commonSupplier": "المورّد",
+  "commonCustomer": "العميل",
+  "commonTotal": "الإجمالي",
+  "commonUnits": "وحدات",
+  "commonActions": "الإجراءات",
+  "commonDetails": "التفاصيل",
+  "commonViewAll": "عرض الكل",
+  "commonApply": "تطبيق",
+  "commonReset": "إعادة ضبط",
+  "commonDone": "تم",
+  "commonNew": "جديد",
+  "commonYes": "نعم",
+  "commonNo": "لا",
+  "commonLanguage": "اللغة",
+  "commonSignOut": "تسجيل الخروج",
+  "commonPlatformAdmin": "مسؤول المنصة",
+  "commonFilters": "عوامل التصفية",
+  "commonSort": "ترتيب",
+  "commonPageOf": "الصفحة {page} من {pages}",
+  "@commonPageOf": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      },
+      "pages": {
+        "type": "int"
+      }
+    }
+  },
+  "commonPrevious": "السابق",
+  "commonError": "حدث خطأ",
+  "commonSuccess": "تم",
+  "commonRequired": "مطلوب",
+  "commonInvalidNumber": "أدخل رقمًا صالحًا",
+  "commonInvalidAmount": "أدخل مبلغًا صالحًا بثلاث خانات عشرية كحد أقصى",
+  "commonNoResults": "لا نتائج",
+  "commonEmpty": "لا شيء بعد",
+  "commonAllWarehouses": "جميع المستودعات",
+  "commonVat": "ضريبة القيمة المضافة",
+  "commonUnitPrice": "سعر الوحدة",
+  "commonSku": "SKU",
+  "commonSerial": "الرقم التسلسلي",
+  "commonImei": "IMEI",
+  "commonRate": "النسبة",
+  "commonAmount": "المبلغ",
+  "commonNote": "ملاحظة",
+  "commonType": "النوع",
+  "commonFrom": "من",
+  "commonTo": "إلى",
+  "commonBy": "بواسطة {name}",
+  "@commonBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commonAt": "عند {time}",
+  "@commonAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "commonOf": "من",
+  "commonItems": "عناصر",
+  "commonToday": "اليوم",
+  "commonSearchWorkflows": "ابحث في الشاشات والإجراءات",
+  "commonViewDocument": "عرض المستند",
+  "commonDownload": "تنزيل",
+  "commonShare": "مشاركة",
+  "commonSavedToPhone": "حُفظ على هذا الهاتف",
+  "commonOpen": "فتح",
+  "commonSelect": "تحديد",
+  "authSignInTitle": "تسجيل الدخول",
+  "authSignUpTitle": "أنشئ حسابك",
+  "authSignInSubtitle": "استخدم البريد الإلكتروني وكلمة المرور المرتبطين بدعوتك.",
+  "authSignUpSubtitle": "يمكن للحساب الانضمام إلى مؤسسة أو إنشائها لاحقًا.",
+  "authEmail": "البريد الإلكتروني",
+  "authPassword": "كلمة المرور",
+  "authSignIn": "تسجيل الدخول",
+  "authSignUp": "إنشاء حساب",
+  "authHaveAccount": "لديك حساب بالفعل؟",
+  "authCreateOne": "أنشئ حسابًا",
+  "authCheckInbox": "تحقّق من بريدك الوارد",
+  "authConfirmationSent": "أرسلنا رابط تأكيد إلى {email}. أكّده ثم سجّل الدخول.",
+  "@authConfirmationSent": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "authBackToSignIn": "العودة إلى تسجيل الدخول",
+  "authInvalidEmail": "أدخل بريدًا إلكترونيًا صالحًا",
+  "authPasswordTooShort": "استخدم 8 أحرف على الأقل",
+  "authFailed": "تعذّر تسجيل الدخول.",
+  "authWelcomeBack": "مرحبًا بعودتك",
+  "authSessionExpired": "انتهت جلستك. سجّل الدخول مجددًا.",
+  "authSecureNote": "تُحفظ جلستك في التخزين الآمن للجهاز.",
+  "orgChooseTitle": "اختر مساحة عمل",
+  "orgChooseSubtitle": "تنتمي إلى أكثر من مؤسسة.",
+  "orgSwitch": "تبديل المؤسسة",
+  "orgCurrent": "المؤسسة الحالية",
+  "orgPendingTitle": "{count, plural, =0{لا دعوات} =1{دعوة واحدة} =2{دعوتان} few{{count} دعوات} many{{count} دعوة} other{{count} دعوة}}",
+  "@orgPendingTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "orgPendingBody": "اقبل الدعوة للانضمام إلى المؤسسة.",
+  "orgAccept": "قبول الدعوة",
+  "orgAccepting": "جارٍ القبول…",
+  "orgAccepted": "تم قبول الدعوة",
+  "orgExpires": "تنتهي في {date}",
+  "@orgExpires": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "orgNoMembershipsTitle": "لا مساحة عمل بعد",
+  "orgNoMembershipsBody": "حسابك ليس عضوًا في أي مؤسسة. اطلب من مالك أو مسؤول أن يدعوك، أو تواصل مع مسؤول منصة Nexora.",
+  "orgNoMembershipsNote": "لا ترسل Nexora أي بريد. يدعو المالك عنوانك وتقبله هنا بعد تسجيل الدخول.",
+  "orgRole": "الدور",
+  "orgMemberOf": "عضو في {organization}",
+  "@orgMemberOf": {
+    "placeholders": {
+      "organization": {
+        "type": "String"
+      }
+    }
+  },
+  "roleOwner": "المالك",
+  "roleAdmin": "مسؤول",
+  "roleManager": "مدير",
+  "roleViewer": "مشاهد",
+  "homeStockValuation": "قيمة المخزون",
+  "homeVsLastMonth": "{change} مقارنة بالشهر الماضي · بالتكلفة",
+  "@homeVsLastMonth": {
+    "placeholders": {
+      "change": {
+        "type": "String"
+      }
+    }
+  },
+  "homeOnHand": "في المخزون",
+  "homeReserved": "محجوز",
+  "homeAvailable": "متاح",
+  "homeStartOperation": "ابدأ عملية",
+  "homeNewSale": "بيع جديد",
+  "homeScanItem": "امسح بندًا",
+  "homeNeedsAttention": "يحتاج إلى انتباه",
+  "homeAllAlerts": "كل التنبيهات ({count})",
+  "@homeAllAlerts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homeBelowReorder": "أقل من حد إعادة الطلب",
+  "homeLowStockEmpty": "لا شيء يحتاج انتباهًا الآن.",
+  "homeRecentActivity": "النشاط الأخير",
+  "homeNoActivity": "لا حركات في هذه الفترة.",
+  "homeWindowLast7": "7 أيام",
+  "homeWindowLast30": "30 يومًا",
+  "homeWindowLast90": "90 يومًا",
+  "homeOpenInventory": "فتح المخزون",
+  "homeHealthOnline": "API متصل",
+  "homeHealthOffline": "API غير متاح",
+  "homeHealthChecking": "جارٍ التحقق من API…",
+  "homeStale": "آخر تحديث {time}",
+  "@homeStale": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "inventoryTitle": "المخزون",
+  "inventorySubtitle": "المخزون المتاح حسب الرف",
+  "inventorySearchHint": "ابحث عن منتج أو SKU أو رقم تسلسلي",
+  "inventoryAllCategories": "جميع الفئات",
+  "inventoryStockOverview": "نظرة على المخزون",
+  "inventoryProductsUnits": "{products} منتجات · {units} وحدة متاحة",
+  "@inventoryProductsUnits": {
+    "placeholders": {
+      "products": {
+        "type": "String"
+      },
+      "units": {
+        "type": "String"
+      }
+    }
+  },
+  "inventorySortName": "الاسم أ-ي",
+  "inventoryInStock": "في المخزون",
+  "inventoryLowStock": "مخزون منخفض",
+  "inventoryOutOfStock": "نفد المخزون",
+  "inventoryAvailableReserved": "{available} متاحة · {reserved} محجوزة",
+  "@inventoryAvailableReserved": {
+    "placeholders": {
+      "available": {
+        "type": "String"
+      },
+      "reserved": {
+        "type": "String"
+      }
+    }
+  },
+  "inventoryNoProducts": "لا منتجات تطابق هذا البحث.",
+  "inventoryProductDetails": "تفاصيل المنتج",
+  "inventoryStockByLocation": "المخزون حسب الموقع",
+  "inventoryAllWarehouses": "جميع المستودعات",
+  "inventoryAvailableFormula": "المتاح = في المخزون − المحجوز",
+  "inventoryDeviceTraceability": "تتبّع الأجهزة",
+  "inventorySelectedDevice": "الجهاز المحدد",
+  "inventoryViewDevices": "عرض الكل ({count})",
+  "@inventoryViewDevices": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "inventorySerialized": "مُسلسل",
+  "inventoryIndividuallyTracked": "وحدات متعقّبة",
+  "inventoryIndividuallyTrackedHint": "تحصل كل وحدة مستلمة على باركود وسجل خاص بها.",
+  "inventoryBulk": "بالجملة",
+  "inventoryReorderLevel": "حد إعادة الطلب",
+  "inventoryBarcode": "الرمز الشريطي",
+  "inventoryInternalCode": "الرمز الداخلي",
+  "inventoryDescription": "الوصف",
+  "inventoryCategoryBrand": "الفئة والعلامة التجارية",
+  "inventoryNoDevices": "لا أجهزة مسجلة لهذا المنتج.",
+  "inventoryDeviceCount": "{count, plural, =0{لا أجهزة} =1{جهاز واحد} =2{جهازان} few{{count} أجهزة} many{{count} جهازًا} other{{count} جهاز}}",
+  "@inventoryDeviceCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "inventoryOnHandShort": "في المخزون",
+  "inventoryReservedShort": "محجوز",
+  "inventoryAvailableShort": "متاح",
+  "inventoryPriceMinor": "سعر البيع",
+  "inventoryCostMinor": "التكلفة",
+  "inventoryVatRate": "ضريبة {rate}%",
+  "@inventoryVatRate": {
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "scanTitle": "امسح بندًا",
+  "scanSubtitle": "رمز شريطي أو SKU أو رقم تسلسلي",
+  "scanCameraActive": "الكاميرا نشطة",
+  "scanKeepInside": "أبقِ الرمز أو الرقم التسلسلي داخل الإطار",
+  "scanEnterManually": "أو أدخل رمزًا يدويًا",
+  "scanPlaceholder": "رمز شريطي أو رقم تسلسلي أو SKU أو رمز داخلي",
+  "scanResolve": "التعرّف على الرمز",
+  "scanDeviceFound": "تم العثور على الجهاز",
+  "scanProductFound": "تم العثور على المنتج",
+  "scanNotFound": "لا تطابق لهذا الرمز",
+  "scanPermissionTitle": "الوصول إلى الكاميرا",
+  "scanPermissionBody": "تستخدم Nexora الكاميرا فقط أثناء فتح هذه الشاشة لقراءة الرموز والأرقام التسلسلية. الإدخال اليدوي متاح دائمًا.",
+  "scanPermissionDenied": "رُفض إذن الكاميرا. أدخل الرمز يدويًا أو اسمح بالكاميرا في إعدادات Android.",
+  "scanStartCamera": "تشغيل الكاميرا",
+  "scanStopCamera": "إيقاف الكاميرا",
+  "scanTorch": "المصباح",
+  "scanUseDeviceToSell": "استخدم هذا الجهاز للبيع",
+  "scanAddToBasket": "أضف إلى السلة",
+  "scanViewProduct": "افتح المنتج",
+  "scanAvailableAt": "{warehouse} · {location}",
+  "@scanAvailableAt": {
+    "placeholders": {
+      "warehouse": {
+        "type": "String"
+      },
+      "location": {
+        "type": "String"
+      }
+    }
+  },
+  "scanWrongLocation": "هذه الوحدة على رف آخر ولا يمكنها الانضمام إلى بيع من هذا الرف.",
+  "scanAlreadyInBasket": "{serial} موجود أصلًا في السلة.",
+  "@scanAlreadyInBasket": {
+    "placeholders": {
+      "serial": {
+        "type": "String"
+      }
+    }
+  },
+  "scanDeviceNotInStock": "{serial} غير متاح للبيع.",
+  "@scanDeviceNotInStock": {
+    "placeholders": {
+      "serial": {
+        "type": "String"
+      }
+    }
+  },
+  "scanManualHint": "قارئ USB أو Bluetooth يكتب في هذا الحقل. مفتاح Enter يتعرّف على الرمز أيضًا.",
+  "scanHardwareHint": "تعمل أدوات المسح بلوحة المفاتيح هنا؛ تبقى الكاميرا والإدخال اليدوي متاحين.",
+  "scanScanning": "جارٍ التعرّف…",
+  "scanStockLines": "المخزون حسب الموقع",
+  "scanTrackedItemFound": "تم العثور على الوحدة",
+  "scanProductBarcode": "باركود المنتج",
+  "scanSerialNumber": "الرقم التسلسلي",
+  "scanPurchaseOrder": "أمر الشراء",
+  "scanReceivedAt": "تاريخ الاستلام",
+  "scanHistory": "سجل الوحدة",
+  "scanNoHistory": "لا توجد حركات مسجّلة بعد.",
+  "scanPrintLabel": "طباعة الملصق",
+  "scanTrackedEventReceived": "تم استلامها في المخزون",
+  "scanTrackedEventMoved": "تم نقلها",
+  "scanTrackedEventSold": "تم بيعها",
+  "scanTrackedEventReturned": "تم إرجاعها",
+  "scanTrackedEventMarkedLost": "تم الإبلاغ عن فقدانها",
+  "scanTrackedEventStatusChanged": "تم تغيير الحالة",
+  "saleTitle": "بيع مباشر",
+  "saleSubtitle": "امسح أو ابحث، سمِّ المشتري، تحصّل المبلغ",
+  "saleDraft": "مسودة · {products} منتجات / {units} وحدات",
+  "@saleDraft": {
+    "placeholders": {
+      "products": {
+        "type": "int"
+      },
+      "units": {
+        "type": "String"
+      }
+    }
+  },
+  "saleStepBasket": "السلة",
+  "saleStepPayment": "الدفع",
+  "saleStepDone": "تم",
+  "saleSearchHint": "أضف بالاسم أو SKU أو مسح",
+  "saleBuyer": "المشتري",
+  "saleChangeBuyer": "تغيير",
+  "saleBasketHeading": "السلة",
+  "saleTaxExclusive": "TND · خارج الضريبة",
+  "saleRemoveLine": "إزالة السطر",
+  "saleDeviceLine": "جهاز واحد × {price}",
+  "@saleDeviceLine": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "saleUnitLine": "{quantity} × {price}",
+  "@saleUnitLine": {
+    "placeholders": {
+      "quantity": {
+        "type": "String"
+      },
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "salePriceOverride": "السعر",
+  "saleTaxRate": "نسبة الضريبة",
+  "saleSubtotal": "الصافي قبل الضريبة",
+  "saleVatLine": "الضريبة · {rate}%",
+  "@saleVatLine": {
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "saleTotalLine": "الإجمالي · TND",
+  "saleReviewPay": "مراجعة ودفع",
+  "saleReviewTitle": "مراجعة ودفع",
+  "saleReviewSubtitle": "بيع مباشر · {units}",
+  "@saleReviewSubtitle": {
+    "placeholders": {
+      "units": {
+        "type": "String"
+      }
+    }
+  },
+  "saleBuyerDetails": "بيانات المشتري",
+  "salePaymentMethod": "طريقة الدفع",
+  "saleCash": "نقدًا",
+  "saleTransfer": "تحويل",
+  "saleCard": "بطاقة",
+  "saleCredit": "آجل",
+  "saleCardHint": "تُسجّل مدفوعات البطاقة يدويًا، دون خصم من طرفية.",
+  "saleCashTendered": "النقد المستلم · TND",
+  "salePaymentRecorded": "تم تسجيل الدفع",
+  "saleChangeToReturn": "الباقي للعميل",
+  "saleChangeHint": "الزائد نقدًا يُعاد كباقٍ، لا كدفعة زائدة على الفاتورة.",
+  "saleAdditionalDetails": "تفاصيل إضافية",
+  "saleAdditionalHint": "مرجع، ملاحظات",
+  "saleConfirmSale": "تأكيد البيع · {total} TND",
+  "@saleConfirmSale": {
+    "placeholders": {
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "salePosting": "جارٍ تثبيت البيع…",
+  "saleCompleteTitle": "تم البيع",
+  "saleCompleteBody": "أُصدرت فاتورة إلى {buyer}. بيعت {units} من {location}.",
+  "@saleCompleteBody": {
+    "placeholders": {
+      "buyer": {
+        "type": "String"
+      },
+      "units": {
+        "type": "String"
+      },
+      "location": {
+        "type": "String"
+      }
+    }
+  },
+  "saleAllPaid": "تم الدفع بالكامل. اكتمل البيع.",
+  "saleInvoice": "الفاتورة",
+  "salePaidInFull": "مدفوعة بالكامل",
+  "salePaidPartial": "مدفوعة جزئيًا",
+  "saleUnpaid": "غير مدفوعة",
+  "saleRemainingBalance": "الرصيد المتبقي",
+  "saleCashBack": "النقد المستلم",
+  "saleNewSale": "بيع جديد",
+  "saleDownloadInvoice": "تنزيل الفاتورة",
+  "saleDownloadIssueNote": "تنزيل أمر الصرف",
+  "saleOpenInvoice": "فتح الفاتورة",
+  "saleRecentInvoices": "الفواتير الأخيرة",
+  "saleNoInvoices": "لم تُصدر فواتير بعد.",
+  "saleWalkIn": "مشترٍ عابر",
+  "saleCustomerName": "اسم المشتري",
+  "saleCustomerPhone": "الهاتف",
+  "saleCustomerEmail": "البريد الإلكتروني",
+  "saleSelectCustomer": "اختر عميلًا",
+  "saleNewCustomer": "عميل جديد",
+  "saleEmptyBasket": "السلة فارغة. امسح جهازًا أو أضف منتجًا.",
+  "saleNeedBuyer": "اختر عميلًا أو سمِّ المشتري.",
+  "saleNeedShelf": "اختر المستودع والموقع الذي يخرج منه البيع.",
+  "saleNeedItems": "أضف سطرًا واحدًا على الأقل.",
+  "saleQtyInvalid": "استخدم كمية أكبر من صفر بأربع خانات عشرية كحد أقصى.",
+  "saleAmountInvalid": "أدخل مبلغًا صالحًا بثلاث خانات عشرية كحد أقصى.",
+  "salePriceInvalid": "أدخل سعرًا بالدينار التونسي بثلاث خانات عشرية كحد أقصى.",
+  "saleOverpaidHint": "المبلغ الزائد عن الإجمالي يُعاد كباقٍ، ولا يُسجّل دفعة على الفاتورة.",
+  "saleCreditHint": "البيع بالآجل لا يسجّل دفعًا الآن؛ يبقى الرصيد على الفاتورة.",
+  "saleLeaveTitle": "مغادرة هذا البيع؟",
+  "saleLeaveBody": "تُحفظ السلة كمسودة لهذا المستخدم وهذه المؤسسة.",
+  "saleLeaveStay": "متابعة العمل",
+  "saleLeaveDraft": "المغادرة مع حفظ المسودة",
+  "salePayments": "المدفوعات",
+  "saleRecordPayment": "تسجيل دفعة",
+  "salePaymentAmount": "المبلغ · TND",
+  "salePaymentNote": "ملاحظة",
+  "salePaymentAdded": "تم تسجيل الدفعة",
+  "saleBalance": "الرصيد",
+  "saleSerializedTag": "مُسلسل",
+  "saleSellingShelf": "رفّ البيع",
+  "saleChooseDevice": "اختر الوحدة المحددة",
+  "saleNoSellableDevices": "لا وحدة في المخزون لهذا المنتج على ذلك الرف.",
+  "saleQuantity": "الكمية",
+  "salePrice": "السعر",
+  "saleVatPercent": "الضريبة %",
+  "saleBuyerRequired": "سمِّ المشتري أو اختر عميلًا.",
+  "saleDuplicateScan": "موجود أصلًا في السلة.",
+  "saleDeviceLocationMismatch": "هذه الوحدة على رف آخر.",
+  "saleStepOf": "الخطوة {step} من {total}",
+  "@saleStepOf": {
+    "placeholders": {
+      "step": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "ordersTitle": "الأوامر",
+  "ordersPurchases": "المشتريات",
+  "ordersSales": "المبيعات",
+  "ordersReturns": "المرتجعات",
+  "ordersSearchHint": "ابحث برقم أو مورّد أو عميل",
+  "ordersNewPurchase": "أمر شراء جديد",
+  "ordersNewSale": "أمر صرف جديد",
+  "ordersSupplier": "المورّد",
+  "ordersDeliverTo": "التسليم إلى",
+  "ordersExpectedOn": "متوقع في {date}",
+  "@ordersExpectedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "ordersOrderedOn": "طُلب في {date}",
+  "@ordersOrderedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "ordersReceivingProgress": "تقدّم الاستلام",
+  "ordersUnitsProgress": "{received} / {ordered} وحدة",
+  "@ordersUnitsProgress": {
+    "placeholders": {
+      "received": {
+        "type": "String"
+      },
+      "ordered": {
+        "type": "String"
+      }
+    }
+  },
+  "ordersOrdered": "المطلوب",
+  "ordersReceived": "المستلم",
+  "ordersRemaining": "المتبقي",
+  "ordersOrderTotal": "إجمالي الأمر",
+  "ordersMarkOrdered": "وضع علامة «طُلب»",
+  "ordersReceive": "استلام",
+  "ordersCancelOrder": "إلغاء الأمر",
+  "ordersReceiveTitle": "الاستلام في المخزون",
+  "ordersSerials": "الأرقام التسلسلية",
+  "ordersAddSerial": "أضف رقمًا تسلسليًا أو IMEI",
+  "ordersSerialCountMismatch": "يحتاج السطر المُسلسل إلى رقم تسلسلي واحد لكل وحدة مستلمة.",
+  "ordersReceiveNote": "ملاحظة الاستلام",
+  "ordersPostReceipt": "تثبيت الاستلام",
+  "ordersReceiptPosted": "تم تثبيت الاستلام",
+  "ordersNewReturn": "مرتجع جديد",
+  "ordersReturnReason": "لماذا تعود البضائع؟",
+  "ordersPostReturn": "تثبيت المرتجع",
+  "ordersCancelReturn": "إلغاء المرتجع",
+  "ordersReturnPosted": "تم تثبيت المرتجع",
+  "ordersDownloadPdf": "تنزيل PDF",
+  "ordersPurchaseOrder": "أمر شراء",
+  "ordersSalesOrder": "أمر صرف",
+  "ordersFilterStatus": "الحالة",
+  "ordersCreatePurchaseTitle": "أمر شراء جديد",
+  "ordersCreateSaleTitle": "أمر صرف جديد",
+  "ordersAddLine": "إضافة سطر",
+  "ordersSelectSupplier": "اختر مورّدًا",
+  "ordersSelectProduct": "اختر منتجًا",
+  "ordersAtLeastOneLine": "أضف سطرًا واحدًا على الأقل.",
+  "ordersDuplicateProduct": "لا يجوز أن يظهر المنتج أكثر من مرة.",
+  "ordersExpectedDate": "التاريخ المتوقع",
+  "ordersStatusDraft": "مسودة",
+  "ordersStatusOrdered": "طُلب",
+  "ordersStatusPartiallyReceived": "مستلم جزئيًا",
+  "ordersStatusReceived": "مستلم",
+  "ordersStatusCancelled": "ملغى",
+  "ordersStatusConfirmed": "مؤكد",
+  "ordersStatusFulfilled": "مُنفّذ",
+  "ordersStatusPosted": "مثبّت",
+  "ordersConfirmOrder": "تأكيد الأمر",
+  "ordersFulfilOrder": "تنفيذ الأمر",
+  "ordersNoOrders": "لا أوامر بعد.",
+  "ordersLines": "{count, plural, =0{لا أسطر} =1{سطر واحد} =2{سطران} few{{count} أسطر} many{{count} سطرًا} other{{count} سطر}}",
+  "@ordersLines": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ordersQuantityOrdered": "المطلوب",
+  "ordersQuantityReceived": "المستلم",
+  "ordersQuantityReturned": "المُرتجع",
+  "ordersUnitCost": "تكلفة الوحدة",
+  "ordersUnitPrice": "سعر الوحدة",
+  "ordersReference": "المرجع",
+  "ordersNotes": "ملاحظات",
+  "ordersCustomer": "اسم العميل",
+  "ordersPostReceiptHint": "تثبت الأسطر بالجملة إدخال مخزون واحدًا لكل سطر. وتسجّل الأسطر المُسلسلة جهازًا لكل رقم تسلسلي.",
+  "stockTitle": "المخزون",
+  "stockMovements": "الحركات",
+  "stockTransfers": "التحويلات",
+  "stockReservations": "الحجوزات",
+  "stockCounts": "جرد المخزون",
+  "stockReconciliation": "المطابقة",
+  "stockPostMovement": "تسجيل حركة",
+  "stockReceipt": "إدخال",
+  "stockIssue": "صرف",
+  "stockAdjustment": "تسوية",
+  "stockSignedQuantity": "الكمية بالإشارة",
+  "stockReasonRequired": "تتطلب التسويات سببًا.",
+  "stockPosted": "تم تسجيل الحركة",
+  "stockMove": "نقل المخزون",
+  "stockTransferTitle": "تحويل المخزون",
+  "stockSource": "المصدر",
+  "stockTarget": "الوجهة",
+  "stockReserve": "حجز مخزون",
+  "stockRelease": "إفراج",
+  "stockReservationStatus": "الحالة",
+  "stockExpires": "تنتهي",
+  "stockNoReservations": "لا حجوزات.",
+  "stockReconcileTitle": "مطابقة المخزون",
+  "stockReconcileBody": "قارن إسقاط الرصيد بمجموع دفتر الحركات. تعيد المطابقة بناء الإسقاط دون المساس بالسجل.",
+  "stockBalance": "الرصيد",
+  "stockLedger": "دفتر الحركات",
+  "stockDifference": "الفرق",
+  "stockRepair": "إصلاح الإسقاط",
+  "stockDryRun": "محاكاة",
+  "stockRepairApplied": "أُصلح الإسقاط",
+  "stockBalanced": "الرصيد ودفتر الحركات متوافقان.",
+  "stockCountsTitle": "جرد المخزون",
+  "stockNewCount": "بدء جرد",
+  "stockResumeCount": "استئناف الجرد",
+  "stockCountLines": "الأسطر المعدودة",
+  "stockAddCountLine": "إضافة سطر أو زيادته",
+  "stockIncrement": "زيادة",
+  "stockSetCount": "تحديد العدد",
+  "stockVariance": "الفرق",
+  "stockPostCount": "تثبيت الجرد",
+  "stockDiscardCount": "إلغاء الجرد",
+  "stockCountPosted": "تم تثبيت الجرد",
+  "stockCountDiscarded": "أُلغي الجرد",
+  "stockCountEmpty": "لا أسطر معدودة بعد.",
+  "stockSerializedNotCountable": "تُعد المنتجات المُسلسلة عبر الأجهزة، لا بالكمية.",
+  "stockOpenCountExists": "يمكن فتح جرد واحد فقط لكل موقع.",
+  "stockSelectCountLocation": "اختر المستودع والموقع المراد جرده.",
+  "stockCountNote": "ملاحظة الجرد",
+  "stockMovementType": "نوع الحركة",
+  "stockNoMovements": "لا حركات في هذه الفترة.",
+  "stockReserveHint": "الحجز لا يستهلك المخزون؛ المتاح = في المخزون − الحجوزات النشطة.",
+  "stockReservationReleased": "أُفرج عن الحجز",
+  "stockQuantityAvailable": "متاح",
+  "devicesTitle": "الأجهزة",
+  "devicesRegister": "تسجيل جهاز",
+  "devicesSerial": "الرقم التسلسلي",
+  "devicesImei": "IMEI",
+  "devicesCondition": "حالة الجهاز",
+  "devicesWarranty": "الضمان",
+  "devicesWarrantyStart": "بداية الضمان",
+  "devicesWarrantyEnd": "نهاية الضمان",
+  "devicesSupplierRef": "مرجع المورّد",
+  "devicesStatus": "الحالة",
+  "devicesEvents": "الأحداث",
+  "devicesMove": "تغيير الموقع",
+  "devicesChangeStatus": "تغيير الحالة",
+  "devicesSearchHint": "ابحث عن رقم تسلسلي أو IMEI أو SKU أو منتج",
+  "devicesAllStatuses": "جميع الحالات",
+  "devicesRegisteredAt": "استُلم في {date}",
+  "@devicesRegisteredAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "devicesNew": "جديد",
+  "devicesUsed": "مستعمل",
+  "devicesRefurbished": "مُجدّد",
+  "devicesDamaged": "متضرر",
+  "devicesDefective": "معيب",
+  "devicesRegisterTitle": "تسجيل وحدة مُسلسلة",
+  "devicesDeviceRegistered": "تم تسجيل الجهاز",
+  "devicesEventHistory": "سجل الأحداث",
+  "devicesNoEvents": "لا أحداث مسجلة.",
+  "devicesMoveTitle": "نقل إلى رف آخر",
+  "devicesStatusChanged": "حُدّثت حالة الجهاز",
+  "devicesStatusInStock": "في المخزون",
+  "devicesStatusReserved": "محجوز",
+  "devicesStatusSold": "مُباع",
+  "devicesStatusReturned": "مُرتجع",
+  "devicesStatusInRepair": "قيد الإصلاح",
+  "devicesStatusLost": "مفقود",
+  "devicesStatusDisposed": "مُتلف",
+  "devicesNoDevices": "لا أجهزة تطابق هذا البحث.",
+  "suppliersTitle": "المورّدون",
+  "suppliersNew": "مورّد جديد",
+  "suppliersSearchHint": "ابحث في المورّدين",
+  "suppliersActive": "نشط",
+  "suppliersInactive": "غير نشط",
+  "suppliersActivate": "تفعيل",
+  "suppliersDeactivate": "تعطيل",
+  "suppliersContact": "اسم جهة الاتصال",
+  "suppliersTaxId": "المعرّف الجبائي",
+  "suppliersCity": "المدينة",
+  "suppliersCountry": "رمز البلد",
+  "suppliersAddress": "العنوان",
+  "suppliersNoSuppliers": "لا مورّدين بعد.",
+  "suppliersSaved": "حُفظ المورّد",
+  "customersTitle": "العملاء",
+  "customersNew": "عميل جديد",
+  "customersSearchHint": "ابحث في العملاء",
+  "customersActive": "نشط",
+  "customersInactive": "غير نشط",
+  "customersActivate": "تفعيل",
+  "customersDeactivate": "تعطيل",
+  "customersPhone": "الهاتف",
+  "customersNoCustomers": "لا عملاء بعد.",
+  "customersSaved": "حُفظ العميل",
+  "customersTaxId": "المعرّف الجبائي",
+  "customersCity": "المدينة",
+  "customersAddress": "العنوان",
+  "reportsTitle": "التقارير",
+  "reportsOverview": "نظرة عامة",
+  "reportsLowStock": "مخزون منخفض",
+  "reportsSupplierPerformance": "أداء المورّدين",
+  "reportsWindow": "الفترة",
+  "reportsPurchases": "قيمة الشراء",
+  "reportsSales": "قيمة البيع بالتجزئة",
+  "reportsUnpriced": "{count} منتجات بلا سعر",
+  "@reportsUnpriced": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reportsMovements": "الحركات",
+  "reportsReceived": "المستلم",
+  "reportsIssued": "الصادر",
+  "reportsNet": "الصافي",
+  "reportsWarehouses": "حسب المستودع",
+  "reportsExportStockLevels": "تصدير مستويات المخزون CSV",
+  "reportsExportMovements": "تصدير الحركات CSV",
+  "reportsExported": "التصدير جاهز",
+  "reportsNoLowStock": "لا شيء تحت حد إعادة الطلب.",
+  "reportsProducts": "المنتجات",
+  "reportsAvailable": "متاح",
+  "reportsShortfall": "النقص",
+  "reportsOnTime": "نسبة الالتزام بالمواعيد",
+  "reportsAvgLeadTime": "متوسط المدة",
+  "reportsReturnRate": "نسبة المرتجعات",
+  "reportsOrdersCreated": "الأوامر المنشأة",
+  "reportsOrdersReceived": "الأوامر المستلمة",
+  "reportsGeneratedAt": "أُنشئ في {time}",
+  "@reportsGeneratedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "reportsNoData": "لا بيانات في هذه الفترة.",
+  "reportsDays": "{count} يومًا",
+  "@reportsDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reportsSalesValue": "قيمة المبيعات",
+  "reportsPurchaseValue": "قيمة المشتريات",
+  "reportsLowStockTitle": "مخزون منخفض",
+  "teamTitle": "الفريق",
+  "teamMembers": "الأعضاء",
+  "teamInvitations": "الدعوات",
+  "teamInvite": "دعوة",
+  "teamInviteTitle": "دعوة زميل",
+  "teamRole": "الدور",
+  "teamChangeRole": "تغيير الدور",
+  "teamRemove": "إزالة من المؤسسة",
+  "teamRemoveConfirm": "إزالة {email} من هذه المؤسسة؟",
+  "@teamRemoveConfirm": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "teamManagerViewerOnly": "يمكن للمديرين دعوة المشاهدين فقط.",
+  "teamOwnerOnly": "المالكون فقط يديرون أدوار المالك.",
+  "teamNoMembers": "لا أعضاء.",
+  "teamPending": "قيد الانتظار",
+  "teamAccepted": "مقبولة",
+  "teamExpired": "منتهية",
+  "teamRevoked": "ملغاة",
+  "teamRevoke": "إلغاء",
+  "teamInvitesExpire": "تنتهي الدعوات بعد 14 يومًا.",
+  "teamInvitedBy": "دعوة من {name}",
+  "@teamInvitedBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "teamInviteCreated": "أُنشئت الدعوة",
+  "teamRoleChanged": "حُدّث الدور",
+  "teamMemberRemoved": "أُزيل العضو",
+  "teamInvitedEmail": "عنوان البريد الإلكتروني",
+  "teamAcceptInvitation": "قبول",
+  "teamInvitationAccepted": "تم قبول الدعوة",
+  "teamPendingInvitations": "الدعوات المعلّقة",
+  "adminTitle": "الإدارة",
+  "adminOrganizations": "المؤسسات",
+  "adminAudit": "نشاط المشغّلين",
+  "adminNewOrganization": "مؤسسة جديدة",
+  "adminNewOrganizationTitle": "إنشاء مؤسسة",
+  "adminOrgName": "اسم المؤسسة",
+  "adminOrgSlug": "المعرّف المختصر",
+  "adminFirstMemberEmail": "بريد العضو الأول",
+  "adminFirstMemberRole": "دور العضو الأول",
+  "adminCreateOrg": "إنشاء المؤسسة",
+  "adminMembers": "{count} أعضاء",
+  "@adminMembers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "adminPendingInvites": "{count} قيد الانتظار",
+  "@adminPendingInvites": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "adminNoOrgs": "لا مؤسسات.",
+  "adminNoAudit": "لا نشاط للمشغّلين.",
+  "adminAction": "الإجراء",
+  "adminActor": "المشغّل",
+  "adminTarget": "الهدف",
+  "adminOrganizationCreated": "أُنشئت المؤسسة",
+  "adminManageTeam": "إدارة الفريق",
+  "adminIdentityOnly": "تغطي إدارة المنصة سجلات الهوية فقط؛ يبقى مخزون المؤسسات ومبيعاتها خلف العضوية.",
+  "brandingTitle": "الهوية البصرية",
+  "brandingUpload": "رفع الشعار",
+  "brandingReplace": "استبدال الشعار",
+  "brandingRemove": "إزالة الشعار",
+  "brandingRemoveConfirm": "إزالة شعار المؤسسة؟",
+  "brandingLogo": "شعار المؤسسة",
+  "brandingHint": "PNG أو JPEG، حتى 400 كيلوبايت. يظهر الشعار في مساحة العمل وعلى المستندات المُنشأة.",
+  "brandingTooLarge": "يجب ألا يتجاوز حجم الصورة 400 كيلوبايت.",
+  "brandingUploaded": "حُدّث الشعار",
+  "brandingRemoved": "أُزيل الشعار",
+  "brandingUnsupported": "اختر صورة PNG أو JPEG.",
+  "documentsLabels": "الملصقات",
+  "documentsSelectCopies": "النسخ",
+  "documentsLabelHint": "تُطبع الملصقات على ورقة A4. اختر من 1 إلى 20 نسخة لكل بند.",
+  "documentsDownloaded": "المستند جاهز",
+  "documentsShare": "مشاركة",
+  "documentsOpen": "فتح",
+  "documentsNoApp": "لا يوجد تطبيق على هذا الهاتف يمكنه فتح هذا الملف. يمكن مشاركته رغم ذلك.",
+  "moreTitle": "المزيد",
+  "moreOperations": "العمليات",
+  "moreDirectory": "الدلائل",
+  "moreOrganization": "المؤسسة",
+  "moreAccount": "الحساب",
+  "moreWarehouses": "المستودعات",
+  "moreCatalogSettings": "إعدادات الكتالوج",
+  "moreReports": "التقارير",
+  "moreAdmin": "إدارة المنصة",
+  "moreStockCounts": "جرد المخزون",
+  "moreMovements": "حركات المخزون",
+  "moreTransfers": "تحويلات المخزون",
+  "moreReservations": "الحجوزات",
+  "moreReconciliation": "المطابقة",
+  "moreDevices": "الأجهزة",
+  "moreSuppliers": "المورّدون",
+  "moreCustomers": "العملاء",
+  "morePurchaseOrders": "أوامر الشراء",
+  "moreSalesOrders": "أوامر الصرف",
+  "moreBranding": "الهوية البصرية",
+  "moreTeam": "الفريق",
+  "moreLanguage": "اللغة",
+  "moreSignOut": "تسجيل الخروج",
+  "moreNoResults": "لا شاشة تطابق هذا البحث.",
+  "moreSignedInAs": "مسجّل الدخول باسم {email}",
+  "@moreSignedInAs": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "moreInventory": "المخزون",
+  "moreStockLevels": "مستويات المخزون",
+  "moreReturns": "المرتجعات",
+  "errorNetwork": "تعذّر الوصول إلى API. تحقّق من الاتصال وأعد المحاولة.",
+  "errorTimeout": "استغرق الطلب وقتًا طويلًا. أعد المحاولة.",
+  "errorUnauthorized": "جلستك لم تعد صالحة. سجّل الدخول مجددًا.",
+  "errorForbidden": "دورك لا يسمح بهذا الإجراء. يرفضه الخادم.",
+  "errorNotFound": "هذا العنصر غير موجود، أو ينتمي إلى مؤسسة أخرى.",
+  "errorConflict": "تتعارض هذه العملية مع البيانات الحالية. حدّث وأعد المحاولة.",
+  "errorValidation": "تحقّق من الحقول المحددة.",
+  "errorRateLimited": "طلبات كثيرة جدًا. أعد المحاولة بعد {seconds} ثانية.",
+  "@errorRateLimited": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "errorServer": "تعذّر على الخادم إتمام الطلب.",
+  "errorUnknown": "حدث أمر غير متوقع.",
+  "errorRequestId": "مرجع الدعم: {requestId}",
+  "@errorRequestId": {
+    "placeholders": {
+      "requestId": {
+        "type": "String"
+      }
+    }
+  },
+  "errorSessionExpired": "انتهت الجلسة",
+  "errorIdempotency": "أُرسل هذا الطلب سابقًا ببيانات مختلفة. راجعه وأعد المحاولة.",
+  "errorInsufficientStock": "المخزون المتاح لا يكفي لهذه العملية.",
+  "errorServerEnforced": "الخادم هو المرجع في الأذونات والمخزون والإجماليات.",
+  "errorServerMessage": "رسالة الخادم",
+  "errorPermissionDenied": "تم رفض الإذن",
+  "errorCameraRequired": "يلزم إذن الكاميرا للمسح.",
+  "commonLoadMore": "تحميل المزيد",
+  "moreInvoices": "الفواتير",
+  "stockReservationActive": "نشط",
+  "stockReservationReleasedStatus": "مُحرَّر",
+  "stockReservationFulfilled": "منفَّذ",
+  "stockReservationExpiredStatus": "منتهي الصلاحية",
+  "warehousesNew": "مستودع جديد",
+  "warehousesCode": "الرمز",
+  "warehousesCity": "المدينة",
+  "warehousesLocations": "المواقع",
+  "warehousesAddLocation": "إضافة موقع",
+  "warehousesLocationCode": "رمز الموقع",
+  "warehousesLocationName": "اسم الموقع",
+  "warehousesSaved": "تم حفظ المستودع",
+  "catalogNewCategory": "فئة جديدة",
+  "catalogNewBrand": "ماركة جديدة",
+  "stockSameLocation": "اختر موقعين مختلفين",
+  "stockTransferred": "تم نقل المخزون",
+  "languageSystem": "لغة النظام",
+  "languageEnglish": "الإنجليزية",
+  "languageFrench": "الفرنسية",
+  "languageArabic": "العربية",
+  "moreConnection": "اتصال API",
+  "connectionTitle": "اتصال API",
+  "connectionIntro": "يرسل التطبيق كل الطلبات إلى هذا العنوان. يُحفظ على هذا الجهاز فقط، ولا يتغيّر حسابك أو بياناتك.",
+  "connectionApiLabel": "عنوان API",
+  "connectionHint": "https://nexora-web-service.onrender.com/api/v1",
+  "connectionBuiltIn": "العنوان المدمج: {url}",
+  "connectionCustom": "عنوان مخصّص على هذا الجهاز",
+  "connectionNoBuiltIn": "لا يحتوي هذا الإصدار على عنوان مدمج.",
+  "connectionTest": "اختبار",
+  "connectionTesting": "جارٍ الاختبار…",
+  "connectionTestOk": "تم الوصول، استغرق الرد {milliseconds} م.ث.",
+  "connectionTestFailed": "لا يوجد رد: {message}",
+  "connectionInvalid": "أدخل عنوان http(s) مع اسم مضيف، مثل https://nexora-web-service.onrender.com/api/v1.",
+  "connectionSaved": "تم حفظ عنوان API.",
+  "connectionReset": "استخدام العنوان المدمج",
+  "connectionWaking": "قد يستغرق تشغيل خادم Render المجاني حتى دقيقة عند أول طلب.",
+  "errorApiNotConfigured": "لا يوجد عنوان API محدّد. افتح إعدادات اتصال API على هذا الجهاز."
+}

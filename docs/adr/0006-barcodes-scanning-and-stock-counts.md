@@ -48,16 +48,18 @@ check digit is rejected rather than silently repaired.
 
 `GET /organizations/:id/scan?code=` resolves in this order:
 
-1. device serial number (case-insensitive) or IMEI,
-2. product barcode (exact),
-3. SKU (case-insensitive),
-4. internal code (case-insensitive).
+1. individually tracked unit code (case-insensitive) — ADR-0020,
+2. device serial number (case-insensitive) or IMEI,
+3. product barcode (exact),
+4. SKU (case-insensitive),
+5. internal code (case-insensitive).
 
-Devices win over products because a serial is a single physical unit, while a product code
-is a quantity. Everything is scoped by `organization_id`; a code that exists only in another
-tenant returns `404 scan_not_found`. The response is a discriminated union: a device result
-carries the device row, a product result carries the product, its per-location stock lines,
-and totals. All members, including viewers, may scan; only mutations are role-gated.
+Unit and device identities win over products because each names a single physical object,
+while a product code is a quantity. Everything is scoped by `organization_id`; a code that
+exists only in another tenant returns `404 scan_not_found`. The response is a discriminated
+union: a tracked-item result carries the unit, its product and its event history; a device
+result carries the device row; a product result carries the product, its per-location stock
+lines, and totals. All members, including viewers, may scan; only mutations are role-gated.
 
 ### 4. Labels are rendered by the server as a print-ready PDF
 

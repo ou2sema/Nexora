@@ -28,6 +28,7 @@ export const catalog: CatalogMessages = {
   'products.caption': 'Produits de cette organisation',
   'products.noBarcode': 'Aucun code-barres attribué',
   'products.trackingSerialized': 'Sérialisé',
+  'products.trackingIndividually': 'Suivi unitaire',
   'products.column.salePrice': 'Prix de vente',
   'products.column.tracking': 'Suivi',
   'products.column.reorderAt': 'Seuil de réappro.',
@@ -49,6 +50,9 @@ export const catalog: CatalogMessages = {
   'productForm.reorderThreshold': 'Seuil de réapprovisionnement',
   'productForm.serialized': 'Suivre les numéros de série individuels',
   'productForm.serializedHint': 'Les alertes de stock faible utilisent le seuil ; 0 les désactive.',
+  'productForm.individuallyTracked': 'Suivre un code-barres par unité physique',
+  'productForm.individuallyTrackedHint':
+    'Chaque unité reçue obtient son propre code interne permanent et son étiquette. Le numéro de série du fabricant reste facultatif.',
   'productForm.failed': 'Impossible de créer le produit.',
   'productForm.create': 'Créer le produit',
   'productForm.skuRequired': 'Saisissez un SKU',

@@ -5,6 +5,10 @@ covers the code that is already in this repository, the Docker stack that runs
 Prometheus, Alertmanager and Grafana, how to point it at the Render service, and
 what to do when a panel is empty.
 
+For a tool-by-tool reference — what Prometheus, Alertmanager, Grafana and Slack
+each do, their full configuration surface, day-2 operations and per-tool failure
+modes — see [`observability-tools.md`](observability-tools.md).
+
 Prometheus and Grafana are for **service health**: traffic, latency, errors,
 memory, event-loop lag. They are not a sales or stock dashboard — those numbers
 live in the app's reports and in Postgres, and the last section explains when a
@@ -48,6 +52,7 @@ What is already in the repository:
 | `infra/observability/prometheus/*.yml`                | Scrape jobs and alert rules                           |
 | `infra/observability/grafana/**`                      | Provisioned datasource, dashboard provider, dashboard |
 | `infra/observability/secrets/metrics_token.example`   | Placeholder for the scrape token                      |
+| `infra/observability/secrets/slack_webhook.example`   | Placeholder for the Slack webhook URL (§6.1)          |
 | `infra/observability/scripts/record-test-run.sh`      | Posts a test-run annotation to Grafana (§13)          |
 | `infra/observability/scripts/sync-ci-annotations.mjs` | Turns finished CI runs into annotations (§14)         |
 
@@ -328,13 +333,73 @@ Rules live in `infra/observability/prometheus/alerts.yml`:
 | `NexoraMemoryPressure` | RSS > 450 MB (512 MB instance)  | 15 m |
 | `NexoraEventLoopLag`   | p99 lag > 500 ms                | 10 m |
 
-They are visible in Prometheus → Alerts and in Alertmanager. **Nothing is sent
-anywhere yet**: `alertmanager/alertmanager.yml` uses an empty default receiver.
-Add Slack, e-mail or a webhook there, then:
+They are visible in Prometheus → Alerts and in Alertmanager, which delivers them
+to Slack.
+
+### 6.1 Point Alertmanager at Slack
+
+The webhook URL is a credential, so it never enters git or a chat. Alertmanager
+reads it from `infra/observability/secrets/slack_webhook` via `api_url_file`;
+the whole `secrets/` directory is mounted read-only at `/etc/alertmanager-secrets`.
+
+1. In Slack: `https://api.slack.com/apps` → create (or pick) an app →
+   **Incoming Webhooks** → **Add New Webhook to Workspace** → choose a channel →
+   copy the URL (`https://hooks.slack.com/services/...`).
+2. Write it to the file with no trailing newline:
+
+   ```bash
+   cd infra/observability
+   printf '%s' 'https://hooks.slack.com/services/...' > secrets/slack_webhook
+   chmod 600 secrets/slack_webhook
+   ```
+
+   On Windows, if the URL is on the clipboard:
+
+   ```powershell
+   (Get-Clipboard -Raw).Trim() |
+     Set-Content -NoNewline -Encoding ascii infra/observability/secrets/slack_webhook
+   ```
+
+3. Start Alertmanager **after** the file exists — it refuses to start without it:
+
+   ```bash
+   docker compose up -d alertmanager      # first start, or after editing compose
+   docker compose restart alertmanager    # after editing alertmanager.yml only
+   ```
+
+`secrets/slack_webhook.example` documents the path. A Slack app webhook always
+posts to the channel chosen when it was installed — Slack ignores per-message
+channel overrides — so use one webhook per destination channel. Leave `channel:`
+out of `alertmanager.yml`; adding it does not move the message.
+
+### 6.2 Prove delivery
+
+Add an alert by hand and watch the channel:
 
 ```bash
-docker compose restart alertmanager
+docker compose exec alertmanager \
+  amtool check-config /etc/alertmanager/alertmanager.yml
+docker compose exec alertmanager \
+  amtool alert add NexoraTestSend severity=warning environment=local \
+    --annotation=summary='Test alert from Alertmanager' \
+    --alertmanager.url=http://localhost:9093
 ```
+
+It arrives within `group_wait` (30 s). Give the alert an `--end` a minute or two
+ahead (`--end=$(date -u -d '+2 minutes' +%FT%TZ)`) and it fires first, then
+clears; with `send_resolved: true` the green “RESOLVED” message follows on the
+next `group_interval`, so up to five minutes after the firing one. Real alerts
+behave the same way: `group_by` keeps one message per
+alert/environment/severity, `group_interval` appends new alerts to the same
+notification, and `repeat_interval: 4h` re-sends anything still firing.
+
+### 6.3 Where the alert links point
+
+Alertmanager builds the “View in Alertmanager” link in each Slack message from
+`--web.external-url`, wired in compose to `ALERTMANAGER_EXTERNAL_URL` (default
+`http://localhost:9093`). Without it the link is the container hostname
+(`http://<container-id>:9093`), which nothing outside Docker can open. Set the
+variable to the tunnel or public address when the stack runs on a server.
 
 Reload Prometheus after editing rules (the compose file enables the lifecycle
 API):
@@ -354,8 +419,9 @@ the alert's `for` window.
 For an always-on stack, use a small VPS:
 
 1. Install Docker and the Compose plugin.
-2. Copy `infra/observability` to the server (without `secrets/metrics_token`
-   ending up in git).
+2. Copy `infra/observability` to the server, then create `secrets/metrics_token`
+   (same value as Render's `METRICS_TOKEN`) and `secrets/slack_webhook`
+   (§6.1) there. Both are gitignored and must not travel through git.
 3. `docker compose up -d`, then reach the UIs through an SSH tunnel:
 
    ```bash
@@ -364,7 +430,10 @@ For an always-on stack, use a small VPS:
 
 4. Do not publish 3000/9090 on a public interface. If you need public Grafana,
    put Caddy or nginx with HTTPS in front and keep Grafana's own login.
-5. Back up `grafana-data` and `prometheus-data` volumes; the dashboards and rules
+5. Set `ALERTMANAGER_EXTERNAL_URL` in `.env` to the address you use through the
+   tunnel (e.g. `http://localhost:9093`, or the public URL if you expose 9093),
+   so Slack links open the right Alertmanager.
+6. Back up `grafana-data` and `prometheus-data` volumes; the dashboards and rules
    are already in git.
 
 Retention defaults to 15 days (`PROMETHEUS_RETENTION` in `.env`). At Nexora's
@@ -376,6 +445,8 @@ series count that is a few hundred MB. Raise it only with disk headroom.
 
 - `METRICS_TOKEN` is long, random and different from every other secret.
 - The token file is `0600` on the host and gitignored.
+- The Slack webhook URL is `0600`, gitignored and never committed; reinstate it
+  from Slack if the app is removed.
 - Prometheus and Grafana ports stay on loopback (the compose file does this).
 - Grafana admin password is not the default; sign-up and anonymous access are off.
 - The API's scrape token, Supabase keys and database password never appear in a
@@ -398,6 +469,8 @@ series count that is a few hundred MB. Raise it only with disk headroom.
 | Grafana login fails after changing `.env`      | password only applies at first boot           | `docker compose down && docker compose up -d` (keeps the volume; admin password persists after creation) |
 | Port already in use                            | another service on 3001/9090/9093             | change the left side of the port mapping                                                                 |
 | Rules not firing                               | Prometheus not reloaded                       | `curl -X POST localhost:9090/-/reload`                                                                   |
+| No Slack message after an alert fires          | webhook file missing or URL rejected          | `docker compose logs alertmanager`, fix `secrets/slack_webhook`, re-run the §6.2 test alert              |
+| Alertmanager exits on start                    | `secrets/slack_webhook` not created yet       | create it (§6.1), then `docker compose up -d alertmanager`                                               |
 
 ---
 
@@ -457,6 +530,17 @@ series count that is a few hundred MB. Raise it only with disk headroom.
   `#2`, then `sync-ci-annotations.mjs` backfilled seven real runs (21 markers,
   including one `failed`), and both `API test runs` and `E2E test runs` queries
   render on the dashboard.
+- Slack delivery was proven against a real workspace: the `Nexora Alerts` app
+  posts through an incoming webhook to the private `#nexora-alerts` channel.
+  `amtool alert add` produced `FIRING: NexoraTestSend (local)` there within
+  `group_wait`, and the production rule fired on its own the same way
+  (`FIRING: NexoraSlowP95 (production)`). The first two messages linked to the
+  container hostname; after adding `--web.external-url`, a third test message
+  linked to `http://localhost:9093`.
+- The resolved path was proven too: a test alert added with `--end` two minutes
+  ahead produced `FIRING` and then `RESOLVED: NexoraTestLink (local)` on the
+  next `group_interval`, both linking to `http://localhost:9093` — so
+  `send_resolved: true` closes the loop in Slack.
 
 ---
 
