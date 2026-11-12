@@ -1,0 +1,11 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  // Assets-only Worker: the Vite build lands in apps/web/dist and the client
+  // router owns every path, so unknown paths return index.html instead of 404.
+  "name": "nexora",
+  "compatibility_date": "2026-11-12",
+  "assets": {
+    "directory": "./apps/web/dist",
+    "not_found_handling": "single-page-application"
+  }
+}

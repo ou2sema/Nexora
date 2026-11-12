@@ -35,6 +35,9 @@ supabase/.temp/
 supabase/.branches/
 supabase/.env
 
+# wrangler local state
+.wrangler/
+
 # logs & os noise
 *.log
 npm-debug.log*
